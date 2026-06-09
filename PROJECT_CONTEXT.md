@@ -37,7 +37,7 @@ The main app supports:
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
 - Search across title, creator, and notes
-- OMDb lookup for Movies and TV Shows
+- OMDb lookup for Movies, TV Shows, and Anime
 - Per-category counts
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
@@ -50,7 +50,7 @@ The main app supports:
 - Vite 7
 - Tailwind CSS 3
 - lucide-react for icons
-- OMDb API for movie and TV show lookup
+- OMDb API for movie, TV show, and anime lookup
 
 ## Project Structure
 
@@ -137,15 +137,27 @@ The production build was last verified successfully after the initial implementa
 
 ## OMDb Integration
 
-Movies and TV Shows include an OMDb lookup panel in the add/edit form.
+Movies, TV Shows, and Anime include an OMDb lookup panel in the add/edit form.
 
 The lookup:
 
 - Searches OMDb by title with `s`.
 - Restricts results to `type=movie` for Movies and `type=series` for TV Shows.
+- Restricts Anime searches to `type=series` so the Anime category stays focused on shows.
 - Fetches selected result details by IMDb id with `i`.
 - Fills title, creator/director, poster URL, and notes with relevant OMDb metadata.
 - Leaves the user's personal 1-5 star rating separate from OMDb's IMDb score.
+
+## Movie Subtypes
+
+Movies support a lightweight `subtype` field:
+
+- `movie`
+- `anime-movie`
+
+Existing saved movie items without a subtype are normalized to `movie` at load time.
+
+The Movies shelf includes an `All / Movies / Anime` filter. Anime movies stay under Movies, while the Anime category is reserved for anime series.
 
 The local API key is read from:
 
@@ -158,10 +170,13 @@ Because this is a frontend-only app, any Vite environment variable used by the b
 ## UX And Product Notes
 
 - The first screen is the actual tracker app, not a marketing page.
-- The UI is intentionally compact and utility-focused.
-- Category tabs are shown at the top.
+- The app is now oriented around mobile-first web use, with desktop treated as a responsive expansion.
+- Mobile browsing uses compact media rows with poster thumbnails for faster scanning.
+- Mobile category switching uses a fixed bottom navigation bar.
+- Desktop and tablet still show the larger category grid near the top.
 - The active shelf is controlled with a two-option segmented control.
-- The add/edit form is placed in a right-side panel on desktop and below the shelf content on smaller screens.
+- The add/edit form opens as a modal sheet instead of living as a permanent sidebar.
+- A floating add button is available on shelf views.
 - Completed items show ratings; planned items do not.
 - The display label adapts to category intent:
   - Books and Manga use "Want to Read"

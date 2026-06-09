@@ -29,9 +29,16 @@ const statuses = ["Completed", "Want to Watch/Read"];
 const omdbTypesByCategory = {
   movies: "movie",
   tv: "series",
+  anime: "series",
 };
 
 const omdbApiKey = import.meta.env.VITE_OMDB_API_KEY;
+
+const movieSubtypeOptions = [
+  { value: "all", label: "All" },
+  { value: "movie", label: "Movies" },
+  { value: "anime-movie", label: "Anime" },
+];
 
 const completedSortOptions = [
   { value: "title", label: "Title" },
@@ -55,6 +62,7 @@ const defaultItems = [
   {
     id: "movie-1",
     category: "movies",
+    subtype: "movie",
     status: "Completed",
     title: "Arrival",
     creator: "Denis Villeneuve",
@@ -101,6 +109,7 @@ const defaultItems = [
 const emptyDraft = {
   id: "",
   category: "books",
+  subtype: "",
   status: "Completed",
   title: "",
   creator: "",
@@ -112,21 +121,30 @@ const emptyDraft = {
 function getStoredItems() {
   try {
     const stored = window.localStorage.getItem("media-shelf-items");
-    return stored ? JSON.parse(stored) : defaultItems;
+    return normalizeItems(stored ? JSON.parse(stored) : defaultItems);
   } catch {
-    return defaultItems;
+    return normalizeItems(defaultItems);
   }
+}
+
+function normalizeItems(items) {
+  return items.map((item) => ({
+    ...item,
+    subtype: item.category === "movies" ? item.subtype || "movie" : "",
+  }));
 }
 
 function App() {
   const [items, setItems] = useState(getStoredItems);
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
+  const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
   const [query, setQuery] = useState("");
   const [route, setRoute] = useState(() => window.location.pathname);
   const [completedSort, setCompletedSort] = useState("title");
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [editingId, setEditingId] = useState(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [omdbQuery, setOmdbQuery] = useState("");
   const [omdbResults, setOmdbResults] = useState([]);
   const [omdbStatus, setOmdbStatus] = useState("idle");
@@ -134,11 +152,15 @@ function App() {
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const isCompletedRoute = route === "/completed";
-  const canUseOmdb = Boolean(omdbTypesByCategory[draft.category]);
+  const canUseOmdb = Object.hasOwn(omdbTypesByCategory, draft.category);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items
       .filter((item) => item.category === activeCategory && item.status === activeStatus)
+      .filter((item) => {
+        if (activeCategory !== "movies" || activeMovieSubtype === "all") return true;
+        return (item.subtype || "movie") === activeMovieSubtype;
+      })
       .filter((item) => {
         if (!normalizedQuery) return true;
         return [item.title, item.creator, item.notes].some((value) =>
@@ -146,7 +168,7 @@ function App() {
         );
       })
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [activeCategory, activeStatus, items, query]);
+  }, [activeCategory, activeMovieSubtype, activeStatus, items, query]);
 
   const completedItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -186,6 +208,17 @@ function App() {
     }, {});
   }, [items]);
 
+  const movieSubtypeCounts = useMemo(() => {
+    const movieItems = items.filter((item) => item.category === "movies" && item.status === activeStatus);
+    return movieSubtypeOptions.reduce((subtypeCounts, option) => {
+      subtypeCounts[option.value] =
+        option.value === "all"
+          ? movieItems.length
+          : movieItems.filter((item) => (item.subtype || "movie") === option.value).length;
+      return subtypeCounts;
+    }, {});
+  }, [activeStatus, items]);
+
   useEffect(() => {
     window.localStorage.setItem("media-shelf-items", JSON.stringify(items));
   }, [items]);
@@ -203,6 +236,7 @@ function App() {
     setDraft((current) => ({
       ...current,
       category: activeCategory,
+      subtype: activeCategory === "movies" ? current.subtype || "movie" : "",
       status: activeStatus,
       rating: activeStatus === "Completed" ? current.rating || 3 : 0,
     }));
@@ -226,6 +260,7 @@ function App() {
       id: editingId || crypto.randomUUID(),
       title: cleanedTitle,
       creator: draft.creator.trim(),
+      subtype: draft.category === "movies" ? draft.subtype || "movie" : "",
       rating: draft.status === "Completed" ? Number(draft.rating) : 0,
       notes: draft.notes.trim(),
       imageUrl: draft.imageUrl.trim(),
@@ -235,12 +270,14 @@ function App() {
       editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [...current, nextItem],
     );
     resetForm();
+    setIsEditorOpen(false);
   }
 
   function resetForm() {
     setDraft({
       ...emptyDraft,
       category: activeCategory,
+      subtype: activeCategory === "movies" ? "movie" : "",
       status: activeStatus,
       rating: activeStatus === "Completed" ? 3 : 0,
     });
@@ -248,10 +285,28 @@ function App() {
   }
 
   function startEdit(item) {
-    setDraft(item);
+    setDraft(normalizeItems([item])[0]);
     setEditingId(item.id);
     setActiveCategory(item.category);
     setActiveStatus(item.status);
+    setIsEditorOpen(true);
+  }
+
+  function startNewItem() {
+    setDraft({
+      ...emptyDraft,
+      category: activeCategory,
+      subtype: activeCategory === "movies" ? "movie" : "",
+      status: activeStatus,
+      rating: activeStatus === "Completed" ? 3 : 0,
+    });
+    setEditingId(null);
+    setIsEditorOpen(true);
+  }
+
+  function closeEditor() {
+    resetForm();
+    setIsEditorOpen(false);
   }
 
   function deleteItem(id) {
@@ -263,6 +318,8 @@ function App() {
     setDraft((current) => ({
       ...current,
       [field]: value,
+      ...(field === "category" && value === "movies" ? { subtype: current.subtype || "movie" } : {}),
+      ...(field === "category" && value !== "movies" ? { subtype: "" } : {}),
       ...(field === "status" && value !== "Completed" ? { rating: 0 } : {}),
       ...(field === "status" && value === "Completed" ? { rating: current.rating || 3 } : {}),
     }));
@@ -289,9 +346,9 @@ function App() {
       return;
     }
 
-    if (!cleanedQuery || !omdbType) {
+    if (!cleanedQuery || !canUseOmdb) {
       setOmdbStatus("error");
-      setOmdbMessage("Enter a movie or TV show title to search.");
+      setOmdbMessage("Enter a movie, TV show, or anime title to search.");
       return;
     }
 
@@ -303,7 +360,9 @@ function App() {
       const url = new URL("https://www.omdbapi.com/");
       url.searchParams.set("apikey", omdbApiKey);
       url.searchParams.set("s", cleanedQuery);
-      url.searchParams.set("type", omdbType);
+      if (omdbType) {
+        url.searchParams.set("type", omdbType);
+      }
 
       const response = await fetch(url);
       const data = await response.json();
@@ -360,17 +419,17 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee]">
-      <section className="border-b border-stone-300/80 bg-[#fffaf2]">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7f4ee] pb-28 sm:pb-0">
+      <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:px-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">
                 <Library size={18} />
                 Personal library
               </div>
-              <h1 className="mt-3 text-3xl font-semibold text-stone-950 sm:text-4xl">Media Shelf</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+              <h1 className="mt-2 text-2xl font-semibold text-stone-950 sm:mt-3 sm:text-4xl">Media Shelf</h1>
+              <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-stone-600 sm:block">
                 Keep finished favorites and future picks organized across books, movies, shows, anime, and manga.
               </p>
             </div>
@@ -413,7 +472,7 @@ function App() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5">
             {categories.map((entry) => {
               const Icon = entry.icon;
               const isActive = entry.id === activeCategory;
@@ -450,7 +509,7 @@ function App() {
           onBack={() => navigate("/")}
         />
       ) : (
-      <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
+      <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <div className="min-w-0">
           <div className="flex flex-col gap-3 border-b border-stone-300 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -477,50 +536,18 @@ function App() {
             </div>
           </div>
 
+          {activeCategory === "movies" && (
+            <MovieSubtypeFilter
+              activeSubtype={activeMovieSubtype}
+              counts={movieSubtypeCounts}
+              onChange={setActiveMovieSubtype}
+            />
+          )}
+
           {visibleItems.length > 0 ? (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
               {visibleItems.map((item) => (
-                <article key={item.id} className="overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm">
-                  <div className="aspect-[4/5] bg-stone-200">
-                    {item.imageUrl ? (
-                      <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
-                    ) : (
-                      <div className="cover-fallback flex h-full w-full items-end p-4 text-lg font-semibold text-white">
-                        {item.title}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-3 p-4">
-                    <div>
-                      <h3 className="line-clamp-2 text-base font-semibold text-stone-950">{item.title}</h3>
-                      <p className="mt-1 text-sm text-stone-600">{item.creator || "Unknown creator"}</p>
-                    </div>
-
-                    {item.status === "Completed" && <Rating value={item.rating} readOnly />}
-
-                    {item.notes && <p className="line-clamp-3 text-sm leading-6 text-stone-700">{item.notes}</p>}
-
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md border border-stone-300 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-                        onClick={() => startEdit(item)}
-                        type="button"
-                      >
-                        <Edit3 size={16} />
-                        Edit
-                      </button>
-                      <button
-                        className="inline-flex h-9 w-10 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
-                        onClick={() => deleteItem(item.id)}
-                        type="button"
-                        aria-label={`Delete ${item.title}`}
-                        title={`Delete ${item.title}`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </article>
+                <MediaItemCard key={item.id} item={item} onDelete={deleteItem} onEdit={startEdit} />
               ))}
             </div>
           ) : (
@@ -533,137 +560,329 @@ function App() {
             </div>
           )}
         </div>
-
-        <aside className="h-fit rounded-lg border border-stone-300 bg-white p-4 shadow-sm lg:sticky lg:top-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-stone-950">{editingId ? "Edit item" : "Add item"}</h2>
-              <p className="mt-1 text-sm text-stone-600">{category.label} / {activeStatus}</p>
-            </div>
-            {editingId && (
-              <button
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100"
-                onClick={resetForm}
-                type="button"
-                aria-label="Cancel editing"
-                title="Cancel editing"
-              >
-                <X size={17} />
-              </button>
-            )}
-          </div>
-
-          <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
-            {canUseOmdb && (
-              <OmdbLookup
-                categoryLabel={category.label}
-                message={omdbMessage}
-                onApply={applyOmdbResult}
-                onQueryChange={setOmdbQuery}
-                onSearch={searchOmdb}
-                query={omdbQuery}
-                results={omdbResults}
-                status={omdbStatus}
-              />
-            )}
-
-            <Field label="Title">
-              <input
-                className="input"
-                value={draft.title}
-                onChange={(event) => updateDraft("title", event.target.value)}
-                placeholder="The Left Hand of Darkness"
-                required
-              />
-            </Field>
-
-            <Field label={category.creatorLabel}>
-              <input
-                className="input"
-                value={draft.creator}
-                onChange={(event) => updateDraft("creator", event.target.value)}
-                placeholder="Creator or author"
-              />
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Category">
-                <select
-                  className="input"
-                  value={draft.category}
-                  onChange={(event) => {
-                    updateDraft("category", event.target.value);
-                    setActiveCategory(event.target.value);
-                  }}
-                >
-                  {categories.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Shelf">
-                <select
-                  className="input"
-                  value={draft.status}
-                  onChange={(event) => {
-                    updateDraft("status", event.target.value);
-                    setActiveStatus(event.target.value);
-                  }}
-                >
-                  {statuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-
-            {draft.status === "Completed" && (
-              <Field label="Rating">
-                <Rating value={Number(draft.rating)} onChange={(rating) => updateDraft("rating", rating)} />
-              </Field>
-            )}
-
-            <Field label="Image URL">
-              <input
-                className="input"
-                value={draft.imageUrl}
-                onChange={(event) => updateDraft("imageUrl", event.target.value)}
-                placeholder="https://..."
-                type="url"
-              />
-            </Field>
-
-            <Field label="Personal notes">
-              <textarea
-                className="input min-h-28 resize-y py-3"
-                value={draft.notes}
-                onChange={(event) => updateDraft("notes", event.target.value)}
-                placeholder="Why it belongs here"
-              />
-            </Field>
-
-            <button
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100"
-              type="submit"
-            >
-              {editingId ? <Save size={17} /> : <Plus size={17} />}
-              {editingId ? "Save changes" : "Add to shelf"}
-            </button>
-          </form>
-        </aside>
       </section>
       )}
+      {!isCompletedRoute && (
+        <button
+          className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 sm:bottom-6 sm:right-6"
+          onClick={startNewItem}
+          type="button"
+          aria-label="Add item"
+          title="Add item"
+        >
+          <Plus size={24} />
+        </button>
+      )}
+      {isEditorOpen && (
+        <EditorSheet
+          activeStatus={activeStatus}
+          canUseOmdb={canUseOmdb}
+          category={category}
+          draft={draft}
+          editingId={editingId}
+          onClose={closeEditor}
+          onSubmit={handleSubmit}
+          onUpdateDraft={updateDraft}
+          omdbMessage={omdbMessage}
+          omdbQuery={omdbQuery}
+          omdbResults={omdbResults}
+          omdbStatus={omdbStatus}
+          onApplyOmdb={applyOmdbResult}
+          onOmdbQueryChange={setOmdbQuery}
+          onSearchOmdb={searchOmdb}
+          setActiveCategory={setActiveCategory}
+          setActiveStatus={setActiveStatus}
+        />
+      )}
+      <BottomNav
+        activeCategory={activeCategory}
+        counts={counts}
+        isCompletedRoute={isCompletedRoute}
+        onNavigate={navigate}
+        onShowCategory={showCategory}
+      />
     </main>
   );
 }
 
 function cleanOmdbValue(value) {
   return value && value !== "N/A" ? value : "";
+}
+
+function MediaItemCard({ item, onDelete, onEdit }) {
+  const subtypeLabel = item.category === "movies" && item.subtype === "anime-movie" ? "Anime movie" : "";
+
+  return (
+    <article className="grid grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm sm:block">
+      <div className="aspect-[3/4] h-full min-h-28 bg-stone-200 sm:aspect-[4/5] sm:h-auto">
+        {item.imageUrl ? (
+          <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
+        ) : (
+          <div className="cover-fallback flex h-full w-full items-end p-2 text-xs font-semibold text-white sm:p-4 sm:text-lg">
+            {item.title}
+          </div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-col justify-between gap-3 p-3 sm:p-4">
+        <div className="min-w-0">
+          <h3 className="line-clamp-2 text-base font-semibold leading-5 text-stone-950">{item.title}</h3>
+          <p className="mt-1 truncate text-sm text-stone-600">{item.creator || "Unknown creator"}</p>
+          {subtypeLabel && (
+            <span className="mt-2 inline-flex rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+              {subtypeLabel}
+            </span>
+          )}
+          {item.status === "Completed" && <Rating value={item.rating} readOnly />}
+          {item.notes && <p className="mt-2 line-clamp-2 text-sm leading-5 text-stone-700 sm:line-clamp-3">{item.notes}</p>}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-stone-300 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+            onClick={() => onEdit(item)}
+            type="button"
+          >
+            <Edit3 size={16} />
+            Edit
+          </button>
+          <button
+            className="inline-flex h-10 w-11 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
+            onClick={() => onDelete(item.id)}
+            type="button"
+            aria-label={`Delete ${item.title}`}
+            title={`Delete ${item.title}`}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MovieSubtypeFilter({ activeSubtype, counts, onChange }) {
+  return (
+    <div className="mt-4 grid grid-cols-3 rounded-md border border-stone-300 bg-white p-1">
+      {movieSubtypeOptions.map((option) => (
+        <button
+          key={option.value}
+          className={`min-h-10 rounded px-2 text-sm font-medium transition ${
+            activeSubtype === option.value ? "bg-teal-700 text-white" : "text-stone-600 hover:bg-stone-100"
+          }`}
+          onClick={() => onChange(option.value)}
+          type="button"
+        >
+          <span className="block truncate">{option.label}</span>
+          <span className={`block text-xs ${activeSubtype === option.value ? "text-teal-50" : "text-stone-400"}`}>
+            {counts[option.value] || 0}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EditorSheet({
+  activeStatus,
+  canUseOmdb,
+  category,
+  draft,
+  editingId,
+  onApplyOmdb,
+  onClose,
+  onOmdbQueryChange,
+  onSearchOmdb,
+  onSubmit,
+  onUpdateDraft,
+  omdbMessage,
+  omdbQuery,
+  omdbResults,
+  omdbStatus,
+  setActiveCategory,
+  setActiveStatus,
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-300 bg-white p-4 shadow-lift sm:max-w-xl sm:rounded-xl sm:p-5">
+        <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 sm:-mx-5 sm:-mt-5 sm:px-5">
+          <div>
+            <h2 className="text-lg font-semibold text-stone-950">{editingId ? "Edit item" : "Add item"}</h2>
+            <p className="mt-1 text-sm text-stone-600">{category.label} / {activeStatus}</p>
+          </div>
+          <button
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100"
+            onClick={onClose}
+            type="button"
+            aria-label="Close editor"
+            title="Close editor"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form className="mt-5 space-y-4" onSubmit={onSubmit}>
+          {canUseOmdb && (
+            <OmdbLookup
+              categoryLabel={category.label}
+              message={omdbMessage}
+              onApply={onApplyOmdb}
+              onQueryChange={onOmdbQueryChange}
+              onSearch={onSearchOmdb}
+              query={omdbQuery}
+              results={omdbResults}
+              status={omdbStatus}
+            />
+          )}
+
+          <Field label="Title">
+            <input
+              className="input"
+              value={draft.title}
+              onChange={(event) => onUpdateDraft("title", event.target.value)}
+              placeholder="The Left Hand of Darkness"
+              required
+            />
+          </Field>
+
+          <Field label={category.creatorLabel}>
+            <input
+              className="input"
+              value={draft.creator}
+              onChange={(event) => onUpdateDraft("creator", event.target.value)}
+              placeholder="Creator or author"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Category">
+              <select
+                className="input"
+                value={draft.category}
+                onChange={(event) => {
+                  onUpdateDraft("category", event.target.value);
+                  setActiveCategory(event.target.value);
+                }}
+              >
+                {categories.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Shelf">
+              <select
+                className="input"
+                value={draft.status}
+                onChange={(event) => {
+                  onUpdateDraft("status", event.target.value);
+                  setActiveStatus(event.target.value);
+                }}
+              >
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          {draft.category === "movies" && (
+            <Field label="Movie type">
+              <select
+                className="input"
+                value={draft.subtype || "movie"}
+                onChange={(event) => onUpdateDraft("subtype", event.target.value)}
+              >
+                {movieSubtypeOptions
+                  .filter((option) => option.value !== "all")
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label === "Anime" ? "Anime movie" : "Movie"}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
+
+          {draft.status === "Completed" && (
+            <Field label="Rating">
+              <Rating value={Number(draft.rating)} onChange={(rating) => onUpdateDraft("rating", rating)} />
+            </Field>
+          )}
+
+          <Field label="Image URL">
+            <input
+              className="input"
+              value={draft.imageUrl}
+              onChange={(event) => onUpdateDraft("imageUrl", event.target.value)}
+              placeholder="https://..."
+              type="url"
+            />
+          </Field>
+
+          <Field label="Personal notes">
+            <textarea
+              className="input min-h-28 resize-y py-3"
+              value={draft.notes}
+              onChange={(event) => onUpdateDraft("notes", event.target.value)}
+              placeholder="Why it belongs here"
+            />
+          </Field>
+
+          <button
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100"
+            type="submit"
+          >
+            {editingId ? <Save size={17} /> : <Plus size={17} />}
+            {editingId ? "Save changes" : "Add to shelf"}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function BottomNav({ activeCategory, counts, isCompletedRoute, onNavigate, onShowCategory }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-300 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_35px_rgba(31,41,55,0.12)] backdrop-blur sm:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-6 gap-1">
+        {categories.map((entry) => {
+          const Icon = entry.icon;
+          const isActive = !isCompletedRoute && entry.id === activeCategory;
+          return (
+            <button
+              key={entry.id}
+              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition ${
+                isActive ? "bg-teal-700 text-white" : "text-stone-600 hover:bg-stone-100"
+              }`}
+              onClick={() => onShowCategory(entry.id)}
+              type="button"
+            >
+              <Icon size={18} />
+              <span className="max-w-full truncate">{entry.label.replace("TV Shows", "TV")}</span>
+              <span className={`text-[10px] ${isActive ? "text-teal-50" : "text-stone-400"}`}>
+                {counts[entry.id]?.Completed || 0}
+              </span>
+            </button>
+          );
+        })}
+        <button
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition ${
+            isCompletedRoute ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+          }`}
+          onClick={() => onNavigate("/completed")}
+          type="button"
+        >
+          <CheckCircle2 size={18} />
+          <span>Done</span>
+          <span className={`text-[10px] ${isCompletedRoute ? "text-stone-200" : "text-stone-400"}`}>All</span>
+        </button>
+      </div>
+    </nav>
+  );
 }
 
 function buildOmdbNotes(detail) {

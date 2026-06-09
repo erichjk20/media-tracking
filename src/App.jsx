@@ -26,6 +26,13 @@ const categories = [
 
 const statuses = ["Completed", "Want to Watch/Read"];
 
+const omdbTypesByCategory = {
+  movies: "movie",
+  tv: "series",
+};
+
+const omdbApiKey = import.meta.env.VITE_OMDB_API_KEY;
+
 const completedSortOptions = [
   { value: "title", label: "Title" },
   { value: "creator", label: "Author" },
@@ -120,9 +127,14 @@ function App() {
   const [completedSort, setCompletedSort] = useState("title");
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [editingId, setEditingId] = useState(null);
+  const [omdbQuery, setOmdbQuery] = useState("");
+  const [omdbResults, setOmdbResults] = useState([]);
+  const [omdbStatus, setOmdbStatus] = useState("idle");
+  const [omdbMessage, setOmdbMessage] = useState("");
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const isCompletedRoute = route === "/completed";
+  const canUseOmdb = Boolean(omdbTypesByCategory[draft.category]);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items
@@ -197,6 +209,13 @@ function App() {
     setEditingId(null);
   }, [activeCategory, activeStatus]);
 
+  useEffect(() => {
+    setOmdbQuery("");
+    setOmdbResults([]);
+    setOmdbStatus("idle");
+    setOmdbMessage("");
+  }, [draft.category]);
+
   function handleSubmit(event) {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
@@ -257,6 +276,87 @@ function App() {
   function showCategory(categoryId) {
     setActiveCategory(categoryId);
     if (isCompletedRoute) navigate("/");
+  }
+
+  async function searchOmdb(event) {
+    event?.preventDefault();
+    const cleanedQuery = omdbQuery.trim();
+    const omdbType = omdbTypesByCategory[draft.category];
+
+    if (!omdbApiKey) {
+      setOmdbStatus("error");
+      setOmdbMessage("Add VITE_OMDB_API_KEY to your environment to use OMDb lookup.");
+      return;
+    }
+
+    if (!cleanedQuery || !omdbType) {
+      setOmdbStatus("error");
+      setOmdbMessage("Enter a movie or TV show title to search.");
+      return;
+    }
+
+    setOmdbStatus("loading");
+    setOmdbMessage("");
+    setOmdbResults([]);
+
+    try {
+      const url = new URL("https://www.omdbapi.com/");
+      url.searchParams.set("apikey", omdbApiKey);
+      url.searchParams.set("s", cleanedQuery);
+      url.searchParams.set("type", omdbType);
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.Response === "False") {
+        setOmdbStatus("error");
+        setOmdbMessage(data.Error || "No matching OMDb results found.");
+        return;
+      }
+
+      setOmdbResults((data.Search || []).slice(0, 5));
+      setOmdbStatus("success");
+    } catch {
+      setOmdbStatus("error");
+      setOmdbMessage("OMDb lookup failed. Check your connection and try again.");
+    }
+  }
+
+  async function applyOmdbResult(result) {
+    setOmdbStatus("loading");
+    setOmdbMessage("");
+
+    try {
+      const url = new URL("https://www.omdbapi.com/");
+      url.searchParams.set("apikey", omdbApiKey);
+      url.searchParams.set("i", result.imdbID);
+      url.searchParams.set("plot", "short");
+
+      const response = await fetch(url);
+      const detail = await response.json();
+
+      if (detail.Response === "False") {
+        setOmdbStatus("error");
+        setOmdbMessage(detail.Error || "Could not load OMDb details.");
+        return;
+      }
+
+      const creator = draft.category === "movies" ? detail.Director : detail.Writer || detail.Director;
+      const notes = buildOmdbNotes(detail);
+
+      setDraft((current) => ({
+        ...current,
+        title: cleanOmdbValue(detail.Title) || result.Title || current.title,
+        creator: cleanOmdbValue(creator) || current.creator,
+        imageUrl: cleanOmdbValue(detail.Poster) || cleanOmdbValue(result.Poster) || current.imageUrl,
+        notes: notes || current.notes,
+      }));
+      setOmdbStatus("success");
+      setOmdbMessage("Details added from OMDb. You can edit anything before saving.");
+    } catch {
+      setOmdbStatus("error");
+      setOmdbMessage("Could not apply that OMDb result.");
+    }
   }
 
   return (
@@ -454,6 +554,19 @@ function App() {
           </div>
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+            {canUseOmdb && (
+              <OmdbLookup
+                categoryLabel={category.label}
+                message={omdbMessage}
+                onApply={applyOmdbResult}
+                onQueryChange={setOmdbQuery}
+                onSearch={searchOmdb}
+                query={omdbQuery}
+                results={omdbResults}
+                status={omdbStatus}
+              />
+            )}
+
             <Field label="Title">
               <input
                 className="input"
@@ -546,6 +659,91 @@ function App() {
       </section>
       )}
     </main>
+  );
+}
+
+function cleanOmdbValue(value) {
+  return value && value !== "N/A" ? value : "";
+}
+
+function buildOmdbNotes(detail) {
+  const lines = [
+    ["Year", detail.Year],
+    ["Genre", detail.Genre],
+    ["Runtime", detail.Runtime],
+    ["Rated", detail.Rated],
+    ["IMDb", detail.imdbRating && detail.imdbRating !== "N/A" ? `${detail.imdbRating}/10` : ""],
+    ["Plot", detail.Plot],
+  ]
+    .map(([label, value]) => [label, cleanOmdbValue(value)])
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`);
+
+  return lines.join("\n");
+}
+
+function OmdbLookup({ categoryLabel, message, onApply, onQueryChange, onSearch, query, results, status }) {
+  return (
+    <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3">
+      <div className="flex gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="mb-2 block text-sm font-medium text-stone-700">OMDb lookup</span>
+          <input
+            className="input bg-white"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                onSearch(event);
+              }
+            }}
+            placeholder={`Search ${categoryLabel.toLowerCase()}`}
+          />
+        </label>
+        <button
+          className="mt-7 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          disabled={status === "loading"}
+          onClick={onSearch}
+          type="button"
+          aria-label="Search OMDb"
+          title="Search OMDb"
+        >
+          <Search size={17} />
+        </button>
+      </div>
+
+      {message && (
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-teal-800"}`}>
+          {message}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {results.map((result) => (
+            <li key={result.imdbID}>
+              <button
+                className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-teal-500"
+                onClick={() => onApply(result)}
+                type="button"
+              >
+                {result.Poster && result.Poster !== "N/A" ? (
+                  <img className="h-14 w-10 rounded object-cover" src={result.Poster} alt={`${result.Title} poster`} />
+                ) : (
+                  <div className="cover-fallback h-14 w-10 rounded" />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-stone-950">{result.Title}</span>
+                  <span className="mt-1 block text-xs text-stone-600">
+                    {result.Year} / {result.Type}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

@@ -37,6 +37,7 @@ The main app supports:
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
 - Search across title, creator, and notes
+- OMDb lookup for Movies and TV Shows
 - Per-category counts
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
@@ -49,6 +50,7 @@ The main app supports:
 - Vite 7
 - Tailwind CSS 3
 - lucide-react for icons
+- OMDb API for movie and TV show lookup
 
 ## Project Structure
 
@@ -102,6 +104,15 @@ Both are ignored by Git.
   - `npm run build`
   - `npm run preview`
 
+`.env.local`
+
+- Stores `VITE_OMDB_API_KEY` for local development.
+- This file is ignored by Git.
+
+`.env.example`
+
+- Documents the required OMDb environment variable shape.
+
 ## Setup And Verification
 
 Install dependencies:
@@ -123,6 +134,26 @@ npm run build
 ```
 
 The production build was last verified successfully after the initial implementation.
+
+## OMDb Integration
+
+Movies and TV Shows include an OMDb lookup panel in the add/edit form.
+
+The lookup:
+
+- Searches OMDb by title with `s`.
+- Restricts results to `type=movie` for Movies and `type=series` for TV Shows.
+- Fetches selected result details by IMDb id with `i`.
+- Fills title, creator/director, poster URL, and notes with relevant OMDb metadata.
+- Leaves the user's personal 1-5 star rating separate from OMDb's IMDb score.
+
+The local API key is read from:
+
+```text
+VITE_OMDB_API_KEY
+```
+
+Because this is a frontend-only app, any Vite environment variable used by the browser is included in the built client bundle. Treat the current setup as appropriate for a personal/local app, not a private production secret.
 
 ## UX And Product Notes
 

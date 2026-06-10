@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
-  ArrowUpDown,
   BookOpen,
-  CheckCircle2,
   Clapperboard,
   Edit3,
   Library,
@@ -26,6 +23,11 @@ const categories = [
 
 const statuses = ["Completed", "Want to Watch/Read"];
 
+const statusLabels = {
+  Completed: "Done",
+  "Want to Watch/Read": "Want",
+};
+
 const omdbTypesByCategory = {
   movies: "movie",
   tv: "series",
@@ -33,18 +35,20 @@ const omdbTypesByCategory = {
 };
 
 const omdbApiKey = import.meta.env.VITE_OMDB_API_KEY;
+const tmdbApiKey = import.meta.env.VITE_TMDB_API_KEY;
+const tmdbAccessToken = import.meta.env.VITE_TMDB_ACCESS_TOKEN;
 
 const movieSubtypeOptions = [
   { value: "all", label: "All" },
   { value: "movie", label: "Movies" },
   { value: "anime-movie", label: "Anime" },
+  { value: "korean-movie", label: "Korean" },
 ];
 
-const completedSortOptions = [
-  { value: "title", label: "Title" },
-  { value: "creator", label: "Author" },
-  { value: "category", label: "Category" },
-  { value: "rating", label: "Rating" },
+const tvSubtypeOptions = [
+  { value: "all", label: "All" },
+  { value: "tv", label: "TV" },
+  { value: "kdrama", label: "K-Drama" },
 ];
 
 const defaultItems = [
@@ -130,7 +134,12 @@ function getStoredItems() {
 function normalizeItems(items) {
   return items.map((item) => ({
     ...item,
-    subtype: item.category === "movies" ? item.subtype || "movie" : "",
+    subtype:
+      item.category === "movies"
+        ? item.subtype || "movie"
+        : item.category === "tv"
+          ? item.subtype || "tv"
+          : "",
   }));
 }
 
@@ -139,9 +148,8 @@ function App() {
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
   const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
+  const [activeTvSubtype, setActiveTvSubtype] = useState("all");
   const [query, setQuery] = useState("");
-  const [route, setRoute] = useState(() => window.location.pathname);
-  const [completedSort, setCompletedSort] = useState("title");
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [editingId, setEditingId] = useState(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -149,10 +157,15 @@ function App() {
   const [omdbResults, setOmdbResults] = useState([]);
   const [omdbStatus, setOmdbStatus] = useState("idle");
   const [omdbMessage, setOmdbMessage] = useState("");
+  const [tmdbQuery, setTmdbQuery] = useState("");
+  const [tmdbLanguage, setTmdbLanguage] = useState("en-US");
+  const [tmdbResults, setTmdbResults] = useState([]);
+  const [tmdbStatus, setTmdbStatus] = useState("idle");
+  const [tmdbMessage, setTmdbMessage] = useState("");
 
   const category = categories.find((entry) => entry.id === activeCategory);
-  const isCompletedRoute = route === "/completed";
   const canUseOmdb = Object.hasOwn(omdbTypesByCategory, draft.category);
+  const canUseTmdb = draft.category === "movies" || draft.category === "tv";
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items
@@ -162,39 +175,17 @@ function App() {
         return (item.subtype || "movie") === activeMovieSubtype;
       })
       .filter((item) => {
+        if (activeCategory !== "tv" || activeTvSubtype === "all") return true;
+        return (item.subtype || "tv") === activeTvSubtype;
+      })
+      .filter((item) => {
         if (!normalizedQuery) return true;
         return [item.title, item.creator, item.notes].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
       })
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [activeCategory, activeMovieSubtype, activeStatus, items, query]);
-
-  const completedItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const getCategoryLabel = (item) => categories.find((entry) => entry.id === item.category)?.label || item.category;
-
-    return items
-      .filter((item) => item.status === "Completed")
-      .filter((item) => {
-        if (!normalizedQuery) return true;
-        return [item.title, item.creator, getCategoryLabel(item)].some((value) =>
-          value.toLowerCase().includes(normalizedQuery),
-        );
-      })
-      .sort((a, b) => {
-        if (completedSort === "creator") {
-          return (a.creator || "").localeCompare(b.creator || "") || a.title.localeCompare(b.title);
-        }
-        if (completedSort === "category") {
-          return getCategoryLabel(a).localeCompare(getCategoryLabel(b)) || a.title.localeCompare(b.title);
-        }
-        if (completedSort === "rating") {
-          return Number(b.rating) - Number(a.rating) || a.title.localeCompare(b.title);
-        }
-        return a.title.localeCompare(b.title);
-      });
-  }, [completedSort, items, query]);
+  }, [activeCategory, activeMovieSubtype, activeStatus, activeTvSubtype, items, query]);
 
   const counts = useMemo(() => {
     return categories.reduce((categoryCounts, currentCategory) => {
@@ -219,24 +210,29 @@ function App() {
     }, {});
   }, [activeStatus, items]);
 
+  const tvSubtypeCounts = useMemo(() => {
+    const tvItems = items.filter((item) => item.category === "tv" && item.status === activeStatus);
+    return tvSubtypeOptions.reduce((subtypeCounts, option) => {
+      subtypeCounts[option.value] =
+        option.value === "all" ? tvItems.length : tvItems.filter((item) => (item.subtype || "tv") === option.value).length;
+      return subtypeCounts;
+    }, {});
+  }, [activeStatus, items]);
+
   useEffect(() => {
     window.localStorage.setItem("media-shelf-items", JSON.stringify(items));
   }, [items]);
 
   useEffect(() => {
-    function handlePopState() {
-      setRoute(window.location.pathname);
-    }
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  useEffect(() => {
     setDraft((current) => ({
       ...current,
       category: activeCategory,
-      subtype: activeCategory === "movies" ? current.subtype || "movie" : "",
+      subtype:
+        activeCategory === "movies"
+          ? current.subtype || "movie"
+          : activeCategory === "tv"
+            ? current.subtype || "tv"
+            : "",
       status: activeStatus,
       rating: activeStatus === "Completed" ? current.rating || 3 : 0,
     }));
@@ -248,6 +244,10 @@ function App() {
     setOmdbResults([]);
     setOmdbStatus("idle");
     setOmdbMessage("");
+    setTmdbQuery("");
+    setTmdbResults([]);
+    setTmdbStatus("idle");
+    setTmdbMessage("");
   }, [draft.category]);
 
   function handleSubmit(event) {
@@ -260,7 +260,12 @@ function App() {
       id: editingId || crypto.randomUUID(),
       title: cleanedTitle,
       creator: draft.creator.trim(),
-      subtype: draft.category === "movies" ? draft.subtype || "movie" : "",
+      subtype:
+        draft.category === "movies"
+          ? draft.subtype || "movie"
+          : draft.category === "tv"
+            ? draft.subtype || "tv"
+            : "",
       rating: draft.status === "Completed" ? Number(draft.rating) : 0,
       notes: draft.notes.trim(),
       imageUrl: draft.imageUrl.trim(),
@@ -277,7 +282,7 @@ function App() {
     setDraft({
       ...emptyDraft,
       category: activeCategory,
-      subtype: activeCategory === "movies" ? "movie" : "",
+      subtype: activeCategory === "movies" ? "movie" : activeCategory === "tv" ? "tv" : "",
       status: activeStatus,
       rating: activeStatus === "Completed" ? 3 : 0,
     });
@@ -296,7 +301,7 @@ function App() {
     setDraft({
       ...emptyDraft,
       category: activeCategory,
-      subtype: activeCategory === "movies" ? "movie" : "",
+      subtype: activeCategory === "movies" ? "movie" : activeCategory === "tv" ? "tv" : "",
       status: activeStatus,
       rating: activeStatus === "Completed" ? 3 : 0,
     });
@@ -319,20 +324,15 @@ function App() {
       ...current,
       [field]: value,
       ...(field === "category" && value === "movies" ? { subtype: current.subtype || "movie" } : {}),
-      ...(field === "category" && value !== "movies" ? { subtype: "" } : {}),
+      ...(field === "category" && value === "tv" ? { subtype: current.subtype || "tv" } : {}),
+      ...(field === "category" && value !== "movies" && value !== "tv" ? { subtype: "" } : {}),
       ...(field === "status" && value !== "Completed" ? { rating: 0 } : {}),
       ...(field === "status" && value === "Completed" ? { rating: current.rating || 3 } : {}),
     }));
   }
 
-  function navigate(path) {
-    window.history.pushState({}, "", path);
-    setRoute(path);
-  }
-
   function showCategory(categoryId) {
     setActiveCategory(categoryId);
-    if (isCompletedRoute) navigate("/");
   }
 
   async function searchOmdb(event) {
@@ -418,23 +418,125 @@ function App() {
     }
   }
 
+  async function searchTmdb(event) {
+    event?.preventDefault();
+    const cleanedQuery = tmdbQuery.trim();
+    const mediaType = draft.category === "movies" ? "movie" : draft.category === "tv" ? "tv" : "";
+
+    if (!tmdbAccessToken && !tmdbApiKey) {
+      setTmdbStatus("error");
+      setTmdbMessage("Add VITE_TMDB_ACCESS_TOKEN or VITE_TMDB_API_KEY to use Korean media lookup.");
+      return;
+    }
+
+    if (!cleanedQuery || !mediaType) {
+      setTmdbStatus("error");
+      setTmdbMessage("Enter an English or Korean title to search.");
+      return;
+    }
+
+    setTmdbStatus("loading");
+    setTmdbMessage("");
+    setTmdbResults([]);
+
+    try {
+      const url = new URL(`https://api.themoviedb.org/3/search/${mediaType}`);
+      applyTmdbAuth(url);
+      url.searchParams.set("query", cleanedQuery);
+      url.searchParams.set("language", tmdbLanguage);
+      url.searchParams.set("include_adult", "false");
+      url.searchParams.set("page", "1");
+      if (mediaType === "movie") {
+        url.searchParams.set("region", "KR");
+      }
+
+      const response = await fetch(url, getTmdbRequestOptions());
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.status_message || "TMDb lookup failed.");
+      }
+
+      const results = (data.results || [])
+        .filter((result) => result.poster_path || result.title || result.name || result.original_title || result.original_name)
+        .slice(0, 8)
+        .map((result) => normalizeTmdbResult(result, mediaType));
+
+      if (!results.length) {
+        setTmdbStatus("error");
+        setTmdbMessage("No TMDb results found.");
+        return;
+      }
+
+      setTmdbResults(results);
+      setTmdbStatus("success");
+    } catch (error) {
+      setTmdbStatus("error");
+      setTmdbMessage(error.message || "TMDb lookup failed. Check your key and try again.");
+    }
+  }
+
+  async function applyTmdbResult(result) {
+    setTmdbStatus("loading");
+    setTmdbMessage("");
+
+    try {
+      const url = new URL(`https://api.themoviedb.org/3/${result.mediaType}/${result.id}`);
+      applyTmdbAuth(url);
+      url.searchParams.set("language", tmdbLanguage);
+      url.searchParams.set("append_to_response", "credits");
+
+      const response = await fetch(url, getTmdbRequestOptions());
+      const detail = await response.json();
+
+      if (!response.ok) {
+        throw new Error(detail.status_message || "Could not load TMDb details.");
+      }
+
+      const isKorean = getTmdbCountries(detail, result.mediaType).includes("KR");
+      const title = cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
+      const originalTitle = cleanTmdbValue(result.originalTitle) || cleanTmdbValue(detail.original_title || detail.original_name);
+      const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvCreator(detail);
+      const notes = buildTmdbNotes(detail, result.mediaType, originalTitle);
+
+      setDraft((current) => ({
+        ...current,
+        category: result.mediaType === "movie" ? "movies" : "tv",
+        subtype:
+          result.mediaType === "movie"
+            ? isKorean
+              ? "korean-movie"
+              : current.subtype || "movie"
+            : isKorean
+              ? "kdrama"
+              : current.subtype || "tv",
+        title: title || current.title,
+        creator: creator || current.creator,
+        imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath) || current.imageUrl,
+        notes: notes || current.notes,
+      }));
+      setTmdbStatus("success");
+      setTmdbMessage(isKorean ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
+    } catch (error) {
+      setTmdbStatus("error");
+      setTmdbMessage(error.message || "Could not apply that TMDb result.");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f7f4ee] pb-28 sm:pb-0">
-      <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:px-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
+      <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur sm:static sm:bg-[#fffaf2]">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
               <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">
                 <Library size={18} />
                 Personal library
               </div>
-              <h1 className="mt-2 text-2xl font-semibold text-stone-950 sm:mt-3 sm:text-4xl">Media Shelf</h1>
-              <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-stone-600 sm:block">
-                Keep finished favorites and future picks organized across books, movies, shows, anime, and manga.
-              </p>
+              <h1 className="mt-1 text-2xl font-semibold text-stone-950 sm:text-3xl">Media Shelf</h1>
             </div>
 
-            <label className="relative w-full max-w-sm">
+            <label className="relative w-full lg:max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
               <input
                 className="h-11 w-full rounded-md border border-stone-300 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
@@ -443,33 +545,6 @@ function App() {
                 placeholder="Search your shelf"
               />
             </label>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-semibold transition ${
-                !isCompletedRoute
-                  ? "border-stone-950 bg-stone-950 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
-              }`}
-              onClick={() => navigate("/")}
-              type="button"
-            >
-              <Library size={17} />
-              Shelf
-            </button>
-            <button
-              className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-semibold transition ${
-                isCompletedRoute
-                  ? "border-teal-700 bg-teal-700 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
-              }`}
-              onClick={() => navigate("/completed")}
-              type="button"
-            >
-              <CheckCircle2 size={17} />
-              All completed
-            </button>
           </div>
 
           <div className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5">
@@ -501,14 +576,6 @@ function App() {
         </div>
       </section>
 
-      {isCompletedRoute ? (
-        <CompletedRoute
-          completedItems={completedItems}
-          completedSort={completedSort}
-          onSortChange={setCompletedSort}
-          onBack={() => navigate("/")}
-        />
-      ) : (
       <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <div className="min-w-0">
           <div className="flex flex-col gap-3 border-b border-stone-300 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -520,27 +587,40 @@ function App() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-white p-1">
+            <div className="grid w-full grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-64">
               {statuses.map((status) => (
                 <button
                   key={status}
-                  className={`min-h-9 rounded px-3 text-sm font-medium transition ${
+                  className={`min-h-8 rounded px-2 text-xs font-semibold transition ${
                     activeStatus === status ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
                   }`}
                   onClick={() => setActiveStatus(status)}
                   type="button"
                 >
-                  {status === "Completed" ? "Completed" : `Want to ${category.action}`}
+                  <span>{statusLabels[status]}</span>
+                  <span className={`ml-1 ${activeStatus === status ? "text-stone-300" : "text-stone-400"}`}>
+                    {counts[activeCategory]?.[status] || 0}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
           {activeCategory === "movies" && (
-            <MovieSubtypeFilter
+            <SubtypeFilter
               activeSubtype={activeMovieSubtype}
               counts={movieSubtypeCounts}
               onChange={setActiveMovieSubtype}
+              options={movieSubtypeOptions}
+            />
+          )}
+
+          {activeCategory === "tv" && (
+            <SubtypeFilter
+              activeSubtype={activeTvSubtype}
+              counts={tvSubtypeCounts}
+              onChange={setActiveTvSubtype}
+              options={tvSubtypeOptions}
             />
           )}
 
@@ -561,22 +641,20 @@ function App() {
           )}
         </div>
       </section>
-      )}
-      {!isCompletedRoute && (
-        <button
-          className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 sm:bottom-6 sm:right-6"
-          onClick={startNewItem}
-          type="button"
-          aria-label="Add item"
-          title="Add item"
-        >
-          <Plus size={24} />
-        </button>
-      )}
+      <button
+        className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 sm:bottom-6 sm:right-6"
+        onClick={startNewItem}
+        type="button"
+        aria-label="Add item"
+        title="Add item"
+      >
+        <Plus size={24} />
+      </button>
       {isEditorOpen && (
         <EditorSheet
           activeStatus={activeStatus}
           canUseOmdb={canUseOmdb}
+          canUseTmdb={canUseTmdb}
           category={category}
           draft={draft}
           editingId={editingId}
@@ -588,17 +666,24 @@ function App() {
           omdbResults={omdbResults}
           omdbStatus={omdbStatus}
           onApplyOmdb={applyOmdbResult}
+          onApplyTmdb={applyTmdbResult}
           onOmdbQueryChange={setOmdbQuery}
           onSearchOmdb={searchOmdb}
+          onSearchTmdb={searchTmdb}
+          onTmdbLanguageChange={setTmdbLanguage}
+          onTmdbQueryChange={setTmdbQuery}
           setActiveCategory={setActiveCategory}
           setActiveStatus={setActiveStatus}
+          tmdbLanguage={tmdbLanguage}
+          tmdbMessage={tmdbMessage}
+          tmdbQuery={tmdbQuery}
+          tmdbResults={tmdbResults}
+          tmdbStatus={tmdbStatus}
         />
       )}
       <BottomNav
         activeCategory={activeCategory}
         counts={counts}
-        isCompletedRoute={isCompletedRoute}
-        onNavigate={navigate}
         onShowCategory={showCategory}
       />
     </main>
@@ -609,12 +694,102 @@ function cleanOmdbValue(value) {
   return value && value !== "N/A" ? value : "";
 }
 
+function cleanTmdbValue(value) {
+  return value || "";
+}
+
+function applyTmdbAuth(url) {
+  if (!tmdbAccessToken && tmdbApiKey) {
+    url.searchParams.set("api_key", tmdbApiKey);
+  }
+}
+
+function getTmdbRequestOptions() {
+  if (!tmdbAccessToken) return {};
+  return {
+    headers: {
+      Authorization: `Bearer ${tmdbAccessToken}`,
+    },
+  };
+}
+
+function normalizeTmdbResult(result, mediaType) {
+  return {
+    id: result.id,
+    mediaType,
+    title: mediaType === "movie" ? result.title : result.name,
+    originalTitle: mediaType === "movie" ? result.original_title : result.original_name,
+    posterPath: result.poster_path,
+    releaseDate: mediaType === "movie" ? result.release_date : result.first_air_date,
+    overview: result.overview,
+    voteAverage: result.vote_average,
+  };
+}
+
+function getTmdbImageUrl(path) {
+  return path ? `https://image.tmdb.org/t/p/w500${path}` : "";
+}
+
+function getTmdbCountries(detail, mediaType) {
+  if (mediaType === "movie") {
+    return (detail.production_countries || []).map((country) => country.iso_3166_1);
+  }
+  return detail.origin_country || [];
+}
+
+function getTmdbDirector(detail) {
+  const director = detail.credits?.crew?.find((person) => person.job === "Director");
+  return director?.name || "";
+}
+
+function getTmdbTvCreator(detail) {
+  const creators = detail.created_by?.map((person) => person.name).filter(Boolean) || [];
+  if (creators.length) return creators.join(", ");
+  return detail.networks?.map((network) => network.name).filter(Boolean).join(", ") || "";
+}
+
+function buildTmdbNotes(detail, mediaType, originalTitle) {
+  const countries = getTmdbCountries(detail, mediaType).join(", ");
+  const releaseDate = mediaType === "movie" ? detail.release_date : detail.first_air_date;
+  const runtime =
+    mediaType === "movie"
+      ? detail.runtime
+        ? `${detail.runtime} min`
+        : ""
+      : detail.number_of_seasons
+        ? `${detail.number_of_seasons} season${detail.number_of_seasons === 1 ? "" : "s"}`
+        : "";
+  const genres = detail.genres?.map((genre) => genre.name).join(", ");
+  const tmdbRating = detail.vote_average ? `${detail.vote_average.toFixed(1)}/10` : "";
+
+  return [
+    ["Original title", originalTitle],
+    ["Year", releaseDate ? releaseDate.slice(0, 4) : ""],
+    ["Country", countries],
+    ["Genre", genres],
+    ["Runtime", runtime],
+    ["TMDb", tmdbRating],
+    ["Overview", detail.overview],
+  ]
+    .map(([label, value]) => [label, cleanTmdbValue(value)])
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join("\n");
+}
+
+function getSubtypeLabel(item) {
+  if (item.category === "movies" && item.subtype === "anime-movie") return "Anime movie";
+  if (item.category === "movies" && item.subtype === "korean-movie") return "Korean movie";
+  if (item.category === "tv" && item.subtype === "kdrama") return "K-Drama";
+  return "";
+}
+
 function MediaItemCard({ item, onDelete, onEdit }) {
-  const subtypeLabel = item.category === "movies" && item.subtype === "anime-movie" ? "Anime movie" : "";
+  const subtypeLabel = getSubtypeLabel(item);
 
   return (
-    <article className="grid grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm sm:block">
-      <div className="aspect-[3/4] h-full min-h-28 bg-stone-200 sm:aspect-[4/5] sm:h-auto">
+    <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm sm:block">
+      <div className="h-28 w-[76px] overflow-hidden bg-stone-200 sm:aspect-[4/5] sm:h-auto sm:w-full">
         {item.imageUrl ? (
           <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
         ) : (
@@ -625,7 +800,7 @@ function MediaItemCard({ item, onDelete, onEdit }) {
       </div>
       <div className="flex min-w-0 flex-col justify-between gap-3 p-3 sm:p-4">
         <div className="min-w-0">
-          <h3 className="line-clamp-2 text-base font-semibold leading-5 text-stone-950">{item.title}</h3>
+          <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950">{item.title}</h3>
           <p className="mt-1 truncate text-sm text-stone-600">{item.creator || "Unknown creator"}</p>
           {subtypeLabel && (
             <span className="mt-2 inline-flex rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
@@ -660,10 +835,10 @@ function MediaItemCard({ item, onDelete, onEdit }) {
   );
 }
 
-function MovieSubtypeFilter({ activeSubtype, counts, onChange }) {
+function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
   return (
-    <div className="mt-4 grid grid-cols-3 rounded-md border border-stone-300 bg-white p-1">
-      {movieSubtypeOptions.map((option) => (
+    <div className={`mt-4 grid rounded-md border border-stone-300 bg-white p-1 ${options.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+      {options.map((option) => (
         <button
           key={option.value}
           className={`min-h-10 rounded px-2 text-sm font-medium transition ${
@@ -685,14 +860,19 @@ function MovieSubtypeFilter({ activeSubtype, counts, onChange }) {
 function EditorSheet({
   activeStatus,
   canUseOmdb,
+  canUseTmdb,
   category,
   draft,
   editingId,
   onApplyOmdb,
+  onApplyTmdb,
   onClose,
   onOmdbQueryChange,
   onSearchOmdb,
+  onSearchTmdb,
   onSubmit,
+  onTmdbLanguageChange,
+  onTmdbQueryChange,
   onUpdateDraft,
   omdbMessage,
   omdbQuery,
@@ -700,6 +880,11 @@ function EditorSheet({
   omdbStatus,
   setActiveCategory,
   setActiveStatus,
+  tmdbLanguage,
+  tmdbMessage,
+  tmdbQuery,
+  tmdbResults,
+  tmdbStatus,
 }) {
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 sm:items-center sm:justify-center">
@@ -721,6 +906,21 @@ function EditorSheet({
         </div>
 
         <form className="mt-5 space-y-4" onSubmit={onSubmit}>
+          {canUseTmdb && (
+            <TmdbLookup
+              categoryLabel={category.label}
+              language={tmdbLanguage}
+              message={tmdbMessage}
+              onApply={onApplyTmdb}
+              onLanguageChange={onTmdbLanguageChange}
+              onQueryChange={onTmdbQueryChange}
+              onSearch={onSearchTmdb}
+              query={tmdbQuery}
+              results={tmdbResults}
+              status={tmdbStatus}
+            />
+          )}
+
           {canUseOmdb && (
             <OmdbLookup
               categoryLabel={category.label}
@@ -800,7 +1000,29 @@ function EditorSheet({
                   .filter((option) => option.value !== "all")
                   .map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label === "Anime" ? "Anime movie" : "Movie"}
+                      {option.value === "anime-movie"
+                        ? "Anime movie"
+                        : option.value === "korean-movie"
+                          ? "Korean movie"
+                          : "Movie"}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
+
+          {draft.category === "tv" && (
+            <Field label="TV type">
+              <select
+                className="input"
+                value={draft.subtype || "tv"}
+                onChange={(event) => onUpdateDraft("subtype", event.target.value)}
+              >
+                {tvSubtypeOptions
+                  .filter((option) => option.value !== "all")
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.value === "kdrama" ? "K-Drama" : "TV show"}
                     </option>
                   ))}
               </select>
@@ -845,13 +1067,13 @@ function EditorSheet({
   );
 }
 
-function BottomNav({ activeCategory, counts, isCompletedRoute, onNavigate, onShowCategory }) {
+function BottomNav({ activeCategory, counts, onShowCategory }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-300 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_35px_rgba(31,41,55,0.12)] backdrop-blur sm:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-6 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {categories.map((entry) => {
           const Icon = entry.icon;
-          const isActive = !isCompletedRoute && entry.id === activeCategory;
+          const isActive = entry.id === activeCategory;
           return (
             <button
               key={entry.id}
@@ -869,17 +1091,6 @@ function BottomNav({ activeCategory, counts, isCompletedRoute, onNavigate, onSho
             </button>
           );
         })}
-        <button
-          className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition ${
-            isCompletedRoute ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
-          }`}
-          onClick={() => onNavigate("/completed")}
-          type="button"
-        >
-          <CheckCircle2 size={18} />
-          <span>Done</span>
-          <span className={`text-[10px] ${isCompletedRoute ? "text-stone-200" : "text-stone-400"}`}>All</span>
-        </button>
       </div>
     </nav>
   );
@@ -899,6 +1110,93 @@ function buildOmdbNotes(detail) {
     .map(([label, value]) => `${label}: ${value}`);
 
   return lines.join("\n");
+}
+
+function TmdbLookup({
+  categoryLabel,
+  language,
+  message,
+  onApply,
+  onLanguageChange,
+  onQueryChange,
+  onSearch,
+  query,
+  results,
+  status,
+}) {
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+      <div className="grid gap-3">
+        <div className="flex gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="mb-2 block text-sm font-medium text-stone-700">Korean media lookup</span>
+            <input
+              className="input bg-white"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  onSearch(event);
+                }
+              }}
+              placeholder={`Search ${categoryLabel.toLowerCase()} in English or Korean`}
+            />
+          </label>
+          <button
+            className="mt-7 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-amber-700 text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+            disabled={status === "loading"}
+            onClick={onSearch}
+            type="button"
+            aria-label="Search TMDb"
+            title="Search TMDb"
+          >
+            <Search size={17} />
+          </button>
+        </div>
+
+        <label>
+          <span className="mb-2 block text-sm font-medium text-stone-700">Result language</span>
+          <select className="input bg-white" value={language} onChange={(event) => onLanguageChange(event.target.value)}>
+            <option value="en-US">English</option>
+            <option value="ko-KR">Korean</option>
+          </select>
+        </label>
+      </div>
+
+      {message && (
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-amber-800"}`}>
+          {message}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {results.map((result) => (
+            <li key={`${result.mediaType}-${result.id}`}>
+              <button
+                className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-amber-500"
+                onClick={() => onApply(result)}
+                type="button"
+              >
+                {result.posterPath ? (
+                  <img className="h-14 w-10 rounded object-cover" src={getTmdbImageUrl(result.posterPath)} alt={`${result.title} poster`} />
+                ) : (
+                  <div className="cover-fallback h-14 w-10 rounded" />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-stone-950">{result.title || result.originalTitle}</span>
+                  <span className="mt-1 block truncate text-xs text-stone-600">
+                    {result.originalTitle && result.originalTitle !== result.title ? `${result.originalTitle} / ` : ""}
+                    {result.releaseDate ? result.releaseDate.slice(0, 4) : "Unknown year"}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function OmdbLookup({ categoryLabel, message, onApply, onQueryChange, onSearch, query, results, status }) {
@@ -963,62 +1261,6 @@ function OmdbLookup({ categoryLabel, message, onApply, onQueryChange, onSearch, 
         </ul>
       )}
     </div>
-  );
-}
-
-function CompletedRoute({ completedItems, completedSort, onSortChange, onBack }) {
-  return (
-    <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 border-b border-stone-300 pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <button
-            className="mb-4 inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-            onClick={onBack}
-            type="button"
-          >
-            <ArrowLeft size={16} />
-            Back to shelf
-          </button>
-          <h2 className="text-xl font-semibold text-stone-950">All completed</h2>
-          <p className="mt-1 text-sm text-stone-600">
-            {completedItems.length} finished {completedItems.length === 1 ? "title" : "titles"} across every category
-          </p>
-        </div>
-
-        <label className="w-full sm:w-56">
-          <span className="mb-2 flex items-center gap-2 text-sm font-medium text-stone-700">
-            <ArrowUpDown size={16} />
-            Sort by
-          </span>
-          <select className="input" value={completedSort} onChange={(event) => onSortChange(event.target.value)}>
-            {completedSortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {completedItems.length > 0 ? (
-        <ul className="mt-5 divide-y divide-stone-200 rounded-lg border border-stone-300 bg-white shadow-sm">
-          {completedItems.map((item) => (
-            <li key={item.id} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:gap-4">
-              <span className="truncate text-sm font-semibold text-stone-950">{item.title}</span>
-              <span className="truncate text-sm text-stone-600">{item.creator || "Unknown author"}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="mt-5 flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-6 text-center">
-          <CheckCircle2 className="text-stone-400" size={36} />
-          <h3 className="mt-4 text-lg font-semibold text-stone-950">No completed titles found</h3>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-stone-600">
-            Clear the search or mark something complete to see it in this list.
-          </p>
-        </div>
-      )}
-    </section>
   );
 }
 

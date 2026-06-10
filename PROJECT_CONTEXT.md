@@ -148,16 +148,43 @@ The lookup:
 - Fills title, creator/director, poster URL, and notes with relevant OMDb metadata.
 - Leaves the user's personal 1-5 star rating separate from OMDb's IMDb score.
 
-## Movie Subtypes
+## TMDb Korean Lookup
+
+Movies and TV Shows include a TMDb-powered Korean media lookup panel in the add/edit form.
+
+The lookup:
+
+- Accepts English or Korean search text.
+- Searches TMDb movie results for Movies.
+- Searches TMDb TV results for TV Shows.
+- Supports English or Korean result language display.
+- Fills title, creator/director, poster URL, and notes with TMDb metadata.
+- Automatically marks Korean movie results as `korean-movie` when TMDb country data includes `KR`.
+- Automatically marks Korean TV results as `kdrama` when TMDb origin country data includes `KR`.
+
+The local TMDb credentials can be read from either:
+
+```text
+VITE_TMDB_ACCESS_TOKEN
+VITE_TMDB_API_KEY
+```
+
+## Subtypes
 
 Movies support a lightweight `subtype` field:
 
 - `movie`
 - `anime-movie`
+- `korean-movie`
 
-Existing saved movie items without a subtype are normalized to `movie` at load time.
+TV Shows support a lightweight `subtype` field:
 
-The Movies shelf includes an `All / Movies / Anime` filter. Anime movies stay under Movies, while the Anime category is reserved for anime series.
+- `tv`
+- `kdrama`
+
+Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
+
+The Movies shelf includes an `All / Movies / Anime / Korean` filter. The TV Shows shelf includes an `All / TV / K-Drama` filter. Anime movies and Korean movies stay under Movies, K-Dramas stay under TV Shows, and the Anime category is reserved for anime series.
 
 The local API key is read from:
 
@@ -173,7 +200,8 @@ Because this is a frontend-only app, any Vite environment variable used by the b
 - The app is now oriented around mobile-first web use, with desktop treated as a responsive expansion.
 - Mobile browsing uses compact media rows with poster thumbnails for faster scanning.
 - Mobile category switching uses a fixed bottom navigation bar.
-- Desktop and tablet still show the larger category grid near the top.
+- Desktop and tablet show a compact top header with search and a category grid below it.
+- The previous "All completed" route/control has been removed for now.
 - The active shelf is controlled with a two-option segmented control.
 - The add/edit form opens as a modal sheet instead of living as a permanent sidebar.
 - A floating add button is available on shelf views.

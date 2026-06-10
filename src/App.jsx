@@ -180,11 +180,20 @@ function App() {
   const [bookResults, setBookResults] = useState([]);
   const [bookStatus, setBookStatus] = useState("idle");
   const [bookMessage, setBookMessage] = useState("");
+  const [aladinQuery, setAladinQuery] = useState("");
+  const [aladinResults, setAladinResults] = useState([]);
+  const [aladinStatus, setAladinStatus] = useState("idle");
+  const [aladinMessage, setAladinMessage] = useState("");
+  const [mangaQuery, setMangaQuery] = useState("");
+  const [mangaResults, setMangaResults] = useState([]);
+  const [mangaStatus, setMangaStatus] = useState("idle");
+  const [mangaMessage, setMangaMessage] = useState("");
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const canUseOmdb = Object.hasOwn(omdbTypesByCategory, draft.category);
   const canUseTmdb = draft.category === "movies" || draft.category === "tv";
   const canUseBookLookup = draft.category === "books";
+  const canUseMangaLookup = draft.category === "manga";
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items
@@ -279,6 +288,14 @@ function App() {
     setBookResults([]);
     setBookStatus("idle");
     setBookMessage("");
+    setAladinQuery("");
+    setAladinResults([]);
+    setAladinStatus("idle");
+    setAladinMessage("");
+    setMangaQuery("");
+    setMangaResults([]);
+    setMangaStatus("idle");
+    setMangaMessage("");
   }, [draft.category]);
 
   function handleSubmit(event) {
@@ -616,6 +633,123 @@ function App() {
     setBookMessage(isKoreanBook ? "Korean book details added." : "Book details added. You can adjust the type before saving.");
   }
 
+  async function searchAladinBooks(event) {
+    event?.preventDefault();
+    const cleanedQuery = aladinQuery.trim();
+
+    if (!cleanedQuery || !canUseBookLookup) {
+      setAladinStatus("error");
+      setAladinMessage("Enter a Korean book title or author to search.");
+      return;
+    }
+
+    setAladinStatus("loading");
+    setAladinMessage("");
+    setAladinResults([]);
+
+    try {
+      const url = new URL("/api/aladin/books", window.location.origin);
+      url.searchParams.set("query", cleanedQuery);
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok || data.errorCode) {
+        throw new Error(data.errorMessage || data.message || "Aladin lookup failed.");
+      }
+
+      const results = (data.item || [])
+        .map(normalizeAladinBookResult)
+        .filter((result) => result.title || result.authors)
+        .slice(0, 8);
+
+      if (!results.length) {
+        setAladinStatus("error");
+        setAladinMessage("No Aladin Korean book results found.");
+        return;
+      }
+
+      setAladinResults(results);
+      setAladinStatus("success");
+    } catch (error) {
+      setAladinStatus("error");
+      setAladinMessage(error.message || "Aladin lookup failed. Check your key and try again.");
+    }
+  }
+
+  function applyAladinBookResult(result) {
+    setDraft((current) => ({
+      ...current,
+      subtype: "korean-book",
+      title: result.title || current.title,
+      creator: result.authors || current.creator,
+      imageUrl: result.imageUrl || current.imageUrl,
+      notes: buildAladinBookNotes(result) || current.notes,
+    }));
+    setAladinStatus("success");
+    setAladinResults([]);
+    setAladinMessage("Korean book details added from Aladin.");
+  }
+
+  async function searchManga(event) {
+    event?.preventDefault();
+    const cleanedQuery = mangaQuery.trim();
+
+    if (!cleanedQuery || !canUseMangaLookup) {
+      setMangaStatus("error");
+      setMangaMessage("Enter a manga title to search.");
+      return;
+    }
+
+    setMangaStatus("loading");
+    setMangaMessage("");
+    setMangaResults([]);
+
+    try {
+      const url = new URL("https://api.jikan.moe/v4/manga");
+      url.searchParams.set("q", cleanedQuery);
+      url.searchParams.set("limit", "8");
+      url.searchParams.set("sfw", "true");
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Jikan lookup failed.");
+      }
+
+      const results = (data.data || [])
+        .map(normalizeJikanMangaResult)
+        .filter((result) => result.title || result.authors)
+        .slice(0, 8);
+
+      if (!results.length) {
+        setMangaStatus("error");
+        setMangaMessage("No Jikan manga results found.");
+        return;
+      }
+
+      setMangaResults(results);
+      setMangaStatus("success");
+    } catch (error) {
+      setMangaStatus("error");
+      setMangaMessage(error.message || "Jikan lookup failed. Check your connection and try again.");
+    }
+  }
+
+  function applyMangaResult(result) {
+    setDraft((current) => ({
+      ...current,
+      title: result.title || current.title,
+      creator: result.authors || current.creator,
+      imageUrl: result.imageUrl || current.imageUrl,
+      notes: buildJikanMangaNotes(result) || current.notes,
+    }));
+    setMangaStatus("success");
+    setMangaResults([]);
+    setMangaMessage("Manga details added from Jikan. You can edit anything before saving.");
+  }
+
   return (
     <main className="min-h-screen bg-[#f7f4ee] pb-28 sm:pb-0">
       <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur sm:static sm:bg-[#fffaf2]">
@@ -757,31 +891,46 @@ function App() {
       {isEditorOpen && (
         <EditorSheet
           activeStatus={activeStatus}
+          aladinMessage={aladinMessage}
+          aladinQuery={aladinQuery}
+          aladinResults={aladinResults}
+          aladinStatus={aladinStatus}
           bookLanguage={bookLanguage}
           bookMessage={bookMessage}
           bookQuery={bookQuery}
           bookResults={bookResults}
           bookStatus={bookStatus}
           canUseBookLookup={canUseBookLookup}
+          canUseMangaLookup={canUseMangaLookup}
           canUseOmdb={canUseOmdb}
           canUseTmdb={canUseTmdb}
           category={category}
           draft={draft}
           editingId={editingId}
+          onApplyAladinBook={applyAladinBookResult}
           onApplyBook={applyBookResult}
+          onApplyManga={applyMangaResult}
           onClose={closeEditor}
           onSubmit={handleSubmit}
           onUpdateDraft={updateDraft}
+          mangaMessage={mangaMessage}
+          mangaQuery={mangaQuery}
+          mangaResults={mangaResults}
+          mangaStatus={mangaStatus}
           omdbMessage={omdbMessage}
           omdbQuery={omdbQuery}
           omdbResults={omdbResults}
           omdbStatus={omdbStatus}
           onApplyOmdb={applyOmdbResult}
           onApplyTmdb={applyTmdbResult}
+          onAladinQueryChange={setAladinQuery}
           onBookLanguageChange={setBookLanguage}
           onBookQueryChange={setBookQuery}
+          onMangaQueryChange={setMangaQuery}
           onOmdbQueryChange={setOmdbQuery}
+          onSearchAladinBooks={searchAladinBooks}
           onSearchBooks={searchBooks}
+          onSearchManga={searchManga}
           onSearchOmdb={searchOmdb}
           onSearchTmdb={searchTmdb}
           onTmdbLanguageChange={setTmdbLanguage}
@@ -926,6 +1075,72 @@ function buildOpenLibraryBookNotes(result) {
     ["Publisher", result.publishers],
     ["Language", result.languages.join(", ")],
     ["Subjects", result.subjects],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join("\n");
+}
+
+function normalizeJikanMangaResult(result) {
+  return {
+    id: result.mal_id,
+    title: result.title_english || result.title || result.title_japanese || "",
+    originalTitle: result.title_japanese || "",
+    authors: normalizeJikanPeople(result.authors).join(", "),
+    genres: normalizeJikanNamedList(result.genres).join(", "),
+    themes: normalizeJikanNamedList(result.themes).join(", "),
+    demographics: normalizeJikanNamedList(result.demographics).join(", "),
+    published: result.published?.string || "",
+    status: result.status || "",
+    chapters: result.chapters || "",
+    volumes: result.volumes || "",
+    score: result.score || "",
+    synopsis: result.synopsis || "",
+    imageUrl: result.images?.jpg?.large_image_url || result.images?.jpg?.image_url || "",
+  };
+}
+
+function normalizeJikanPeople(value) {
+  return normalizeOpenLibraryList(value).map((person) => person.name).filter(Boolean);
+}
+
+function normalizeJikanNamedList(value) {
+  return normalizeOpenLibraryList(value).map((entry) => entry.name).filter(Boolean);
+}
+
+function buildJikanMangaNotes(result) {
+  return [
+    ["Volumes", result.volumes],
+    ["Chapters", result.chapters],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join("\n");
+}
+
+function normalizeAladinBookResult(item) {
+  return {
+    id: item.itemId || item.isbn13 || item.isbn || item.link,
+    title: item.title || "",
+    authors: item.author || "",
+    publisher: item.publisher || "",
+    publishedDate: item.pubDate || "",
+    category: item.categoryName || "",
+    isbn13: item.isbn13 || "",
+    description: item.description || "",
+    imageUrl: item.cover || "",
+    link: item.link || "",
+  };
+}
+
+function buildAladinBookNotes(result) {
+  return [
+    ["Published", result.publishedDate],
+    ["Publisher", result.publisher],
+    ["Category", result.category],
+    ["ISBN13", result.isbn13],
+    ["Description", result.description],
+    ["Aladin", result.link],
   ]
     .filter(([, value]) => value)
     .map(([label, value]) => `${label}: ${value}`)
@@ -1118,31 +1333,46 @@ function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
 
 function EditorSheet({
   activeStatus,
+  aladinMessage,
+  aladinQuery,
+  aladinResults,
+  aladinStatus,
   bookLanguage,
   bookMessage,
   bookQuery,
   bookResults,
   bookStatus,
   canUseBookLookup,
+  canUseMangaLookup,
   canUseOmdb,
   canUseTmdb,
   category,
   draft,
   editingId,
+  onApplyAladinBook,
   onApplyBook,
+  onApplyManga,
   onApplyOmdb,
   onApplyTmdb,
+  onAladinQueryChange,
   onBookLanguageChange,
   onBookQueryChange,
   onClose,
+  onMangaQueryChange,
   onOmdbQueryChange,
+  onSearchAladinBooks,
   onSearchBooks,
+  onSearchManga,
   onSearchOmdb,
   onSearchTmdb,
   onSubmit,
   onTmdbLanguageChange,
   onTmdbQueryChange,
   onUpdateDraft,
+  mangaMessage,
+  mangaQuery,
+  mangaResults,
+  mangaStatus,
   omdbMessage,
   omdbQuery,
   omdbResults,
@@ -1176,16 +1406,39 @@ function EditorSheet({
 
         <form className="mt-5 space-y-4" onSubmit={onSubmit}>
           {canUseBookLookup && (
-            <BookLookup
-              language={bookLanguage}
-              message={bookMessage}
-              onApply={onApplyBook}
-              onLanguageChange={onBookLanguageChange}
-              onQueryChange={onBookQueryChange}
-              onSearch={onSearchBooks}
-              query={bookQuery}
-              results={bookResults}
-              status={bookStatus}
+            <>
+              <AladinBookLookup
+                message={aladinMessage}
+                onApply={onApplyAladinBook}
+                onQueryChange={onAladinQueryChange}
+                onSearch={onSearchAladinBooks}
+                query={aladinQuery}
+                results={aladinResults}
+                status={aladinStatus}
+              />
+              <BookLookup
+                language={bookLanguage}
+                message={bookMessage}
+                onApply={onApplyBook}
+                onLanguageChange={onBookLanguageChange}
+                onQueryChange={onBookQueryChange}
+                onSearch={onSearchBooks}
+                query={bookQuery}
+                results={bookResults}
+                status={bookStatus}
+              />
+            </>
+          )}
+
+          {canUseMangaLookup && (
+            <MangaLookup
+              message={mangaMessage}
+              onApply={onApplyManga}
+              onQueryChange={onMangaQueryChange}
+              onSearch={onSearchManga}
+              query={mangaQuery}
+              results={mangaResults}
+              status={mangaStatus}
             />
           )}
 
@@ -1479,6 +1732,138 @@ function BookLookup({ language, message, onApply, onLanguageChange, onQueryChang
                   <span className="mt-1 block truncate text-xs text-stone-600">
                     {result.authors || "Unknown author"}
                     {result.firstPublishYear ? ` / ${result.firstPublishYear}` : ""}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AladinBookLookup({ message, onApply, onQueryChange, onSearch, query, results, status }) {
+  return (
+    <div className="rounded-lg border border-rose-200 bg-rose-50/70 p-3">
+      <div className="flex gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="mb-2 block text-sm font-medium text-stone-700">Korean book lookup</span>
+          <input
+            className="input bg-white"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                onSearch(event);
+              }
+            }}
+            placeholder="한국어 제목 또는 저자 검색"
+          />
+        </label>
+        <button
+          className="mt-7 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-rose-700 text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          disabled={status === "loading"}
+          onClick={onSearch}
+          type="button"
+          aria-label="Search Aladin"
+          title="Search Aladin"
+        >
+          <Search size={17} />
+        </button>
+      </div>
+
+      {message && (
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-rose-800"}`}>
+          {message}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {results.map((result) => (
+            <li key={result.id}>
+              <button
+                className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-rose-500"
+                onClick={() => onApply(result)}
+                type="button"
+              >
+                {result.imageUrl ? (
+                  <img className="h-14 w-10 rounded object-cover" src={result.imageUrl} alt={`${result.title} cover`} />
+                ) : (
+                  <div className="cover-fallback h-14 w-10 rounded" />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-stone-950">{result.title}</span>
+                  <span className="mt-1 block truncate text-xs text-stone-600">
+                    {result.authors || "Unknown author"}
+                    {result.publishedDate ? ` / ${result.publishedDate.slice(0, 4)}` : ""}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function MangaLookup({ message, onApply, onQueryChange, onSearch, query, results, status }) {
+  return (
+    <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50/70 p-3">
+      <div className="flex gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="mb-2 block text-sm font-medium text-stone-700">Jikan manga lookup</span>
+          <input
+            className="input bg-white"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                onSearch(event);
+              }
+            }}
+            placeholder="Search manga by title"
+          />
+        </label>
+        <button
+          className="mt-7 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-fuchsia-700 text-white transition hover:bg-fuchsia-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          disabled={status === "loading"}
+          onClick={onSearch}
+          type="button"
+          aria-label="Search Jikan"
+          title="Search Jikan"
+        >
+          <Search size={17} />
+        </button>
+      </div>
+
+      {message && (
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-fuchsia-800"}`}>
+          {message}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {results.map((result) => (
+            <li key={result.id}>
+              <button
+                className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-fuchsia-500"
+                onClick={() => onApply(result)}
+                type="button"
+              >
+                {result.imageUrl ? (
+                  <img className="h-14 w-10 rounded object-cover" src={result.imageUrl} alt={`${result.title} cover`} />
+                ) : (
+                  <div className="cover-fallback h-14 w-10 rounded" />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-stone-950">{result.title}</span>
+                  <span className="mt-1 block truncate text-xs text-stone-600">
+                    {result.authors || "Unknown author"}
+                    {result.published ? ` / ${result.published}` : ""}
                   </span>
                 </span>
               </button>

@@ -39,6 +39,8 @@ The main app supports:
 - Search across title, creator, and notes
 - OMDb lookup for Movies, TV Shows, and Anime
 - Open Library lookup for Books
+- Aladin lookup for Korean Books
+- Jikan lookup for Manga
 - Per-category counts
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
@@ -53,6 +55,8 @@ The main app supports:
 - lucide-react for icons
 - OMDb API for movie, TV show, and anime lookup
 - Open Library API for book lookup
+- Aladin API for Korean book lookup
+- Jikan API for manga lookup
 
 ## Project Structure
 
@@ -214,6 +218,36 @@ The lookup:
 - Fills title, author, cover image URL, and notes with Open Library metadata.
 - Automatically marks Korean-language book results as `korean-book`.
 - Saves titles and authors exactly as returned by the API.
+
+## Aladin Korean Book Lookup
+
+Books include an Aladin-powered Korean book lookup panel in the add/edit form.
+
+The lookup:
+
+- Accepts Korean title or author search text.
+- Uses a local Vite `/api/aladin/books` route that calls Aladin `ItemSearch.aspx` with `SearchTarget=Book`.
+- Fills Korean title, author, cover image URL, and notes with Aladin metadata.
+- Automatically marks selected results as `korean-book`.
+- Saves Korean titles and authors exactly as returned by the API.
+
+The local Aladin key is read server-side by the Vite route from:
+
+```text
+VITE_ALADIN_TTB_KEY
+```
+
+## Jikan Manga Lookup
+
+Manga include a Jikan-powered lookup panel in the add/edit form.
+
+The lookup:
+
+- Searches manga by title via `https://api.jikan.moe/v4/manga`.
+- Does not require a local API key.
+- Fills title, author/artist, cover image URL, and notes with volume/chapter counts from Jikan.
+- Uses safe-for-work search results.
+- Saves title and author/artist exactly as normalized from the API response.
 
 ## UX And Product Notes
 

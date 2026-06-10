@@ -33,15 +33,21 @@ This is a client-only React app. It stores library data in `localStorage` under 
 
 The main app supports:
 
+- A homepage for choosing a media type, then quickly searching and logging new media
+- Home/Library view switching
 - Category switching
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
 - Search across title, creator, and notes
-- OMDb lookup for Movies, TV Shows, and Anime
-- Open Library lookup for Books
-- Aladin lookup for Korean Books
-- Jikan lookup for Manga
+- A unified add/edit lookup search that queries the relevant APIs for the selected category
+- Homepage search prefill that opens the add sheet and runs the same unified lookup flow
+- OMDb lookup behind the unified search for Movies, TV Shows, and Anime
+- TMDb lookup behind the unified search for Movies and TV Shows
+- Open Library and Aladin lookup behind the unified search for Books
+- Jikan lookup behind the unified search for Manga
 - Per-category counts
+- A homepage library snapshot broken down by category and shelf
+- A recently added homepage section with media type tags
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
 - Star rating input for Completed items only
@@ -143,7 +149,7 @@ The production build was last verified successfully after the initial implementa
 
 ## OMDb Integration
 
-Movies, TV Shows, and Anime include an OMDb lookup panel in the add/edit form.
+Movies, TV Shows, and Anime include OMDb results in the unified add/edit lookup.
 
 The lookup:
 
@@ -156,7 +162,7 @@ The lookup:
 
 ## TMDb Korean Lookup
 
-Movies and TV Shows include a TMDb-powered Korean media lookup panel in the add/edit form.
+Movies and TV Shows include TMDb-powered Korean media results in the unified add/edit lookup.
 
 The lookup:
 
@@ -207,7 +213,7 @@ Because this is a frontend-only app, any Vite environment variable used by the b
 
 ## Open Library Lookup
 
-Books include an Open Library-powered lookup panel in the add/edit form.
+Books include Open Library-powered results in the unified add/edit lookup.
 
 The lookup:
 

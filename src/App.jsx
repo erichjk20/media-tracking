@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowDownAZ,
+  ArrowUpZA,
   BookOpen,
   Clapperboard,
+  ClockArrowDown,
   Edit3,
+  Home,
   LayoutGrid,
   Library,
   List as ListIcon,
+  PanelsTopLeft,
   Plus,
   Save,
   Search,
+  Sparkles,
   Star,
   Trash2,
   Tv,
@@ -19,8 +25,8 @@ const categories = [
   { id: "books", label: "Books", creatorLabel: "Author", action: "Read", icon: BookOpen },
   { id: "movies", label: "Movies", creatorLabel: "Director", action: "Watch", icon: Clapperboard },
   { id: "tv", label: "TV Shows", creatorLabel: "Creator", action: "Watch", icon: Tv },
-  { id: "anime", label: "Anime", creatorLabel: "Studio / Creator", action: "Watch", icon: Tv },
-  { id: "manga", label: "Manga", creatorLabel: "Author / Artist", action: "Read", icon: BookOpen },
+  { id: "anime", label: "Anime", creatorLabel: "Studio / Creator", action: "Watch", icon: Sparkles },
+  { id: "manga", label: "Manga", creatorLabel: "Author / Artist", action: "Read", icon: PanelsTopLeft },
 ];
 
 const statuses = ["Completed", "Want to Watch/Read"];
@@ -129,7 +135,14 @@ const emptyDraft = {
   rating: 3,
   notes: "",
   imageUrl: "",
+  addedAt: "",
 };
+
+const sortOptions = [
+  { value: "recent", label: "Recently added", icon: ClockArrowDown },
+  { value: "title-asc", label: "A to Z", icon: ArrowDownAZ },
+  { value: "title-desc", label: "Z to A", icon: ArrowUpZA },
+];
 
 function getStoredItems() {
   try {
@@ -154,70 +167,174 @@ function getDefaultSubtype(category, subtype = "") {
   return "";
 }
 
+function compareTitles(a, b) {
+  return a.title.localeCompare(b.title, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function getAddedSortValue(item, index) {
+  const timestamp = Date.parse(item.addedAt || "");
+  return Number.isNaN(timestamp) ? index : timestamp;
+}
+
+function compareShelfItems(a, b, sortOrder) {
+  if (sortOrder === "title-asc") return compareTitles(a.item, b.item);
+  if (sortOrder === "title-desc") return compareTitles(b.item, a.item);
+
+  return getAddedSortValue(b.item, b.index) - getAddedSortValue(a.item, a.index) || compareTitles(a.item, b.item);
+}
+
+function getLookupProviders(category) {
+  if (category === "books") {
+    return [
+      { id: "aladin", label: "Aladin" },
+      { id: "open-library", label: "Open Library" },
+    ];
+  }
+  if (category === "movies" || category === "tv") {
+    return [
+      { id: "tmdb", label: "TMDb" },
+      { id: "omdb", label: "OMDb" },
+    ];
+  }
+  if (category === "anime") return [{ id: "omdb", label: "OMDb" }];
+  if (category === "manga") return [{ id: "jikan", label: "Jikan" }];
+  return [];
+}
+
+function createLookupResult(source, result) {
+  return {
+    id: `${source}-${getLookupResultId(source, result)}`,
+    source,
+    sourceLabel: getLookupSourceLabel(source),
+    result,
+  };
+}
+
+function getLookupSourceLabel(source) {
+  const labels = {
+    aladin: "Aladin",
+    "open-library": "Open Library",
+    tmdb: "TMDb",
+    omdb: "OMDb",
+    jikan: "Jikan",
+  };
+  return labels[source] || source;
+}
+
+function getLookupResultId(source, result) {
+  if (source === "omdb") return result.imdbID;
+  if (source === "tmdb") return `${result.mediaType}-${result.id}`;
+  if (source === "open-library" || source === "jikan" || source === "aladin") return result.id;
+  return result.title || result.Title || source;
+}
+
+function getLookupResultTitle(lookupResult) {
+  const { result, source } = lookupResult;
+  if (source === "omdb") return result.Title;
+  if (source === "tmdb") return result.title || result.originalTitle;
+  return result.title;
+}
+
+function getLookupResultMeta(lookupResult) {
+  const { result, source } = lookupResult;
+  if (source === "omdb") return [result.Year, result.Type].filter(Boolean).join(" / ");
+  if (source === "tmdb") {
+    return [
+      result.originalTitle && result.originalTitle !== result.title ? result.originalTitle : "",
+      result.releaseDate ? result.releaseDate.slice(0, 4) : "Unknown year",
+    ]
+      .filter(Boolean)
+      .join(" / ");
+  }
+  if (source === "open-library") {
+    return [
+      result.authors || "Unknown author",
+      result.firstPublishYear,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+  }
+  if (source === "aladin") {
+    return [
+      result.authors || "Unknown author",
+      result.publishedDate ? result.publishedDate.slice(0, 4) : "",
+    ]
+      .filter(Boolean)
+      .join(" / ");
+  }
+  return [
+    result.authors || "Unknown author",
+    result.published,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function getLookupResultImage(lookupResult) {
+  const { result, source } = lookupResult;
+  if (source === "omdb") return result.Poster && result.Poster !== "N/A" ? result.Poster : "";
+  if (source === "tmdb") return getTmdbImageUrl(result.posterPath);
+  return result.imageUrl || "";
+}
+
 function App() {
   const [items, setItems] = useState(getStoredItems);
+  const [activeView, setActiveView] = useState("home");
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
   const [activeBookSubtype, setActiveBookSubtype] = useState("all");
   const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
   const [activeTvSubtype, setActiveTvSubtype] = useState("all");
   const [shelfView, setShelfView] = useState("list");
+  const [sortOrder, setSortOrder] = useState("recent");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [editingId, setEditingId] = useState(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [omdbQuery, setOmdbQuery] = useState("");
-  const [omdbResults, setOmdbResults] = useState([]);
-  const [omdbStatus, setOmdbStatus] = useState("idle");
-  const [omdbMessage, setOmdbMessage] = useState("");
-  const [tmdbQuery, setTmdbQuery] = useState("");
+  const [lookupQuery, setLookupQuery] = useState("");
+  const [lookupResults, setLookupResults] = useState([]);
+  const [lookupStatus, setLookupStatus] = useState("idle");
+  const [lookupMessage, setLookupMessage] = useState("");
   const [tmdbLanguage, setTmdbLanguage] = useState("en-US");
-  const [tmdbResults, setTmdbResults] = useState([]);
-  const [tmdbStatus, setTmdbStatus] = useState("idle");
-  const [tmdbMessage, setTmdbMessage] = useState("");
-  const [bookQuery, setBookQuery] = useState("");
   const [bookLanguage, setBookLanguage] = useState("all");
-  const [bookResults, setBookResults] = useState([]);
-  const [bookStatus, setBookStatus] = useState("idle");
-  const [bookMessage, setBookMessage] = useState("");
-  const [aladinQuery, setAladinQuery] = useState("");
-  const [aladinResults, setAladinResults] = useState([]);
-  const [aladinStatus, setAladinStatus] = useState("idle");
-  const [aladinMessage, setAladinMessage] = useState("");
-  const [mangaQuery, setMangaQuery] = useState("");
-  const [mangaResults, setMangaResults] = useState([]);
-  const [mangaStatus, setMangaStatus] = useState("idle");
-  const [mangaMessage, setMangaMessage] = useState("");
+  const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
+  const [shouldRunLookup, setShouldRunLookup] = useState(false);
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const canUseOmdb = Object.hasOwn(omdbTypesByCategory, draft.category);
   const canUseTmdb = draft.category === "movies" || draft.category === "tv";
   const canUseBookLookup = draft.category === "books";
   const canUseMangaLookup = draft.category === "manga";
+  const lookupProviders = getLookupProviders(draft.category);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items
-      .filter((item) => item.category === activeCategory && item.status === activeStatus)
-      .filter((item) => {
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.category === activeCategory && item.status === activeStatus)
+      .filter(({ item }) => {
         if (activeCategory !== "books" || activeBookSubtype === "all") return true;
         return (item.subtype || "book") === activeBookSubtype;
       })
-      .filter((item) => {
+      .filter(({ item }) => {
         if (activeCategory !== "movies" || activeMovieSubtype === "all") return true;
         return (item.subtype || "movie") === activeMovieSubtype;
       })
-      .filter((item) => {
+      .filter(({ item }) => {
         if (activeCategory !== "tv" || activeTvSubtype === "all") return true;
         return (item.subtype || "tv") === activeTvSubtype;
       })
-      .filter((item) => {
+      .filter(({ item }) => {
         if (!normalizedQuery) return true;
         return [item.title, item.creator, item.notes].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
       })
-      .sort((a, b) => a.title.localeCompare(b.title));
-  }, [activeBookSubtype, activeCategory, activeMovieSubtype, activeStatus, activeTvSubtype, items, query]);
+      .sort((a, b) => compareShelfItems(a, b, sortOrder))
+      .map(({ item }) => item);
+  }, [activeBookSubtype, activeCategory, activeMovieSubtype, activeStatus, activeTvSubtype, items, query, sortOrder]);
 
   const counts = useMemo(() => {
     return categories.reduce((categoryCounts, currentCategory) => {
@@ -276,27 +393,30 @@ function App() {
   }, [activeCategory, activeStatus]);
 
   useEffect(() => {
-    setOmdbQuery("");
-    setOmdbResults([]);
-    setOmdbStatus("idle");
-    setOmdbMessage("");
-    setTmdbQuery("");
-    setTmdbResults([]);
-    setTmdbStatus("idle");
-    setTmdbMessage("");
-    setBookQuery("");
-    setBookResults([]);
-    setBookStatus("idle");
-    setBookMessage("");
-    setAladinQuery("");
-    setAladinResults([]);
-    setAladinStatus("idle");
-    setAladinMessage("");
-    setMangaQuery("");
-    setMangaResults([]);
-    setMangaStatus("idle");
-    setMangaMessage("");
+    setLookupQuery("");
+    setLookupResults([]);
+    setLookupStatus("idle");
+    setLookupMessage("");
   }, [draft.category]);
+
+  useEffect(() => {
+    if (!pendingHomeLookup || !isEditorOpen) return;
+    if (draft.category !== pendingHomeLookup.categoryId || draft.status !== pendingHomeLookup.status) return;
+
+    setLookupQuery(pendingHomeLookup.query);
+    setLookupResults([]);
+    setLookupStatus("idle");
+    setLookupMessage("");
+    setShouldRunLookup(Boolean(pendingHomeLookup.query.trim()));
+    setPendingHomeLookup(null);
+  }, [draft.category, draft.status, isEditorOpen, pendingHomeLookup]);
+
+  useEffect(() => {
+    if (!shouldRunLookup || !isEditorOpen || !lookupQuery.trim()) return;
+
+    setShouldRunLookup(false);
+    searchDetails();
+  }, [isEditorOpen, lookupQuery, shouldRunLookup]);
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -306,6 +426,7 @@ function App() {
     const nextItem = {
       ...draft,
       id: editingId || crypto.randomUUID(),
+      addedAt: editingId ? draft.addedAt || "" : new Date().toISOString(),
       title: cleanedTitle,
       creator: draft.creator.trim(),
       subtype: getDefaultSubtype(draft.category, draft.subtype),
@@ -352,6 +473,28 @@ function App() {
     setIsEditorOpen(true);
   }
 
+  function startHomeLookup({ categoryId, query: homeQuery, status }) {
+    const cleanedQuery = homeQuery.trim();
+
+    setActiveCategory(categoryId);
+    setActiveStatus(status);
+    setDraft({
+      ...emptyDraft,
+      category: categoryId,
+      subtype: getDefaultSubtype(categoryId),
+      status,
+      title: cleanedQuery,
+      rating: status === "Completed" ? 3 : 0,
+    });
+    setEditingId(null);
+    setIsEditorOpen(true);
+    setPendingHomeLookup({
+      categoryId,
+      query: cleanedQuery,
+      status,
+    });
+  }
+
   function closeEditor() {
     resetForm();
     setIsEditorOpen(false);
@@ -373,118 +516,98 @@ function App() {
   }
 
   function showCategory(categoryId) {
+    setActiveView("library");
     setActiveCategory(categoryId);
   }
 
-  async function searchOmdb(event) {
+  async function searchDetails(event) {
     event?.preventDefault();
-    const cleanedQuery = omdbQuery.trim();
+    const cleanedQuery = lookupQuery.trim();
+    const providers = getLookupProviders(draft.category);
+
+    if (!cleanedQuery || !providers.length) {
+      setLookupStatus("error");
+      setLookupMessage("Enter a title to search.");
+      return;
+    }
+
+    setLookupStatus("loading");
+    setLookupMessage("");
+    setLookupResults([]);
+
+    const searches = providers.map((provider) => {
+      if (provider.id === "omdb") return fetchOmdbResults(cleanedQuery);
+      if (provider.id === "tmdb") return fetchTmdbResults(cleanedQuery);
+      if (provider.id === "open-library") return fetchOpenLibraryResults(cleanedQuery);
+      if (provider.id === "aladin") return fetchAladinResults(cleanedQuery);
+      return fetchMangaResults(cleanedQuery);
+    });
+
+    const settledResults = await Promise.allSettled(searches);
+    const results = settledResults.flatMap((entry) => (entry.status === "fulfilled" ? entry.value.results : []));
+    const messages = settledResults
+      .map((entry) => (entry.status === "fulfilled" ? entry.value.message : entry.reason?.message))
+      .filter(Boolean);
+
+    if (!results.length) {
+      setLookupStatus("error");
+      setLookupMessage(messages[0] || "No matching results found.");
+      return;
+    }
+
+    setLookupResults(results);
+    setLookupStatus("success");
+    setLookupMessage(messages.length ? messages.join(" ") : "");
+  }
+
+  async function fetchOmdbResults(searchText) {
     const omdbType = omdbTypesByCategory[draft.category];
 
     if (!omdbApiKey) {
-      setOmdbStatus("error");
-      setOmdbMessage("Add VITE_OMDB_API_KEY to your environment to use OMDb lookup.");
-      return;
+      return { results: [], message: "Add VITE_OMDB_API_KEY to use OMDb." };
     }
 
-    if (!cleanedQuery || !canUseOmdb) {
-      setOmdbStatus("error");
-      setOmdbMessage("Enter a movie, TV show, or anime title to search.");
-      return;
+    if (!omdbType) {
+      return { results: [], message: "" };
     }
-
-    setOmdbStatus("loading");
-    setOmdbMessage("");
-    setOmdbResults([]);
 
     try {
       const url = new URL("https://www.omdbapi.com/");
       url.searchParams.set("apikey", omdbApiKey);
-      url.searchParams.set("s", cleanedQuery);
-      if (omdbType) {
-        url.searchParams.set("type", omdbType);
-      }
+      url.searchParams.set("s", searchText);
+      url.searchParams.set("type", omdbType);
 
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.Response === "False") {
-        setOmdbStatus("error");
-        setOmdbMessage(data.Error || "No matching OMDb results found.");
-        return;
+        return { results: [], message: data.Error || "No OMDb results found." };
       }
 
-      setOmdbResults((data.Search || []).slice(0, 5));
-      setOmdbStatus("success");
+      return {
+        results: (data.Search || []).slice(0, 5).map((result) => createLookupResult("omdb", result)),
+        message: "",
+      };
     } catch {
-      setOmdbStatus("error");
-      setOmdbMessage("OMDb lookup failed. Check your connection and try again.");
+      return { results: [], message: "OMDb lookup failed." };
     }
   }
 
-  async function applyOmdbResult(result) {
-    setOmdbStatus("loading");
-    setOmdbMessage("");
-
-    try {
-      const url = new URL("https://www.omdbapi.com/");
-      url.searchParams.set("apikey", omdbApiKey);
-      url.searchParams.set("i", result.imdbID);
-      url.searchParams.set("plot", "short");
-
-      const response = await fetch(url);
-      const detail = await response.json();
-
-      if (detail.Response === "False") {
-        setOmdbStatus("error");
-        setOmdbMessage(detail.Error || "Could not load OMDb details.");
-        return;
-      }
-
-      const creator = draft.category === "movies" ? detail.Director : detail.Writer || detail.Director;
-      const notes = buildOmdbNotes(detail);
-
-      setDraft((current) => ({
-        ...current,
-        title: cleanOmdbValue(detail.Title) || result.Title || current.title,
-        creator: cleanOmdbValue(creator) || current.creator,
-        imageUrl: cleanOmdbValue(detail.Poster) || cleanOmdbValue(result.Poster) || current.imageUrl,
-        notes: notes || current.notes,
-      }));
-      setOmdbStatus("success");
-      setOmdbResults([]);
-      setOmdbMessage("Details added from OMDb. You can edit anything before saving.");
-    } catch {
-      setOmdbStatus("error");
-      setOmdbMessage("Could not apply that OMDb result.");
-    }
-  }
-
-  async function searchTmdb(event) {
-    event?.preventDefault();
-    const cleanedQuery = tmdbQuery.trim();
+  async function fetchTmdbResults(searchText) {
     const mediaType = draft.category === "movies" ? "movie" : draft.category === "tv" ? "tv" : "";
 
     if (!tmdbAccessToken && !tmdbApiKey) {
-      setTmdbStatus("error");
-      setTmdbMessage("Add VITE_TMDB_ACCESS_TOKEN or VITE_TMDB_API_KEY to use Korean media lookup.");
-      return;
+      return { results: [], message: "Add VITE_TMDB_ACCESS_TOKEN or VITE_TMDB_API_KEY to use TMDb." };
     }
 
-    if (!cleanedQuery || !mediaType) {
-      setTmdbStatus("error");
-      setTmdbMessage("Enter an English or Korean title to search.");
-      return;
+    if (!mediaType) {
+      return { results: [], message: "" };
     }
-
-    setTmdbStatus("loading");
-    setTmdbMessage("");
-    setTmdbResults([]);
 
     try {
       const url = new URL(`https://api.themoviedb.org/3/search/${mediaType}`);
       applyTmdbAuth(url);
-      url.searchParams.set("query", cleanedQuery);
+      url.searchParams.set("query", searchText);
       url.searchParams.set("language", tmdbLanguage);
       url.searchParams.set("include_adult", "false");
       url.searchParams.set("page", "1");
@@ -505,84 +628,19 @@ function App() {
         .map((result) => normalizeTmdbResult(result, mediaType));
 
       if (!results.length) {
-        setTmdbStatus("error");
-        setTmdbMessage("No TMDb results found.");
-        return;
+        return { results: [], message: "No TMDb results found." };
       }
 
-      setTmdbResults(results);
-      setTmdbStatus("success");
+      return { results: results.map((result) => createLookupResult("tmdb", result)), message: "" };
     } catch (error) {
-      setTmdbStatus("error");
-      setTmdbMessage(error.message || "TMDb lookup failed. Check your key and try again.");
+      return { results: [], message: error.message || "TMDb lookup failed." };
     }
   }
 
-  async function applyTmdbResult(result) {
-    setTmdbStatus("loading");
-    setTmdbMessage("");
-
-    try {
-      const url = new URL(`https://api.themoviedb.org/3/${result.mediaType}/${result.id}`);
-      applyTmdbAuth(url);
-      url.searchParams.set("language", tmdbLanguage);
-      url.searchParams.set("append_to_response", "credits");
-
-      const response = await fetch(url, getTmdbRequestOptions());
-      const detail = await response.json();
-
-      if (!response.ok) {
-        throw new Error(detail.status_message || "Could not load TMDb details.");
-      }
-
-      const isKorean = getTmdbCountries(detail, result.mediaType).includes("KR");
-      const title = cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
-      const originalTitle = cleanTmdbValue(result.originalTitle) || cleanTmdbValue(detail.original_title || detail.original_name);
-      const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvCreator(detail);
-      const notes = buildTmdbNotes(detail, result.mediaType, originalTitle);
-
-      setDraft((current) => ({
-        ...current,
-        category: result.mediaType === "movie" ? "movies" : "tv",
-        subtype:
-          result.mediaType === "movie"
-            ? isKorean
-              ? "korean-movie"
-              : current.subtype || "movie"
-            : isKorean
-              ? "kdrama"
-              : current.subtype || "tv",
-        title: title || current.title,
-        creator: creator || current.creator,
-        imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath) || current.imageUrl,
-        notes: notes || current.notes,
-      }));
-      setTmdbStatus("success");
-      setTmdbResults([]);
-      setTmdbMessage(isKorean ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
-    } catch (error) {
-      setTmdbStatus("error");
-      setTmdbMessage(error.message || "Could not apply that TMDb result.");
-    }
-  }
-
-  async function searchBooks(event) {
-    event?.preventDefault();
-    const cleanedQuery = bookQuery.trim();
-
-    if (!cleanedQuery || !canUseBookLookup) {
-      setBookStatus("error");
-      setBookMessage("Enter an English or Korean book title to search.");
-      return;
-    }
-
-    setBookStatus("loading");
-    setBookMessage("");
-    setBookResults([]);
-
+  async function fetchOpenLibraryResults(searchText) {
     try {
       const url = new URL("https://openlibrary.org/search.json");
-      url.searchParams.set("q", buildOpenLibraryQuery(cleanedQuery, bookLanguage));
+      url.searchParams.set("q", buildOpenLibraryQuery(searchText, bookLanguage));
       url.searchParams.set(
         "fields",
         "key,title,author_name,first_publish_year,cover_i,language,publisher,subject,edition_count",
@@ -605,51 +663,19 @@ function App() {
         .slice(0, 8);
 
       if (!results.length) {
-        setBookStatus("error");
-        setBookMessage("No Open Library results found.");
-        return;
+        return { results: [], message: "No Open Library results found." };
       }
 
-      setBookResults(results);
-      setBookStatus("success");
+      return { results: results.map((result) => createLookupResult("open-library", result)), message: "" };
     } catch (error) {
-      setBookStatus("error");
-      setBookMessage(error.message || "Open Library lookup failed. Check your connection and try again.");
+      return { results: [], message: error.message || "Open Library lookup failed." };
     }
   }
 
-  function applyBookResult(result) {
-    const isKoreanBook = result.languages.includes("kor");
-    setDraft((current) => ({
-      ...current,
-      subtype: isKoreanBook ? "korean-book" : getDefaultSubtype("books", current.subtype),
-      title: result.title || current.title,
-      creator: result.authors || current.creator,
-      imageUrl: result.imageUrl || current.imageUrl,
-      notes: buildOpenLibraryBookNotes(result) || current.notes,
-    }));
-    setBookStatus("success");
-    setBookResults([]);
-    setBookMessage(isKoreanBook ? "Korean book details added." : "Book details added. You can adjust the type before saving.");
-  }
-
-  async function searchAladinBooks(event) {
-    event?.preventDefault();
-    const cleanedQuery = aladinQuery.trim();
-
-    if (!cleanedQuery || !canUseBookLookup) {
-      setAladinStatus("error");
-      setAladinMessage("Enter a Korean book title or author to search.");
-      return;
-    }
-
-    setAladinStatus("loading");
-    setAladinMessage("");
-    setAladinResults([]);
-
+  async function fetchAladinResults(searchText) {
     try {
       const url = new URL("/api/aladin/books", window.location.origin);
-      url.searchParams.set("query", cleanedQuery);
+      url.searchParams.set("query", searchText);
 
       const response = await fetch(url);
       const data = await response.json();
@@ -664,50 +690,19 @@ function App() {
         .slice(0, 8);
 
       if (!results.length) {
-        setAladinStatus("error");
-        setAladinMessage("No Aladin Korean book results found.");
-        return;
+        return { results: [], message: "No Aladin Korean book results found." };
       }
 
-      setAladinResults(results);
-      setAladinStatus("success");
+      return { results: results.map((result) => createLookupResult("aladin", result)), message: "" };
     } catch (error) {
-      setAladinStatus("error");
-      setAladinMessage(error.message || "Aladin lookup failed. Check your key and try again.");
+      return { results: [], message: error.message || "Aladin lookup failed." };
     }
   }
 
-  function applyAladinBookResult(result) {
-    setDraft((current) => ({
-      ...current,
-      subtype: "korean-book",
-      title: result.title || current.title,
-      creator: result.authors || current.creator,
-      imageUrl: result.imageUrl || current.imageUrl,
-      notes: buildAladinBookNotes(result) || current.notes,
-    }));
-    setAladinStatus("success");
-    setAladinResults([]);
-    setAladinMessage("Korean book details added from Aladin.");
-  }
-
-  async function searchManga(event) {
-    event?.preventDefault();
-    const cleanedQuery = mangaQuery.trim();
-
-    if (!cleanedQuery || !canUseMangaLookup) {
-      setMangaStatus("error");
-      setMangaMessage("Enter a manga title to search.");
-      return;
-    }
-
-    setMangaStatus("loading");
-    setMangaMessage("");
-    setMangaResults([]);
-
+  async function fetchMangaResults(searchText) {
     try {
       const url = new URL("https://api.jikan.moe/v4/manga");
-      url.searchParams.set("q", cleanedQuery);
+      url.searchParams.set("q", searchText);
       url.searchParams.set("limit", "8");
       url.searchParams.set("sfw", "true");
 
@@ -724,17 +719,132 @@ function App() {
         .slice(0, 8);
 
       if (!results.length) {
-        setMangaStatus("error");
-        setMangaMessage("No Jikan manga results found.");
-        return;
+        return { results: [], message: "No Jikan manga results found." };
       }
 
-      setMangaResults(results);
-      setMangaStatus("success");
+      return { results: results.map((result) => createLookupResult("jikan", result)), message: "" };
     } catch (error) {
-      setMangaStatus("error");
-      setMangaMessage(error.message || "Jikan lookup failed. Check your connection and try again.");
+      return { results: [], message: error.message || "Jikan lookup failed." };
     }
+  }
+
+  async function applyLookupResult(lookupResult) {
+    setLookupStatus("loading");
+    setLookupMessage("");
+
+    try {
+      if (lookupResult.source === "omdb") {
+        await applyOmdbResult(lookupResult.result);
+      } else if (lookupResult.source === "tmdb") {
+        await applyTmdbResult(lookupResult.result);
+      } else if (lookupResult.source === "open-library") {
+        applyBookResult(lookupResult.result);
+      } else if (lookupResult.source === "aladin") {
+        applyAladinBookResult(lookupResult.result);
+      } else {
+        applyMangaResult(lookupResult.result);
+      }
+    } catch (error) {
+      setLookupStatus("error");
+      setLookupMessage(error.message || "Could not apply that result.");
+    }
+  }
+
+  async function applyOmdbResult(result) {
+    const url = new URL("https://www.omdbapi.com/");
+    url.searchParams.set("apikey", omdbApiKey);
+    url.searchParams.set("i", result.imdbID);
+    url.searchParams.set("plot", "short");
+
+    const response = await fetch(url);
+    const detail = await response.json();
+
+    if (detail.Response === "False") {
+      throw new Error(detail.Error || "Could not load OMDb details.");
+    }
+
+    const creator = draft.category === "movies" ? detail.Director : detail.Writer || detail.Director;
+    const notes = buildOmdbNotes(detail);
+
+    setDraft((current) => ({
+      ...current,
+      title: cleanOmdbValue(detail.Title) || result.Title || current.title,
+      creator: cleanOmdbValue(creator) || current.creator,
+      imageUrl: cleanOmdbValue(detail.Poster) || cleanOmdbValue(result.Poster) || current.imageUrl,
+      notes: notes || current.notes,
+    }));
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage("Details added from OMDb. You can edit anything before saving.");
+  }
+
+  async function applyTmdbResult(result) {
+    const url = new URL(`https://api.themoviedb.org/3/${result.mediaType}/${result.id}`);
+    applyTmdbAuth(url);
+    url.searchParams.set("language", tmdbLanguage);
+    url.searchParams.set("append_to_response", "credits");
+
+    const response = await fetch(url, getTmdbRequestOptions());
+    const detail = await response.json();
+
+    if (!response.ok) {
+      throw new Error(detail.status_message || "Could not load TMDb details.");
+    }
+
+    const isKorean = getTmdbCountries(detail, result.mediaType).includes("KR");
+    const title = cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
+    const originalTitle = cleanTmdbValue(result.originalTitle) || cleanTmdbValue(detail.original_title || detail.original_name);
+    const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvCreator(detail);
+    const notes = buildTmdbNotes(detail, result.mediaType, originalTitle);
+
+    setDraft((current) => ({
+      ...current,
+      category: result.mediaType === "movie" ? "movies" : "tv",
+      subtype:
+        result.mediaType === "movie"
+          ? isKorean
+            ? "korean-movie"
+            : current.subtype || "movie"
+          : isKorean
+            ? "kdrama"
+            : current.subtype || "tv",
+      title: title || current.title,
+      creator: creator || current.creator,
+      imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath) || current.imageUrl,
+      notes: notes || current.notes,
+    }));
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage(isKorean ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
+  }
+
+  function applyBookResult(result) {
+    const isKoreanBook = result.languages.includes("kor");
+    setDraft((current) => ({
+      ...current,
+      subtype: isKoreanBook ? "korean-book" : getDefaultSubtype("books", current.subtype),
+      title: result.title || current.title,
+      creator: result.authors || current.creator,
+      imageUrl: result.imageUrl || current.imageUrl,
+      notes: buildOpenLibraryBookNotes(result) || current.notes,
+    }));
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage(isKoreanBook ? "Korean book details added." : "Book details added. You can adjust the type before saving.");
+  }
+
+  function applyAladinBookResult(result) {
+    setDraft((current) => ({
+      ...current,
+      subtype: "korean-book",
+      title: result.title || current.title,
+      creator: result.authors || current.creator,
+      imageUrl: result.imageUrl || current.imageUrl,
+      notes: buildAladinBookNotes(result) || current.notes,
+    }));
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage("Korean book details added from Aladin.");
   }
 
   function applyMangaResult(result) {
@@ -745,9 +855,9 @@ function App() {
       imageUrl: result.imageUrl || current.imageUrl,
       notes: buildJikanMangaNotes(result) || current.notes,
     }));
-    setMangaStatus("success");
-    setMangaResults([]);
-    setMangaMessage("Manga details added from Jikan. You can edit anything before saving.");
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage("Manga details added from Jikan. You can edit anything before saving.");
   }
 
   return (
@@ -762,9 +872,31 @@ function App() {
               </div>
               <h1 className="mt-1 text-2xl font-semibold text-stone-950 sm:text-3xl">Media Shelf</h1>
             </div>
+            <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-56">
+              <button
+                className={`inline-flex h-9 items-center justify-center gap-2 rounded text-sm font-semibold transition ${
+                  activeView === "home" ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                }`}
+                onClick={() => setActiveView("home")}
+                type="button"
+              >
+                <Home size={15} />
+                Home
+              </button>
+              <button
+                className={`inline-flex h-9 items-center justify-center gap-2 rounded text-sm font-semibold transition ${
+                  activeView === "library" ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                }`}
+                onClick={() => setActiveView("library")}
+                type="button"
+              >
+                <Library size={15} />
+                Library
+              </button>
+            </div>
           </div>
 
-          <div className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5">
+          <div className={`hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5 ${activeView === "home" ? "sm:hidden" : ""}`}>
             {categories.map((entry) => {
               const Icon = entry.icon;
               const isActive = entry.id === activeCategory;
@@ -793,6 +925,14 @@ function App() {
         </div>
       </section>
 
+      {activeView === "home" ? (
+        <HomeView
+          counts={counts}
+          items={items}
+          onBrowseCategory={showCategory}
+          onStartLookup={startHomeLookup}
+        />
+      ) : (
       <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <div className="min-w-0">
           <div className="flex flex-col gap-3 border-b border-stone-300 pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -804,8 +944,9 @@ function App() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <ShelfSearch query={query} onChange={setQuery} />
+              <SortSelect sortOrder={sortOrder} onChange={setSortOrder} />
               <ViewToggle shelfView={shelfView} onChange={setShelfView} />
               <div className="grid flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-64 sm:flex-none">
                 {statuses.map((status) => (
@@ -879,6 +1020,8 @@ function App() {
           )}
         </div>
       </section>
+      )}
+      {activeView === "library" && (
       <button
         className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 sm:bottom-6 sm:right-6"
         onClick={startNewItem}
@@ -888,18 +1031,11 @@ function App() {
       >
         <Plus size={24} />
       </button>
+      )}
       {isEditorOpen && (
         <EditorSheet
           activeStatus={activeStatus}
-          aladinMessage={aladinMessage}
-          aladinQuery={aladinQuery}
-          aladinResults={aladinResults}
-          aladinStatus={aladinStatus}
           bookLanguage={bookLanguage}
-          bookMessage={bookMessage}
-          bookQuery={bookQuery}
-          bookResults={bookResults}
-          bookStatus={bookStatus}
           canUseBookLookup={canUseBookLookup}
           canUseMangaLookup={canUseMangaLookup}
           canUseOmdb={canUseOmdb}
@@ -907,48 +1043,31 @@ function App() {
           category={category}
           draft={draft}
           editingId={editingId}
-          onApplyAladinBook={applyAladinBookResult}
-          onApplyBook={applyBookResult}
-          onApplyManga={applyMangaResult}
           onClose={closeEditor}
+          onLookupQueryChange={setLookupQuery}
+          onApplyLookupResult={applyLookupResult}
           onSubmit={handleSubmit}
           onUpdateDraft={updateDraft}
-          mangaMessage={mangaMessage}
-          mangaQuery={mangaQuery}
-          mangaResults={mangaResults}
-          mangaStatus={mangaStatus}
-          omdbMessage={omdbMessage}
-          omdbQuery={omdbQuery}
-          omdbResults={omdbResults}
-          omdbStatus={omdbStatus}
-          onApplyOmdb={applyOmdbResult}
-          onApplyTmdb={applyTmdbResult}
-          onAladinQueryChange={setAladinQuery}
           onBookLanguageChange={setBookLanguage}
-          onBookQueryChange={setBookQuery}
-          onMangaQueryChange={setMangaQuery}
-          onOmdbQueryChange={setOmdbQuery}
-          onSearchAladinBooks={searchAladinBooks}
-          onSearchBooks={searchBooks}
-          onSearchManga={searchManga}
-          onSearchOmdb={searchOmdb}
-          onSearchTmdb={searchTmdb}
+          onSearchDetails={searchDetails}
           onTmdbLanguageChange={setTmdbLanguage}
-          onTmdbQueryChange={setTmdbQuery}
+          lookupMessage={lookupMessage}
+          lookupProviders={lookupProviders}
+          lookupQuery={lookupQuery}
+          lookupResults={lookupResults}
+          lookupStatus={lookupStatus}
           setActiveCategory={setActiveCategory}
           setActiveStatus={setActiveStatus}
           tmdbLanguage={tmdbLanguage}
-          tmdbMessage={tmdbMessage}
-          tmdbQuery={tmdbQuery}
-          tmdbResults={tmdbResults}
-          tmdbStatus={tmdbStatus}
         />
       )}
-      <BottomNav
-        activeCategory={activeCategory}
-        counts={counts}
-        onShowCategory={showCategory}
-      />
+      {activeView === "library" && (
+        <BottomNav
+          activeCategory={activeCategory}
+          counts={counts}
+          onShowCategory={showCategory}
+        />
+      )}
     </main>
   );
 }
@@ -1155,9 +1274,174 @@ function getSubtypeLabel(item) {
   return "";
 }
 
+function HomeView({ counts, items, onBrowseCategory, onStartLookup }) {
+  const [homeQuery, setHomeQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("Want to Watch/Read");
+  const selectedCategoryDetails = categories.find((entry) => entry.id === selectedCategory);
+  const recentItems = items.slice(-6).reverse();
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    if (!selectedCategory) return;
+
+    onStartLookup({
+      categoryId: selectedCategory,
+      query: homeQuery,
+      status: selectedStatus,
+    });
+  }
+
+  return (
+    <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="min-w-0">
+          <div className="max-w-3xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">Log something new</p>
+            <h2 className="mt-2 text-3xl font-semibold leading-tight text-stone-950 sm:text-5xl">Choose a media type.</h2>
+          </div>
+
+          <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+            {categories.map((entry) => {
+              const Icon = entry.icon;
+              const isSelected = entry.id === selectedCategory;
+              return (
+                <button
+                  key={entry.id}
+                  className={`inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-full border text-sm font-semibold transition sm:h-10 sm:w-auto sm:justify-start sm:px-3 ${
+                    isSelected
+                      ? "border-stone-950 bg-stone-950 text-white shadow-sm"
+                      : "border-stone-300 bg-white text-stone-700 hover:border-teal-700 hover:text-teal-800"
+                  }`}
+                  onClick={() => setSelectedCategory(entry.id)}
+                  type="button"
+                  aria-label={entry.label}
+                  title={entry.label}
+                >
+                  <Icon size={17} />
+                  <span className="hidden sm:inline">{entry.label}</span>
+                  <span className={`hidden rounded-full px-1.5 py-0.5 text-[11px] sm:inline ${
+                    isSelected ? "bg-white/15 text-stone-100" : "bg-stone-100 text-stone-500"
+                  }`}>
+                    {(counts[entry.id]?.Completed || 0) + (counts[entry.id]?.["Want to Watch/Read"] || 0)} saved
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <form className="mt-5 max-w-3xl" onSubmit={handleSubmit}>
+            <div className={`rounded-md border bg-white p-1 shadow-sm ${selectedCategory ? "border-stone-300" : "border-dashed border-stone-300"}`}>
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+                <input
+                  className="h-12 w-full rounded border-0 bg-white pl-10 pr-3 text-sm font-medium text-stone-950 outline-none placeholder:text-stone-400 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-50"
+                  disabled={!selectedCategory}
+                  value={homeQuery}
+                  onChange={(event) => setHomeQuery(event.target.value)}
+                  placeholder={selectedCategoryDetails ? `Search ${selectedCategoryDetails.label.toLowerCase()} to log` : "Pick a media type first"}
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+              <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-white p-1 sm:w-72">
+                {statuses.map((status) => (
+                  <button
+                    key={status}
+                    className={`min-h-9 rounded px-3 text-sm font-semibold transition ${
+                      selectedStatus === status ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                    }`}
+                    onClick={() => setSelectedStatus(status)}
+                    type="button"
+                  >
+                    {statusLabels[status]}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300"
+                disabled={!selectedCategory}
+                type="submit"
+              >
+                <Search size={17} />
+                Search to add
+              </button>
+            </div>
+          </form>
+
+          {recentItems.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Recently added</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {recentItems.map((item) => {
+                  const itemCategory = categories.find((entry) => entry.id === item.category);
+                  const Icon = itemCategory?.icon || Library;
+                  return (
+                    <div key={item.id} className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 shadow-sm">
+                      {item.imageUrl ? (
+                        <img className="h-16 w-11 rounded object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
+                      ) : (
+                        <div className="cover-fallback h-16 w-11 rounded" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-stone-950">{item.title}</p>
+                        <p className="mt-1 truncate text-xs text-stone-600">{item.creator || "Unknown creator"}</p>
+                        <p className="mt-1 text-xs font-medium text-stone-500">{statusLabels[item.status] || item.status}</p>
+                      </div>
+                      <span className="inline-flex h-8 items-center gap-1 rounded bg-teal-50 px-2 text-[11px] font-semibold text-teal-800 ring-1 ring-teal-100">
+                        <Icon size={13} />
+                        {itemCategory?.label.replace("TV Shows", "TV") || "Media"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="grid gap-4">
+          <div className="rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Library snapshot</h3>
+            <div className="mt-4 grid grid-cols-6 gap-x-2 gap-y-5">
+              {categories.map((entry, index) => {
+                const Icon = entry.icon;
+                const completedCount = counts[entry.id]?.Completed || 0;
+                const plannedCount = counts[entry.id]?.["Want to Watch/Read"] || 0;
+                const totalCount = completedCount + plannedCount;
+                return (
+                  <button
+                    key={entry.id}
+                    className={`group flex flex-col items-center text-center text-stone-700 transition ${index < 3 ? "col-span-2" : "col-span-3"}`}
+                    onClick={() => onBrowseCategory(entry.id)}
+                    type="button"
+                  >
+                    <Icon size={18} className="text-teal-700 transition group-hover:text-teal-800" />
+                    <span className="mt-2 text-3xl font-semibold leading-none text-stone-950 transition group-hover:text-teal-800">
+                      {totalCount}
+                    </span>
+                    <span className="mt-2 max-w-full truncate text-xs font-semibold text-stone-700 underline-offset-4 transition group-hover:text-teal-800 group-hover:underline">
+                      {entry.label.replace("TV Shows", "TV")}
+                    </span>
+                    <span className="mt-1 text-[11px] font-medium text-stone-500">
+                      {completedCount} done / {plannedCount} want
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function ShelfSearch({ query, onChange }) {
   return (
-    <label className="relative block w-full min-w-0 sm:w-44 md:w-52">
+    <label className="relative block min-w-0 flex-1 sm:w-44 sm:flex-none md:w-52">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" size={15} />
       <input
         className="h-9 w-full rounded-md border border-stone-300 bg-white/80 pl-8 pr-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
@@ -1165,6 +1449,33 @@ function ShelfSearch({ query, onChange }) {
         onChange={(event) => onChange(event.target.value)}
         placeholder="Filter shelf"
       />
+    </label>
+  );
+}
+
+function SortSelect({ sortOrder, onChange }) {
+  const activeOption = sortOptions.find((option) => option.value === sortOrder) || sortOptions[0];
+  const Icon = activeOption.icon;
+
+  return (
+    <label
+      className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-100"
+      title={`Sort: ${activeOption.label}`}
+    >
+      <span className="sr-only">Sort shelf</span>
+      <Icon size={15} />
+      <select
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        value={sortOrder}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="Sort shelf"
+      >
+        {sortOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -1333,15 +1644,7 @@ function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
 
 function EditorSheet({
   activeStatus,
-  aladinMessage,
-  aladinQuery,
-  aladinResults,
-  aladinStatus,
   bookLanguage,
-  bookMessage,
-  bookQuery,
-  bookResults,
-  bookStatus,
   canUseBookLookup,
   canUseMangaLookup,
   canUseOmdb,
@@ -1349,42 +1652,25 @@ function EditorSheet({
   category,
   draft,
   editingId,
-  onApplyAladinBook,
-  onApplyBook,
-  onApplyManga,
-  onApplyOmdb,
-  onApplyTmdb,
-  onAladinQueryChange,
+  lookupMessage,
+  lookupProviders,
+  lookupQuery,
+  lookupResults,
+  lookupStatus,
+  onApplyLookupResult,
   onBookLanguageChange,
-  onBookQueryChange,
   onClose,
-  onMangaQueryChange,
-  onOmdbQueryChange,
-  onSearchAladinBooks,
-  onSearchBooks,
-  onSearchManga,
-  onSearchOmdb,
-  onSearchTmdb,
+  onLookupQueryChange,
+  onSearchDetails,
   onSubmit,
   onTmdbLanguageChange,
-  onTmdbQueryChange,
   onUpdateDraft,
-  mangaMessage,
-  mangaQuery,
-  mangaResults,
-  mangaStatus,
-  omdbMessage,
-  omdbQuery,
-  omdbResults,
-  omdbStatus,
   setActiveCategory,
   setActiveStatus,
   tmdbLanguage,
-  tmdbMessage,
-  tmdbQuery,
-  tmdbResults,
-  tmdbStatus,
 }) {
+  const canLookupDetails = canUseBookLookup || canUseMangaLookup || canUseOmdb || canUseTmdb;
+
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 sm:items-center sm:justify-center">
       <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-300 bg-white p-4 shadow-lift sm:max-w-xl sm:rounded-xl sm:p-5">
@@ -1405,68 +1691,23 @@ function EditorSheet({
         </div>
 
         <form className="mt-5 space-y-4" onSubmit={onSubmit}>
-          {canUseBookLookup && (
-            <>
-              <AladinBookLookup
-                message={aladinMessage}
-                onApply={onApplyAladinBook}
-                onQueryChange={onAladinQueryChange}
-                onSearch={onSearchAladinBooks}
-                query={aladinQuery}
-                results={aladinResults}
-                status={aladinStatus}
-              />
-              <BookLookup
-                language={bookLanguage}
-                message={bookMessage}
-                onApply={onApplyBook}
-                onLanguageChange={onBookLanguageChange}
-                onQueryChange={onBookQueryChange}
-                onSearch={onSearchBooks}
-                query={bookQuery}
-                results={bookResults}
-                status={bookStatus}
-              />
-            </>
-          )}
-
-          {canUseMangaLookup && (
-            <MangaLookup
-              message={mangaMessage}
-              onApply={onApplyManga}
-              onQueryChange={onMangaQueryChange}
-              onSearch={onSearchManga}
-              query={mangaQuery}
-              results={mangaResults}
-              status={mangaStatus}
-            />
-          )}
-
-          {canUseTmdb && (
-            <TmdbLookup
+          {canLookupDetails && (
+            <DetailsLookup
+              bookLanguage={bookLanguage}
               categoryLabel={category.label}
-              language={tmdbLanguage}
-              message={tmdbMessage}
-              onApply={onApplyTmdb}
-              onLanguageChange={onTmdbLanguageChange}
-              onQueryChange={onTmdbQueryChange}
-              onSearch={onSearchTmdb}
-              query={tmdbQuery}
-              results={tmdbResults}
-              status={tmdbStatus}
-            />
-          )}
-
-          {canUseOmdb && (
-            <OmdbLookup
-              categoryLabel={category.label}
-              message={omdbMessage}
-              onApply={onApplyOmdb}
-              onQueryChange={onOmdbQueryChange}
-              onSearch={onSearchOmdb}
-              query={omdbQuery}
-              results={omdbResults}
-              status={omdbStatus}
+              canUseBookLookup={canUseBookLookup}
+              canUseTmdb={canUseTmdb}
+              lookupProviders={lookupProviders}
+              message={lookupMessage}
+              onApply={onApplyLookupResult}
+              onBookLanguageChange={onBookLanguageChange}
+              onQueryChange={onLookupQueryChange}
+              onSearch={onSearchDetails}
+              onTmdbLanguageChange={onTmdbLanguageChange}
+              query={lookupQuery}
+              results={lookupResults}
+              status={lookupStatus}
+              tmdbLanguage={tmdbLanguage}
             />
           )}
 
@@ -1664,6 +1905,126 @@ function buildOmdbNotes(detail) {
     .map(([label, value]) => `${label}: ${value}`);
 
   return lines.join("\n");
+}
+
+function DetailsLookup({
+  bookLanguage,
+  categoryLabel,
+  canUseBookLookup,
+  canUseTmdb,
+  lookupProviders,
+  message,
+  onApply,
+  onBookLanguageChange,
+  onQueryChange,
+  onSearch,
+  onTmdbLanguageChange,
+  query,
+  results,
+  status,
+  tmdbLanguage,
+}) {
+  return (
+    <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-stone-800">Find details</span>
+        {lookupProviders.map((provider) => (
+          <span key={provider.id} className="rounded bg-white px-2 py-1 text-xs font-semibold text-teal-800 ring-1 ring-teal-100">
+            {provider.label}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">Search title details</span>
+          <input
+            className="input bg-white"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                onSearch(event);
+              }
+            }}
+            placeholder={`Search ${categoryLabel.toLowerCase()} title`}
+          />
+        </label>
+        <button
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          disabled={status === "loading"}
+          onClick={onSearch}
+          type="button"
+          aria-label="Find title details"
+          title="Find title details"
+        >
+          <Search size={17} />
+        </button>
+      </div>
+
+      {(canUseBookLookup || canUseTmdb) && (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {canUseBookLookup && (
+            <label>
+              <span className="mb-2 block text-sm font-medium text-stone-700">Book language</span>
+              <select className="input bg-white" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
+                <option value="all">Any language</option>
+                <option value="ko">Korean</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+          )}
+
+          {canUseTmdb && (
+            <label>
+              <span className="mb-2 block text-sm font-medium text-stone-700">TMDb language</span>
+              <select className="input bg-white" value={tmdbLanguage} onChange={(event) => onTmdbLanguageChange(event.target.value)}>
+                <option value="en-US">English</option>
+                <option value="ko-KR">Korean</option>
+              </select>
+            </label>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-teal-800"}`}>
+          {message}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {results.map((lookupResult) => {
+            const imageUrl = getLookupResultImage(lookupResult);
+            const title = getLookupResultTitle(lookupResult);
+            return (
+              <li key={lookupResult.id}>
+                <button
+                  className="grid w-full grid-cols-[42px_minmax(0,1fr)_auto] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-teal-500"
+                  onClick={() => onApply(lookupResult)}
+                  type="button"
+                >
+                  {imageUrl ? (
+                    <img className="h-14 w-10 rounded object-cover" src={imageUrl} alt={`${title} cover`} />
+                  ) : (
+                    <div className="cover-fallback h-14 w-10 rounded" />
+                  )}
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-stone-950">{title}</span>
+                    <span className="mt-1 block truncate text-xs text-stone-600">{getLookupResultMeta(lookupResult)}</span>
+                  </span>
+                  <span className="self-start rounded bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-600">
+                    {lookupResult.sourceLabel}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function BookLookup({ language, message, onApply, onLanguageChange, onQueryChange, onSearch, query, results, status }) {

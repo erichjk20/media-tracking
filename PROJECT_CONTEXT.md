@@ -38,6 +38,7 @@ The main app supports:
 - Add, edit, and delete media items
 - Search across title, creator, and notes
 - OMDb lookup for Movies, TV Shows, and Anime
+- Open Library lookup for Books
 - Per-category counts
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
@@ -51,6 +52,7 @@ The main app supports:
 - Tailwind CSS 3
 - lucide-react for icons
 - OMDb API for movie, TV show, and anime lookup
+- Open Library API for book lookup
 
 ## Project Structure
 
@@ -171,6 +173,11 @@ VITE_TMDB_API_KEY
 
 ## Subtypes
 
+Books support a lightweight `subtype` field:
+
+- `book`
+- `korean-book`
+
 Movies support a lightweight `subtype` field:
 
 - `movie`
@@ -182,9 +189,9 @@ TV Shows support a lightweight `subtype` field:
 - `tv`
 - `kdrama`
 
-Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
+Existing saved book items without a subtype are normalized to `book` at load time. Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
 
-The Movies shelf includes an `All / Movies / Anime / Korean` filter. The TV Shows shelf includes an `All / TV / K-Drama` filter. Anime movies and Korean movies stay under Movies, K-Dramas stay under TV Shows, and the Anime category is reserved for anime series.
+The Books shelf includes an `All / Books / Korean` filter. The Movies shelf includes an `All / Movies / Anime / Korean` filter. The TV Shows shelf includes an `All / TV / K-Drama` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, K-Dramas stay under TV Shows, and the Anime category is reserved for anime series.
 
 The local API key is read from:
 
@@ -193,6 +200,20 @@ VITE_OMDB_API_KEY
 ```
 
 Because this is a frontend-only app, any Vite environment variable used by the browser is included in the built client bundle. Treat the current setup as appropriate for a personal/local app, not a private production secret.
+
+## Open Library Lookup
+
+Books include an Open Library-powered lookup panel in the add/edit form.
+
+The lookup:
+
+- Accepts English or Korean search text.
+- Can search all languages, Korean-only results, or English-only results.
+- Uses Open Library search via `https://openlibrary.org/search.json`.
+- Does not require a local API key.
+- Fills title, author, cover image URL, and notes with Open Library metadata.
+- Automatically marks Korean-language book results as `korean-book`.
+- Saves titles and authors exactly as returned by the API.
 
 ## UX And Product Notes
 

@@ -47,6 +47,12 @@ const movieSubtypeOptions = [
   { value: "korean-movie", label: "Korean" },
 ];
 
+const bookSubtypeOptions = [
+  { value: "all", label: "All" },
+  { value: "book", label: "Books" },
+  { value: "korean-book", label: "Korean" },
+];
+
 const tvSubtypeOptions = [
   { value: "all", label: "All" },
   { value: "tv", label: "TV" },
@@ -57,6 +63,7 @@ const defaultItems = [
   {
     id: "book-1",
     category: "books",
+    subtype: "book",
     status: "Completed",
     title: "Piranesi",
     creator: "Susanna Clarke",
@@ -136,19 +143,22 @@ function getStoredItems() {
 function normalizeItems(items) {
   return items.map((item) => ({
     ...item,
-    subtype:
-      item.category === "movies"
-        ? item.subtype || "movie"
-        : item.category === "tv"
-          ? item.subtype || "tv"
-          : "",
+    subtype: getDefaultSubtype(item.category, item.subtype),
   }));
+}
+
+function getDefaultSubtype(category, subtype = "") {
+  if (category === "books") return bookSubtypeOptions.some((option) => option.value === subtype) && subtype !== "all" ? subtype : "book";
+  if (category === "movies") return movieSubtypeOptions.some((option) => option.value === subtype) && subtype !== "all" ? subtype : "movie";
+  if (category === "tv") return tvSubtypeOptions.some((option) => option.value === subtype) && subtype !== "all" ? subtype : "tv";
+  return "";
 }
 
 function App() {
   const [items, setItems] = useState(getStoredItems);
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
+  const [activeBookSubtype, setActiveBookSubtype] = useState("all");
   const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
   const [activeTvSubtype, setActiveTvSubtype] = useState("all");
   const [shelfView, setShelfView] = useState("list");
@@ -165,14 +175,24 @@ function App() {
   const [tmdbResults, setTmdbResults] = useState([]);
   const [tmdbStatus, setTmdbStatus] = useState("idle");
   const [tmdbMessage, setTmdbMessage] = useState("");
+  const [bookQuery, setBookQuery] = useState("");
+  const [bookLanguage, setBookLanguage] = useState("all");
+  const [bookResults, setBookResults] = useState([]);
+  const [bookStatus, setBookStatus] = useState("idle");
+  const [bookMessage, setBookMessage] = useState("");
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const canUseOmdb = Object.hasOwn(omdbTypesByCategory, draft.category);
   const canUseTmdb = draft.category === "movies" || draft.category === "tv";
+  const canUseBookLookup = draft.category === "books";
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items
       .filter((item) => item.category === activeCategory && item.status === activeStatus)
+      .filter((item) => {
+        if (activeCategory !== "books" || activeBookSubtype === "all") return true;
+        return (item.subtype || "book") === activeBookSubtype;
+      })
       .filter((item) => {
         if (activeCategory !== "movies" || activeMovieSubtype === "all") return true;
         return (item.subtype || "movie") === activeMovieSubtype;
@@ -188,7 +208,7 @@ function App() {
         );
       })
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [activeCategory, activeMovieSubtype, activeStatus, activeTvSubtype, items, query]);
+  }, [activeBookSubtype, activeCategory, activeMovieSubtype, activeStatus, activeTvSubtype, items, query]);
 
   const counts = useMemo(() => {
     return categories.reduce((categoryCounts, currentCategory) => {
@@ -213,6 +233,15 @@ function App() {
     }, {});
   }, [activeStatus, items]);
 
+  const bookSubtypeCounts = useMemo(() => {
+    const bookItems = items.filter((item) => item.category === "books" && item.status === activeStatus);
+    return bookSubtypeOptions.reduce((subtypeCounts, option) => {
+      subtypeCounts[option.value] =
+        option.value === "all" ? bookItems.length : bookItems.filter((item) => (item.subtype || "book") === option.value).length;
+      return subtypeCounts;
+    }, {});
+  }, [activeStatus, items]);
+
   const tvSubtypeCounts = useMemo(() => {
     const tvItems = items.filter((item) => item.category === "tv" && item.status === activeStatus);
     return tvSubtypeOptions.reduce((subtypeCounts, option) => {
@@ -230,12 +259,7 @@ function App() {
     setDraft((current) => ({
       ...current,
       category: activeCategory,
-      subtype:
-        activeCategory === "movies"
-          ? current.subtype || "movie"
-          : activeCategory === "tv"
-            ? current.subtype || "tv"
-            : "",
+      subtype: getDefaultSubtype(activeCategory, current.subtype),
       status: activeStatus,
       rating: activeStatus === "Completed" ? current.rating || 3 : 0,
     }));
@@ -251,6 +275,10 @@ function App() {
     setTmdbResults([]);
     setTmdbStatus("idle");
     setTmdbMessage("");
+    setBookQuery("");
+    setBookResults([]);
+    setBookStatus("idle");
+    setBookMessage("");
   }, [draft.category]);
 
   function handleSubmit(event) {
@@ -263,12 +291,7 @@ function App() {
       id: editingId || crypto.randomUUID(),
       title: cleanedTitle,
       creator: draft.creator.trim(),
-      subtype:
-        draft.category === "movies"
-          ? draft.subtype || "movie"
-          : draft.category === "tv"
-            ? draft.subtype || "tv"
-            : "",
+      subtype: getDefaultSubtype(draft.category, draft.subtype),
       rating: draft.status === "Completed" ? Number(draft.rating) : 0,
       notes: draft.notes.trim(),
       imageUrl: draft.imageUrl.trim(),
@@ -285,7 +308,7 @@ function App() {
     setDraft({
       ...emptyDraft,
       category: activeCategory,
-      subtype: activeCategory === "movies" ? "movie" : activeCategory === "tv" ? "tv" : "",
+      subtype: getDefaultSubtype(activeCategory),
       status: activeStatus,
       rating: activeStatus === "Completed" ? 3 : 0,
     });
@@ -304,7 +327,7 @@ function App() {
     setDraft({
       ...emptyDraft,
       category: activeCategory,
-      subtype: activeCategory === "movies" ? "movie" : activeCategory === "tv" ? "tv" : "",
+      subtype: getDefaultSubtype(activeCategory),
       status: activeStatus,
       rating: activeStatus === "Completed" ? 3 : 0,
     });
@@ -326,9 +349,7 @@ function App() {
     setDraft((current) => ({
       ...current,
       [field]: value,
-      ...(field === "category" && value === "movies" ? { subtype: current.subtype || "movie" } : {}),
-      ...(field === "category" && value === "tv" ? { subtype: current.subtype || "tv" } : {}),
-      ...(field === "category" && value !== "movies" && value !== "tv" ? { subtype: "" } : {}),
+      ...(field === "category" ? { subtype: getDefaultSubtype(value, current.subtype) } : {}),
       ...(field === "status" && value !== "Completed" ? { rating: 0 } : {}),
       ...(field === "status" && value === "Completed" ? { rating: current.rating || 3 } : {}),
     }));
@@ -414,6 +435,7 @@ function App() {
         notes: notes || current.notes,
       }));
       setOmdbStatus("success");
+      setOmdbResults([]);
       setOmdbMessage("Details added from OMDb. You can edit anything before saving.");
     } catch {
       setOmdbStatus("error");
@@ -519,11 +541,79 @@ function App() {
         notes: notes || current.notes,
       }));
       setTmdbStatus("success");
+      setTmdbResults([]);
       setTmdbMessage(isKorean ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
     } catch (error) {
       setTmdbStatus("error");
       setTmdbMessage(error.message || "Could not apply that TMDb result.");
     }
+  }
+
+  async function searchBooks(event) {
+    event?.preventDefault();
+    const cleanedQuery = bookQuery.trim();
+
+    if (!cleanedQuery || !canUseBookLookup) {
+      setBookStatus("error");
+      setBookMessage("Enter an English or Korean book title to search.");
+      return;
+    }
+
+    setBookStatus("loading");
+    setBookMessage("");
+    setBookResults([]);
+
+    try {
+      const url = new URL("https://openlibrary.org/search.json");
+      url.searchParams.set("q", buildOpenLibraryQuery(cleanedQuery, bookLanguage));
+      url.searchParams.set(
+        "fields",
+        "key,title,author_name,first_publish_year,cover_i,language,publisher,subject,edition_count",
+      );
+      url.searchParams.set("limit", "8");
+      if (bookLanguage !== "all") {
+        url.searchParams.set("lang", bookLanguage);
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Open Library lookup failed.");
+      }
+
+      const results = (data.docs || [])
+        .map(normalizeOpenLibraryBookResult)
+        .filter((result) => result.title || result.authors)
+        .slice(0, 8);
+
+      if (!results.length) {
+        setBookStatus("error");
+        setBookMessage("No Open Library results found.");
+        return;
+      }
+
+      setBookResults(results);
+      setBookStatus("success");
+    } catch (error) {
+      setBookStatus("error");
+      setBookMessage(error.message || "Open Library lookup failed. Check your connection and try again.");
+    }
+  }
+
+  function applyBookResult(result) {
+    const isKoreanBook = result.languages.includes("kor");
+    setDraft((current) => ({
+      ...current,
+      subtype: isKoreanBook ? "korean-book" : getDefaultSubtype("books", current.subtype),
+      title: result.title || current.title,
+      creator: result.authors || current.creator,
+      imageUrl: result.imageUrl || current.imageUrl,
+      notes: buildOpenLibraryBookNotes(result) || current.notes,
+    }));
+    setBookStatus("success");
+    setBookResults([]);
+    setBookMessage(isKoreanBook ? "Korean book details added." : "Book details added. You can adjust the type before saving.");
   }
 
   return (
@@ -538,16 +628,6 @@ function App() {
               </div>
               <h1 className="mt-1 text-2xl font-semibold text-stone-950 sm:text-3xl">Media Shelf</h1>
             </div>
-
-            <label className="relative w-full lg:max-w-sm">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
-              <input
-                className="h-11 w-full rounded-md border border-stone-300 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search your shelf"
-              />
-            </label>
           </div>
 
           <div className="hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5">
@@ -590,7 +670,8 @@ function App() {
               </p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <ShelfSearch query={query} onChange={setQuery} />
               <ViewToggle shelfView={shelfView} onChange={setShelfView} />
               <div className="grid flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-64 sm:flex-none">
                 {statuses.map((status) => (
@@ -611,6 +692,15 @@ function App() {
               </div>
             </div>
           </div>
+
+          {activeCategory === "books" && (
+            <SubtypeFilter
+              activeSubtype={activeBookSubtype}
+              counts={bookSubtypeCounts}
+              onChange={setActiveBookSubtype}
+              options={bookSubtypeOptions}
+            />
+          )}
 
           {activeCategory === "movies" && (
             <SubtypeFilter
@@ -667,11 +757,18 @@ function App() {
       {isEditorOpen && (
         <EditorSheet
           activeStatus={activeStatus}
+          bookLanguage={bookLanguage}
+          bookMessage={bookMessage}
+          bookQuery={bookQuery}
+          bookResults={bookResults}
+          bookStatus={bookStatus}
+          canUseBookLookup={canUseBookLookup}
           canUseOmdb={canUseOmdb}
           canUseTmdb={canUseTmdb}
           category={category}
           draft={draft}
           editingId={editingId}
+          onApplyBook={applyBookResult}
           onClose={closeEditor}
           onSubmit={handleSubmit}
           onUpdateDraft={updateDraft}
@@ -681,7 +778,10 @@ function App() {
           omdbStatus={omdbStatus}
           onApplyOmdb={applyOmdbResult}
           onApplyTmdb={applyTmdbResult}
+          onBookLanguageChange={setBookLanguage}
+          onBookQueryChange={setBookQuery}
           onOmdbQueryChange={setOmdbQuery}
+          onSearchBooks={searchBooks}
           onSearchOmdb={searchOmdb}
           onSearchTmdb={searchTmdb}
           onTmdbLanguageChange={setTmdbLanguage}
@@ -791,11 +891,67 @@ function buildTmdbNotes(detail, mediaType, originalTitle) {
     .join("\n");
 }
 
+function buildOpenLibraryQuery(query, language) {
+  const languageFilter = language === "ko" ? "language:kor" : language === "en" ? "language:eng" : "";
+  return [query, languageFilter].filter(Boolean).join(" ");
+}
+
+function normalizeOpenLibraryBookResult(doc) {
+  return {
+    id: doc.key,
+    title: doc.title || "",
+    authors: normalizeOpenLibraryList(doc.author_name).join(", "),
+    firstPublishYear: doc.first_publish_year || "",
+    editionCount: doc.edition_count || "",
+    languages: normalizeOpenLibraryList(doc.language),
+    publishers: normalizeOpenLibraryList(doc.publisher).slice(0, 3).join(", "),
+    subjects: normalizeOpenLibraryList(doc.subject).slice(0, 5).join(", "),
+    imageUrl: getOpenLibraryCoverUrl(doc.cover_i),
+  };
+}
+
+function normalizeOpenLibraryList(value) {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
+function getOpenLibraryCoverUrl(coverId) {
+  return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : "";
+}
+
+function buildOpenLibraryBookNotes(result) {
+  return [
+    ["First published", result.firstPublishYear],
+    ["Editions", result.editionCount],
+    ["Publisher", result.publishers],
+    ["Language", result.languages.join(", ")],
+    ["Subjects", result.subjects],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join("\n");
+}
+
 function getSubtypeLabel(item) {
+  if (item.category === "books" && item.subtype === "korean-book") return "Korean book";
   if (item.category === "movies" && item.subtype === "anime-movie") return "Anime movie";
   if (item.category === "movies" && item.subtype === "korean-movie") return "Korean movie";
   if (item.category === "tv" && item.subtype === "kdrama") return "K-Drama";
   return "";
+}
+
+function ShelfSearch({ query, onChange }) {
+  return (
+    <label className="relative block w-full min-w-0 sm:w-44 md:w-52">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" size={15} />
+      <input
+        className="h-9 w-full rounded-md border border-stone-300 bg-white/80 pl-8 pr-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
+        value={query}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Filter shelf"
+      />
+    </label>
+  );
 }
 
 function ViewToggle({ shelfView, onChange }) {
@@ -962,15 +1118,25 @@ function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
 
 function EditorSheet({
   activeStatus,
+  bookLanguage,
+  bookMessage,
+  bookQuery,
+  bookResults,
+  bookStatus,
+  canUseBookLookup,
   canUseOmdb,
   canUseTmdb,
   category,
   draft,
   editingId,
+  onApplyBook,
   onApplyOmdb,
   onApplyTmdb,
+  onBookLanguageChange,
+  onBookQueryChange,
   onClose,
   onOmdbQueryChange,
+  onSearchBooks,
   onSearchOmdb,
   onSearchTmdb,
   onSubmit,
@@ -1009,6 +1175,20 @@ function EditorSheet({
         </div>
 
         <form className="mt-5 space-y-4" onSubmit={onSubmit}>
+          {canUseBookLookup && (
+            <BookLookup
+              language={bookLanguage}
+              message={bookMessage}
+              onApply={onApplyBook}
+              onLanguageChange={onBookLanguageChange}
+              onQueryChange={onBookQueryChange}
+              onSearch={onSearchBooks}
+              query={bookQuery}
+              results={bookResults}
+              status={bookStatus}
+            />
+          )}
+
           {canUseTmdb && (
             <TmdbLookup
               categoryLabel={category.label}
@@ -1114,6 +1294,24 @@ function EditorSheet({
             </Field>
           )}
 
+          {draft.category === "books" && (
+            <Field label="Book type">
+              <select
+                className="input"
+                value={draft.subtype || "book"}
+                onChange={(event) => onUpdateDraft("subtype", event.target.value)}
+              >
+                {bookSubtypeOptions
+                  .filter((option) => option.value !== "all")
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.value === "korean-book" ? "Korean book" : "Book"}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
+
           {draft.category === "tv" && (
             <Field label="TV type">
               <select
@@ -1213,6 +1411,83 @@ function buildOmdbNotes(detail) {
     .map(([label, value]) => `${label}: ${value}`);
 
   return lines.join("\n");
+}
+
+function BookLookup({ language, message, onApply, onLanguageChange, onQueryChange, onSearch, query, results, status }) {
+  return (
+    <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3">
+      <div className="grid gap-3">
+        <div className="flex gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="mb-2 block text-sm font-medium text-stone-700">Open Library lookup</span>
+            <input
+              className="input bg-white"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  onSearch(event);
+                }
+              }}
+              placeholder="Search books in English or Korean"
+            />
+          </label>
+          <button
+            className="mt-7 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-sky-700 text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+            disabled={status === "loading"}
+            onClick={onSearch}
+            type="button"
+            aria-label="Search Open Library"
+            title="Search Open Library"
+          >
+            <Search size={17} />
+          </button>
+        </div>
+
+        <label>
+          <span className="mb-2 block text-sm font-medium text-stone-700">Language filter</span>
+          <select className="input bg-white" value={language} onChange={(event) => onLanguageChange(event.target.value)}>
+            <option value="all">Any language</option>
+            <option value="ko">Korean</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
+
+      {message && (
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-sky-800"}`}>
+          {message}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {results.map((result) => (
+            <li key={result.id}>
+              <button
+                className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-sky-500"
+                onClick={() => onApply(result)}
+                type="button"
+              >
+                {result.imageUrl ? (
+                  <img className="h-14 w-10 rounded object-cover" src={result.imageUrl} alt={`${result.title} cover`} />
+                ) : (
+                  <div className="cover-fallback h-14 w-10 rounded" />
+                )}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-stone-950">{result.title}</span>
+                  <span className="mt-1 block truncate text-xs text-stone-600">
+                    {result.authors || "Unknown author"}
+                    {result.firstPublishYear ? ` / ${result.firstPublishYear}` : ""}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function TmdbLookup({

@@ -3,7 +3,9 @@ import {
   BookOpen,
   Clapperboard,
   Edit3,
+  LayoutGrid,
   Library,
+  List as ListIcon,
   Plus,
   Save,
   Search,
@@ -149,6 +151,7 @@ function App() {
   const [activeStatus, setActiveStatus] = useState("Completed");
   const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
   const [activeTvSubtype, setActiveTvSubtype] = useState("all");
+  const [shelfView, setShelfView] = useState("list");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [editingId, setEditingId] = useState(null);
@@ -587,22 +590,25 @@ function App() {
               </p>
             </div>
 
-            <div className="grid w-full grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-64">
-              {statuses.map((status) => (
-                <button
-                  key={status}
-                  className={`min-h-8 rounded px-2 text-xs font-semibold transition ${
-                    activeStatus === status ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
-                  }`}
-                  onClick={() => setActiveStatus(status)}
-                  type="button"
-                >
-                  <span>{statusLabels[status]}</span>
-                  <span className={`ml-1 ${activeStatus === status ? "text-stone-300" : "text-stone-400"}`}>
-                    {counts[activeCategory]?.[status] || 0}
-                  </span>
-                </button>
-              ))}
+            <div className="flex gap-2">
+              <ViewToggle shelfView={shelfView} onChange={setShelfView} />
+              <div className="grid flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-64 sm:flex-none">
+                {statuses.map((status) => (
+                  <button
+                    key={status}
+                    className={`min-h-8 rounded px-2 text-xs font-semibold transition ${
+                      activeStatus === status ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                    }`}
+                    onClick={() => setActiveStatus(status)}
+                    type="button"
+                  >
+                    <span>{statusLabels[status]}</span>
+                    <span className={`ml-1 ${activeStatus === status ? "text-stone-300" : "text-stone-400"}`}>
+                      {counts[activeCategory]?.[status] || 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -625,11 +631,19 @@ function App() {
           )}
 
           {visibleItems.length > 0 ? (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-              {visibleItems.map((item) => (
-                <MediaItemCard key={item.id} item={item} onDelete={deleteItem} onEdit={startEdit} />
-              ))}
-            </div>
+            shelfView === "grid" ? (
+              <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
+                {visibleItems.map((item) => (
+                  <MediaPosterCard key={item.id} item={item} onDelete={deleteItem} onEdit={startEdit} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+                {visibleItems.map((item) => (
+                  <MediaItemCard key={item.id} item={item} onDelete={deleteItem} onEdit={startEdit} />
+                ))}
+              </div>
+            )
           ) : (
             <div className="mt-5 flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-6 text-center">
               <Library className="text-stone-400" size={36} />
@@ -784,6 +798,36 @@ function getSubtypeLabel(item) {
   return "";
 }
 
+function ViewToggle({ shelfView, onChange }) {
+  const options = [
+    { value: "list", label: "List", icon: ListIcon },
+    { value: "grid", label: "Grid", icon: LayoutGrid },
+  ];
+
+  return (
+    <div className="grid w-20 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5">
+      {options.map((option) => {
+        const Icon = option.icon;
+        const isActive = shelfView === option.value;
+        return (
+          <button
+            key={option.value}
+            className={`inline-flex h-8 items-center justify-center rounded transition ${
+              isActive ? "bg-teal-700 text-white" : "text-stone-600 hover:bg-stone-100"
+            }`}
+            onClick={() => onChange(option.value)}
+            type="button"
+            aria-label={`${option.label} view`}
+            title={`${option.label} view`}
+          >
+            <Icon size={15} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function MediaItemCard({ item, onDelete, onEdit }) {
   const subtypeLabel = getSubtypeLabel(item);
 
@@ -798,36 +842,95 @@ function MediaItemCard({ item, onDelete, onEdit }) {
           </div>
         )}
       </div>
-      <div className="flex min-w-0 flex-col justify-between gap-3 p-3 sm:p-4">
+      <div className="min-w-0 p-3 sm:p-4">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <div className="min-w-0">
+            <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950">{item.title}</h3>
+            <p className="mt-1 truncate text-sm text-stone-600">{item.creator || "Unknown creator"}</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex gap-1">
+              <button
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
+                onClick={() => onEdit(item)}
+                type="button"
+                aria-label={`Edit ${item.title}`}
+                title={`Edit ${item.title}`}
+              >
+                <Edit3 size={14} />
+              </button>
+              <button
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
+                onClick={() => onDelete(item.id)}
+                type="button"
+                aria-label={`Delete ${item.title}`}
+                title={`Delete ${item.title}`}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+            {item.status === "Completed" && <Rating value={item.rating} readOnly compact />}
+          </div>
+        </div>
+
         <div className="min-w-0">
-          <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950">{item.title}</h3>
-          <p className="mt-1 truncate text-sm text-stone-600">{item.creator || "Unknown creator"}</p>
           {subtypeLabel && (
             <span className="mt-2 inline-flex rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
               {subtypeLabel}
             </span>
           )}
-          {item.status === "Completed" && <Rating value={item.rating} readOnly />}
           {item.notes && <p className="mt-2 line-clamp-2 text-sm leading-5 text-stone-700 sm:line-clamp-3">{item.notes}</p>}
         </div>
+      </div>
+    </article>
+  );
+}
 
-        <div className="flex gap-2">
+function MediaPosterCard({ item, onDelete, onEdit }) {
+  const subtypeLabel = getSubtypeLabel(item);
+
+  return (
+    <article className="grid min-w-0 grid-rows-[auto_116px]">
+      <button
+        className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-teal-600"
+        onClick={() => onEdit(item)}
+        type="button"
+      >
+        <div className="aspect-[2/3] overflow-hidden bg-stone-200">
+          {item.imageUrl ? (
+            <img
+              className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+              src={item.imageUrl}
+              alt={`${item.title} cover`}
+            />
+          ) : (
+            <div className="cover-fallback flex h-full w-full items-end p-2 text-xs font-semibold text-white">
+              {item.title}
+            </div>
+          )}
+        </div>
+      </button>
+
+      <div className="mt-2 flex min-h-0 min-w-0 flex-col">
+        <h3 className="line-clamp-2 h-8 break-words text-xs font-semibold leading-4 text-stone-950 sm:text-sm">{item.title}</h3>
+        <p className="mt-1 h-4 truncate text-[11px] font-medium text-amber-700">{subtypeLabel}</p>
+        <div className="h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
+        <div className="mt-auto grid grid-cols-[1fr_32px] gap-1">
           <button
-            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-stone-300 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100"
             onClick={() => onEdit(item)}
             type="button"
           >
-            <Edit3 size={16} />
             Edit
           </button>
           <button
-            className="inline-flex h-10 w-11 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
             onClick={() => onDelete(item.id)}
             type="button"
             aria-label={`Delete ${item.title}`}
             title={`Delete ${item.title}`}
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </button>
         </div>
       </div>
@@ -1273,26 +1376,29 @@ function Field({ label, children }) {
   );
 }
 
-function Rating({ value, onChange, readOnly = false }) {
+function Rating({ value, onChange, readOnly = false, compact = false }) {
+  const starSize = compact ? 13 : 18;
+  const buttonSize = compact ? "h-6 w-6" : "h-8 w-8";
+
   return (
-    <div className="flex h-8 items-center gap-1" aria-label={`${value} out of 5 stars`}>
+    <div className={`flex items-center gap-0.5 ${compact ? "mt-1 h-5" : "h-8 gap-1"}`} aria-label={`${value} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((rating) => {
         const filled = rating <= value;
         const classes = filled ? "fill-amber-400 text-amber-500" : "text-stone-300";
         if (readOnly) {
-          return <Star key={rating} className={classes} size={18} />;
+          return <Star key={rating} className={classes} size={starSize} />;
         }
 
         return (
           <button
             key={rating}
-            className="inline-flex h-8 w-8 items-center justify-center rounded text-stone-400 transition hover:bg-amber-50 hover:text-amber-500"
+            className={`inline-flex ${buttonSize} items-center justify-center rounded text-stone-400 transition hover:bg-amber-50 hover:text-amber-500`}
             onClick={() => onChange(rating)}
             type="button"
             aria-label={`${rating} stars`}
             title={`${rating} stars`}
           >
-            <Star className={classes} size={20} />
+            <Star className={classes} size={compact ? 15 : 20} />
           </button>
         );
       })}

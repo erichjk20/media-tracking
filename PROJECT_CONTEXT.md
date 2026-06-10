@@ -199,6 +199,8 @@ Because this is a frontend-only app, any Vite environment variable used by the b
 - The first screen is the actual tracker app, not a marketing page.
 - The app is now oriented around mobile-first web use, with desktop treated as a responsive expansion.
 - Mobile browsing uses compact media rows with poster thumbnails for faster scanning.
+- Shelf browsing supports a list view and a poster grid view.
+- Poster grid view keeps at least three columns on narrow screens.
 - Mobile category switching uses a fixed bottom navigation bar.
 - Desktop and tablet show a compact top header with search and a category grid below it.
 - The previous "All completed" route/control has been removed for now.

@@ -2,7 +2,9 @@
 
 ## Goal
 
-Build a lightweight personal media library tracker web app using React, Vite, and Tailwind CSS.
+Build shelvd, a lightweight personal media library tracker web app using React, Vite, and Tailwind CSS.
+
+Tagline: Track your media without the noise.
 
 The app tracks exactly five media categories:
 

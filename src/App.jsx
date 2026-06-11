@@ -201,21 +201,29 @@ function compareShelfItems(a, b, sortOrder) {
   return getAddedSortValue(b.item, b.index) - getAddedSortValue(a.item, a.index) || compareTitles(a.item, b.item);
 }
 
-function getLookupProviders(category) {
+function getLookupProviders(category, subtype = "") {
   if (category === "books") {
     return [
       { id: "aladin", label: "Aladin" },
       { id: "open-library", label: "Open Library" },
     ];
   }
-  if (category === "movies" || category === "tv") {
-    return [
-      { id: "tmdb", label: "TMDb" },
-      { id: "omdb", label: "OMDb" },
-    ];
-  }
+  if (category === "movies" && subtype === "korean-movie") return [{ id: "tmdb", label: "TMDb" }];
+  if (category === "movies") return [{ id: "omdb", label: "OMDb" }];
+  if (category === "tv" && subtype === "kdrama") return [{ id: "tmdb", label: "TMDb" }];
+  if (category === "tv") return [{ id: "omdb", label: "OMDb" }];
   if (category === "anime") return [{ id: "omdb", label: "OMDb" }];
   if (category === "manga") return [{ id: "jikan", label: "Jikan" }];
+  return [];
+}
+
+function getFallbackLookupProviders(category, subtype = "", attemptedProviderIds = []) {
+  if (category === "movies" && subtype !== "korean-movie" && !attemptedProviderIds.includes("tmdb")) {
+    return [{ id: "tmdb", label: "TMDb" }];
+  }
+  if (category === "tv" && subtype !== "kdrama" && !attemptedProviderIds.includes("tmdb")) {
+    return [{ id: "tmdb", label: "TMDb" }];
+  }
   return [];
 }
 
@@ -295,6 +303,107 @@ function getLookupResultImage(lookupResult) {
   return result.imageUrl || "";
 }
 
+function getLookupResultYear(lookupResult) {
+  const { result, source } = lookupResult;
+  if (source === "omdb") return (result.Year || "").slice(0, 4);
+  if (source === "tmdb") return (result.releaseDate || "").slice(0, 4);
+  if (source === "open-library") return String(result.firstPublishYear || "");
+  if (source === "aladin") return (result.publishedDate || "").slice(0, 4);
+  return String(result.published || "").slice(0, 4);
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getSearchTokens(query) {
+  return normalizeSearchText(query)
+    .split(/[\s,;:()[\]{}"'`~!?.\\/|_-]+/)
+    .filter(Boolean);
+}
+
+function countTokenMatches(text, token) {
+  let count = 0;
+  let index = text.indexOf(token);
+
+  while (index !== -1) {
+    count += 1;
+    index = text.indexOf(token, index + token.length);
+  }
+
+  return count;
+}
+
+function getKeywordMatchScore(text, tokens) {
+  const normalizedText = normalizeSearchText(text);
+  if (!tokens.every((token) => normalizedText.includes(token))) return -1;
+  return tokens.reduce((score, token) => score + countTokenMatches(normalizedText, token), 0);
+}
+
+function getLookupSearchText(lookupResult) {
+  return [
+    getLookupResultTitle(lookupResult),
+    getLookupResultMeta(lookupResult),
+    lookupResult.sourceLabel,
+  ].join(" ");
+}
+
+function getLookupDedupKey(lookupResult) {
+  const title = normalizeSearchText(getLookupResultTitle(lookupResult)).replace(/[^a-z0-9가-힣]+/g, "");
+  const year = getLookupResultYear(lookupResult);
+  return `${title}-${year}`;
+}
+
+function dedupeLookupResults(results, preferredSource) {
+  const selectedByKey = new Map();
+
+  results.forEach((result, index) => {
+    const key = getLookupDedupKey(result);
+    if (!key || key === "-") {
+      selectedByKey.set(`${result.id}-${index}`, { result, index });
+      return;
+    }
+
+    const current = selectedByKey.get(key);
+    if (!current) {
+      selectedByKey.set(key, { result, index });
+      return;
+    }
+
+    const currentIsPreferred = current.result.source === preferredSource;
+    const nextIsPreferred = result.source === preferredSource;
+    if (nextIsPreferred && !currentIsPreferred) {
+      selectedByKey.set(key, { result, index });
+    }
+  });
+
+  return [...selectedByKey.values()]
+    .sort((a, b) => a.index - b.index)
+    .map(({ result }) => result);
+}
+
+function rankLookupResults(results, query) {
+  const tokens = getSearchTokens(query);
+  if (!tokens.length) return results;
+
+  return results
+    .map((result, index) => ({
+      result,
+      index,
+      score: getKeywordMatchScore(getLookupSearchText(result), tokens),
+    }))
+    .filter(({ score }) => score >= tokens.length)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(({ result }) => result);
+}
+
+function getLookupMessage(entry) {
+  return entry.status === "fulfilled" ? entry.value.message : entry.reason?.message;
+}
+
 function App() {
   const [items, setItems] = useState(getStoredItems);
   const [storageMode, setStorageMode] = useState(isSupabaseConfigured ? "loading" : "local");
@@ -321,15 +430,16 @@ function App() {
   const [bookLanguage, setBookLanguage] = useState("all");
   const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
+  const [homeSearchResetToken, setHomeSearchResetToken] = useState(0);
 
   const category = categories.find((entry) => entry.id === activeCategory);
-  const canUseOmdb = Object.hasOwn(omdbTypesByCategory, draft.category);
-  const canUseTmdb = draft.category === "movies" || draft.category === "tv";
   const canUseBookLookup = draft.category === "books";
   const canUseMangaLookup = draft.category === "manga";
-  const lookupProviders = getLookupProviders(draft.category);
+  const lookupProviders = getLookupProviders(draft.category, draft.subtype);
+  const canUseOmdb = lookupProviders.some((provider) => provider.id === "omdb");
+  const canUseTmdb = lookupProviders.some((provider) => provider.id === "tmdb");
   const visibleItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const queryTokens = getSearchTokens(query);
     return items
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => item.category === activeCategory && item.status === activeStatus)
@@ -346,10 +456,8 @@ function App() {
         return (item.subtype || "tv") === activeTvSubtype;
       })
       .filter(({ item }) => {
-        if (!normalizedQuery) return true;
-        return [item.title, item.creator, item.notes].some((value) =>
-          value.toLowerCase().includes(normalizedQuery),
-        );
+        if (!queryTokens.length) return true;
+        return getKeywordMatchScore([item.title, item.creator, item.notes].join(" "), queryTokens) >= queryTokens.length;
       })
       .sort((a, b) => compareShelfItems(a, b, sortOrder))
       .map(({ item }) => item);
@@ -449,7 +557,7 @@ function App() {
     setLookupResults([]);
     setLookupStatus("idle");
     setLookupMessage("");
-  }, [draft.category]);
+  }, [draft.category, draft.subtype]);
 
   useEffect(() => {
     if (!pendingHomeLookup || !isEditorOpen) return;
@@ -474,6 +582,7 @@ function App() {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
     if (!cleanedTitle) return;
+    const isAddingNewItem = !editingId;
 
     const nextItem = {
       ...draft,
@@ -496,6 +605,9 @@ function App() {
           : [...current, savedItem],
       );
       resetForm();
+      if (isAddingNewItem) {
+        setHomeSearchResetToken((current) => current + 1);
+      }
       setIsEditorOpen(false);
     } catch {
       setStorageMode("local");
@@ -504,6 +616,9 @@ function App() {
         editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [...current, nextItem],
       );
       resetForm();
+      if (isAddingNewItem) {
+        setHomeSearchResetToken((current) => current + 1);
+      }
       setIsEditorOpen(false);
     }
   }
@@ -594,7 +709,7 @@ function App() {
   async function searchDetails(event) {
     event?.preventDefault();
     const cleanedQuery = lookupQuery.trim();
-    const providers = getLookupProviders(draft.category);
+    const providers = getLookupProviders(draft.category, draft.subtype);
 
     if (!cleanedQuery || !providers.length) {
       setLookupStatus("error");
@@ -606,19 +721,34 @@ function App() {
     setLookupMessage("");
     setLookupResults([]);
 
-    const searches = providers.map((provider) => {
-      if (provider.id === "omdb") return fetchOmdbResults(cleanedQuery);
-      if (provider.id === "tmdb") return fetchTmdbResults(cleanedQuery);
-      if (provider.id === "open-library") return fetchOpenLibraryResults(cleanedQuery);
-      if (provider.id === "aladin") return fetchAladinResults(cleanedQuery);
-      return fetchMangaResults(cleanedQuery);
-    });
+    const runProviderSearches = async (activeProviders) => {
+      const searches = activeProviders.map((provider) => {
+        if (provider.id === "omdb") return fetchOmdbResults(cleanedQuery);
+        if (provider.id === "tmdb") return fetchTmdbResults(cleanedQuery);
+        if (provider.id === "open-library") return fetchOpenLibraryResults(cleanedQuery);
+        if (provider.id === "aladin") return fetchAladinResults(cleanedQuery);
+        return fetchMangaResults(cleanedQuery);
+      });
 
-    const settledResults = await Promise.allSettled(searches);
-    const results = settledResults.flatMap((entry) => (entry.status === "fulfilled" ? entry.value.results : []));
-    const messages = settledResults
-      .map((entry) => (entry.status === "fulfilled" ? entry.value.message : entry.reason?.message))
-      .filter(Boolean);
+      const settledResults = await Promise.allSettled(searches);
+      const providerResults = settledResults.flatMap((entry) => (entry.status === "fulfilled" ? entry.value.results : []));
+      const messages = settledResults.map(getLookupMessage).filter(Boolean);
+
+      return { messages, providerResults, settledResults };
+    };
+
+    const preferredProvider = providers[0]?.id;
+    let { messages, providerResults } = await runProviderSearches(providers);
+    const fallbackProviders = getFallbackLookupProviders(draft.category, draft.subtype, providers.map((provider) => provider.id));
+
+    if (!providerResults.length && fallbackProviders.length) {
+      const fallbackSearch = await runProviderSearches(fallbackProviders);
+      providerResults = fallbackSearch.providerResults;
+      messages = fallbackSearch.messages.length ? fallbackSearch.messages : messages;
+    }
+
+    const dedupedResults = dedupeLookupResults(providerResults, preferredProvider);
+    const results = rankLookupResults(dedupedResults, cleanedQuery);
 
     if (!results.length) {
       setLookupStatus("error");
@@ -815,6 +945,7 @@ function App() {
       } else {
         applyMangaResult(lookupResult.result);
       }
+      setLookupQuery("");
     } catch (error) {
       setLookupStatus("error");
       setLookupMessage(error.message || "Could not apply that result.");
@@ -1010,6 +1141,7 @@ function App() {
           items={items}
           onBrowseCategory={showCategory}
           onStartLookup={startHomeLookup}
+          searchResetToken={homeSearchResetToken}
         />
       ) : (
       <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
@@ -1372,20 +1504,25 @@ function getSubtypeLabel(item) {
   return "";
 }
 
-function HomeView({ counts, items, onBrowseCategory, onStartLookup }) {
+function HomeView({ counts, items, onBrowseCategory, onStartLookup, searchResetToken }) {
   const [homeQuery, setHomeQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Completed");
   const selectedCategoryDetails = categories.find((entry) => entry.id === selectedCategory);
   const recentItems = items.slice(-6).reverse();
 
+  useEffect(() => {
+    setHomeQuery("");
+  }, [searchResetToken]);
+
   function handleSubmit(event) {
     event.preventDefault();
-    if (!selectedCategory) return;
+    const cleanedQuery = homeQuery.trim();
+    if (!selectedCategory || !cleanedQuery) return;
 
     onStartLookup({
       categoryId: selectedCategory,
-      query: homeQuery,
+      query: cleanedQuery,
       status: selectedStatus,
     });
   }
@@ -2020,6 +2157,8 @@ function DetailsLookup({
   status,
   tmdbLanguage,
 }) {
+  const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
+
   return (
     <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -2089,9 +2228,9 @@ function DetailsLookup({
         </p>
       )}
 
-      {results.length > 0 && (
+      {visibleResults.length > 0 && (
         <ul className="mt-3 space-y-2">
-          {results.map((lookupResult) => {
+          {visibleResults.map((lookupResult) => {
             const imageUrl = getLookupResultImage(lookupResult);
             const title = getLookupResultTitle(lookupResult);
             return (

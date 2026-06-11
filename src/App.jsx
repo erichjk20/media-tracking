@@ -20,6 +20,12 @@ import {
   Tv,
   X,
 } from "lucide-react";
+import {
+  fetchMediaItems,
+  isSupabaseConfigured,
+  removeMediaItem,
+  saveMediaItem,
+} from "./lib/mediaItemsStore";
 
 const categories = [
   { id: "books", label: "Books", creatorLabel: "Author", action: "Read", icon: BookOpen },
@@ -153,6 +159,15 @@ function getStoredItems() {
   }
 }
 
+function getLocalStorageItems() {
+  try {
+    const stored = window.localStorage.getItem("media-shelf-items");
+    return stored ? normalizeItems(JSON.parse(stored)) : [];
+  } catch {
+    return [];
+  }
+}
+
 function normalizeItems(items) {
   return items.map((item) => ({
     ...item,
@@ -282,6 +297,10 @@ function getLookupResultImage(lookupResult) {
 
 function App() {
   const [items, setItems] = useState(getStoredItems);
+  const [storageMode, setStorageMode] = useState(isSupabaseConfigured ? "loading" : "local");
+  const [storageMessage, setStorageMessage] = useState(
+    isSupabaseConfigured ? "Connecting to Supabase..." : "",
+  );
   const [activeView, setActiveView] = useState("home");
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
@@ -378,8 +397,41 @@ function App() {
   }, [activeStatus, items]);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    let isCurrent = true;
+
+    async function loadDatabaseItems() {
+      try {
+        let databaseItems = await fetchMediaItems();
+        const localItems = getLocalStorageItems();
+
+        if (!databaseItems.length && localItems.length) {
+          databaseItems = await Promise.all(localItems.map((item) => saveMediaItem(item)));
+        }
+
+        if (!isCurrent) return;
+        setItems(normalizeItems(databaseItems));
+        setStorageMode("supabase");
+        setStorageMessage("");
+      } catch {
+        if (!isCurrent) return;
+        setStorageMode("local");
+        setStorageMessage("Supabase is unavailable. Changes are being saved in this browser.");
+      }
+    }
+
+    loadDatabaseItems();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (storageMode === "loading" || storageMode === "supabase") return;
     window.localStorage.setItem("media-shelf-items", JSON.stringify(items));
-  }, [items]);
+  }, [items, storageMode]);
 
   useEffect(() => {
     setDraft((current) => ({
@@ -418,7 +470,7 @@ function App() {
     searchDetails();
   }, [isEditorOpen, lookupQuery, shouldRunLookup]);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
     if (!cleanedTitle) return;
@@ -435,11 +487,25 @@ function App() {
       imageUrl: draft.imageUrl.trim(),
     };
 
-    setItems((current) =>
-      editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [...current, nextItem],
-    );
-    resetForm();
-    setIsEditorOpen(false);
+    try {
+      const savedItem = storageMode === "supabase" ? await saveMediaItem(nextItem) : nextItem;
+
+      setItems((current) =>
+        editingId
+          ? current.map((item) => (item.id === editingId ? savedItem : item))
+          : [...current, savedItem],
+      );
+      resetForm();
+      setIsEditorOpen(false);
+    } catch {
+      setStorageMode("local");
+      setStorageMessage("Could not save to Supabase. This change was saved in this browser instead.");
+      setItems((current) =>
+        editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [...current, nextItem],
+      );
+      resetForm();
+      setIsEditorOpen(false);
+    }
   }
 
   function resetForm() {
@@ -500,9 +566,14 @@ function App() {
     setIsEditorOpen(false);
   }
 
-  function deleteItem(id) {
-    setItems((current) => current.filter((item) => item.id !== id));
-    if (editingId === id) resetForm();
+  async function deleteItem(id) {
+    try {
+      if (storageMode === "supabase") await removeMediaItem(id);
+      setItems((current) => current.filter((item) => item.id !== id));
+      if (editingId === id) resetForm();
+    } catch {
+      setStorageMessage("Could not delete from Supabase. Try again in a moment.");
+    }
   }
 
   function updateDraft(field, value) {
@@ -924,6 +995,14 @@ function App() {
           </div>
         </div>
       </section>
+
+      {storageMessage && (
+        <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+            {storageMessage}
+          </p>
+        </div>
+      )}
 
       {activeView === "home" ? (
         <HomeView

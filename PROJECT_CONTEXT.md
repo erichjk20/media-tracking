@@ -31,7 +31,7 @@ Each media item contains:
 
 ## Current Implementation
 
-This is a client-only React app. It stores library data in `localStorage` under the key `media-shelf-items`.
+This is a client-only React app. It stores library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. If Supabase is not configured or is unavailable, it falls back to `localStorage` under the key `media-shelf-items`.
 
 The main app supports:
 
@@ -65,6 +65,7 @@ The main app supports:
 - Open Library API for book lookup
 - Aladin API for Korean book lookup
 - Jikan API for manga lookup
+- Supabase for hosted Postgres persistence
 
 ## Project Structure
 
@@ -79,11 +80,16 @@ Tracked/source files:
 ├── package-lock.json
 ├── package.json
 ├── postcss.config.js
+├── supabase
+│   └── schema.sql
 ├── tailwind.config.js
 ├── vite.config.js
 └── src
     ├── App.jsx
     ├── index.css
+    ├── lib
+    │   ├── mediaItemsStore.js
+    │   └── supabase.js
     └── main.jsx
 ```
 
@@ -102,7 +108,21 @@ Both are ignored by Git.
 
 - Contains the full application UI and state logic.
 - Defines categories, statuses, sample data, item CRUD behavior, filtering, search, rating component, and form handling.
-- Persists all media items to `localStorage`.
+- Loads and saves media items through the Supabase/localStorage persistence layer.
+
+`src/lib/supabase.js`
+
+- Creates the Supabase client when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present.
+
+`src/lib/mediaItemsStore.js`
+
+- Maps app media items to/from the Supabase `library_items` table.
+- Provides fetch, upsert, and delete helpers.
+- Converts legacy non-UUID local item IDs to UUIDs before writing to Supabase.
+
+`supabase/schema.sql`
+
+- Defines the `library_items` table, category/status constraints, rating rules, useful indexes, and personal-app anon CRUD grants.
 
 `src/index.css`
 
@@ -120,12 +140,12 @@ Both are ignored by Git.
 
 `.env.local`
 
-- Stores `VITE_OMDB_API_KEY` for local development.
+- Stores local API keys and Supabase credentials for local development.
 - This file is ignored by Git.
 
 `.env.example`
 
-- Documents the required OMDb environment variable shape.
+- Documents the expected API and Supabase environment variable shape.
 
 ## Setup And Verification
 
@@ -148,6 +168,26 @@ npm run build
 ```
 
 The production build was last verified successfully after the initial implementation.
+
+## Supabase Persistence
+
+The app uses the `library_items` table defined in `supabase/schema.sql`.
+
+The database stores status values as:
+
+- `completed`
+- `want`
+
+The React app maps those values to its display labels:
+
+- `Completed`
+- `Want to Watch/Read`
+
+The browser-facing Supabase anon key is not a private secret. The current schema disables row-level security for a simple personal/local setup. Before deploying this for multiple users or a public audience, add Supabase Auth, a `user_id` column, and row-level security policies.
+
+The schema grants `select`, `insert`, `update`, and `delete` on `library_items` to `anon` and `authenticated` so the browser client can write during the personal-app phase. If Supabase reports a row-level security violation during setup, rerun the bottom of `supabase/schema.sql`.
+
+When Supabase is first configured, the app loads from the database. If the database is empty and browser `localStorage` contains saved items, the app attempts to migrate those items to Supabase automatically.
 
 ## OMDb Integration
 

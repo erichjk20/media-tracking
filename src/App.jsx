@@ -12,6 +12,7 @@ import {
   List as ListIcon,
   PanelsTopLeft,
   Plus,
+  RefreshCw,
   Save,
   Search,
   Sparkles,
@@ -30,7 +31,7 @@ import {
 const categories = [
   { id: "books", label: "Books", creatorLabel: "Author", action: "Read", icon: BookOpen },
   { id: "movies", label: "Movies", creatorLabel: "Director", action: "Watch", icon: Clapperboard },
-  { id: "tv", label: "TV Shows", creatorLabel: "Creator", action: "Watch", icon: Tv },
+  { id: "tv", label: "TV Shows", creatorLabel: "Director", action: "Watch", icon: Tv },
   { id: "anime", label: "Anime", creatorLabel: "Studio / Creator", action: "Watch", icon: Sparkles },
   { id: "manga", label: "Manga", creatorLabel: "Author / Artist", action: "Read", icon: PanelsTopLeft },
 ];
@@ -138,6 +139,21 @@ const emptyDraft = {
   status: "Completed",
   title: "",
   creator: "",
+  director: "",
+  genre: "",
+  durationMinutes: "",
+  pageCount: "",
+  publisher: "",
+  isbn: "",
+  language: "",
+  author: "",
+  artist: "",
+  volumeCount: "",
+  chapterCount: "",
+  seasonCount: "",
+  episodeCount: "",
+  durationMinutesPerEpisode: "",
+  studio: "",
   rating: 3,
   notes: "",
   imageUrl: "",
@@ -172,6 +188,21 @@ function getLocalStorageItems() {
 function normalizeItems(items) {
   return items.map((item) => ({
     ...item,
+    director: item.director || (item.category === "movies" ? item.creator || "" : ""),
+    genre: item.genre || "",
+    durationMinutes: item.durationMinutes || "",
+    pageCount: item.pageCount || "",
+    publisher: item.publisher || "",
+    isbn: item.isbn || "",
+    language: item.language || "",
+    author: item.author || (item.category === "manga" ? item.creator || "" : ""),
+    artist: item.artist || "",
+    volumeCount: item.volumeCount || "",
+    chapterCount: item.chapterCount || "",
+    seasonCount: item.seasonCount || "",
+    episodeCount: item.episodeCount || "",
+    durationMinutesPerEpisode: item.durationMinutesPerEpisode || "",
+    studio: item.studio || "",
     subtype: getDefaultSubtype(item.category, item.subtype),
   }));
 }
@@ -412,6 +443,17 @@ function getLookupMessage(entry) {
   return entry.status === "fulfilled" ? entry.value.message : entry.reason?.message;
 }
 
+function mergeApiNotes(existingNotes, apiNotes) {
+  const cleanedApiNotes = String(apiNotes || "").trim();
+  if (!cleanedApiNotes) return String(existingNotes || "").trim();
+
+  const personalNotes = String(existingNotes || "")
+    .replace(/(?:^|\n\n)API details:\n[\s\S]*$/u, "")
+    .trim();
+
+  return [personalNotes, `API details:\n${cleanedApiNotes}`].filter(Boolean).join("\n\n");
+}
+
 function App() {
   const [items, setItems] = useState(getStoredItems);
   const [storageMode, setStorageMode] = useState(isSupabaseConfigured ? "loading" : "local");
@@ -439,6 +481,8 @@ function App() {
   const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
   const [homeSearchResetToken, setHomeSearchResetToken] = useState(0);
+  const [refreshStatus, setRefreshStatus] = useState("idle");
+  const [refreshMessage, setRefreshMessage] = useState("");
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const canUseBookLookup = draft.category === "books";
@@ -530,10 +574,11 @@ function App() {
         setItems(normalizeItems(databaseItems));
         setStorageMode("supabase");
         setStorageMessage("");
-      } catch {
+      } catch (error) {
+        console.error("Supabase load failed", error);
         if (!isCurrent) return;
         setStorageMode("local");
-        setStorageMessage("Supabase is unavailable. Changes are being saved in this browser.");
+        setStorageMessage(`Supabase is unavailable. Changes are being saved in this browser. ${error.message || ""}`.trim());
       }
     }
 
@@ -598,6 +643,21 @@ function App() {
       addedAt: editingId ? draft.addedAt || "" : new Date().toISOString(),
       title: cleanedTitle,
       creator: draft.creator.trim(),
+      director: draft.director.trim(),
+      genre: draft.genre.trim(),
+      durationMinutes: draft.durationMinutes ? Number(draft.durationMinutes) : "",
+      pageCount: draft.pageCount ? Number(draft.pageCount) : "",
+      publisher: draft.publisher.trim(),
+      isbn: draft.isbn.trim(),
+      language: draft.language.trim(),
+      author: draft.author.trim(),
+      artist: draft.artist.trim(),
+      volumeCount: draft.volumeCount ? Number(draft.volumeCount) : "",
+      chapterCount: draft.chapterCount ? Number(draft.chapterCount) : "",
+      seasonCount: draft.seasonCount ? Number(draft.seasonCount) : "",
+      episodeCount: draft.episodeCount ? Number(draft.episodeCount) : "",
+      durationMinutesPerEpisode: draft.durationMinutesPerEpisode ? Number(draft.durationMinutesPerEpisode) : "",
+      studio: draft.studio.trim(),
       subtype: getDefaultSubtype(draft.category, draft.subtype),
       rating: draft.status === "Completed" ? Number(draft.rating) : 0,
       notes: draft.notes.trim(),
@@ -617,9 +677,10 @@ function App() {
         setHomeSearchResetToken((current) => current + 1);
       }
       setIsEditorOpen(false);
-    } catch {
+    } catch (error) {
+      console.error("Supabase save failed", error);
       setStorageMode("local");
-      setStorageMessage("Could not save to Supabase. This change was saved in this browser instead.");
+      setStorageMessage(`Could not save to Supabase. This change was saved in this browser instead. ${error.message || ""}`.trim());
       setItems((current) =>
         editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [...current, nextItem],
       );
@@ -699,6 +760,98 @@ function App() {
     }
   }
 
+  async function refreshExistingItems() {
+    if (refreshStatus === "loading") return;
+
+    setRefreshStatus("loading");
+    setRefreshMessage(`Updating ${items.length} saved item${items.length === 1 ? "" : "s"}...`);
+
+    const refreshedItems = [];
+    const failures = [];
+
+    for (const item of items) {
+      try {
+        const refreshedItem = await refreshItemDetails(item);
+        const savedItem = storageMode === "supabase" ? await saveMediaItem(refreshedItem) : refreshedItem;
+        refreshedItems.push(savedItem);
+      } catch {
+        refreshedItems.push(item);
+        failures.push(item.title);
+      }
+    }
+
+    setItems(normalizeItems(refreshedItems));
+    setRefreshStatus(failures.length ? "error" : "success");
+    setRefreshMessage(
+      failures.length
+        ? `Updated ${items.length - failures.length} item${items.length - failures.length === 1 ? "" : "s"}. ${failures.length} could not be matched.`
+        : `Updated ${items.length} saved item${items.length === 1 ? "" : "s"} with API details.`,
+    );
+  }
+
+  async function refreshItemDetails(item) {
+    const lookupResult = await findBestLookupResultForItem(item);
+    if (!lookupResult) throw new Error("No matching API result found.");
+
+    const patch = await getItemPatchFromLookupResult(item, lookupResult);
+    const nextNotes = mergeApiNotes(item.notes, patch.notes);
+
+    return {
+      ...item,
+      ...patch,
+      id: item.id,
+      status: item.status,
+      rating: item.rating,
+      addedAt: item.addedAt,
+      title: patch.title || item.title,
+      notes: nextNotes,
+      creator: patch.creator || item.creator,
+      director: patch.director || item.director,
+      genre: patch.genre || item.genre,
+      durationMinutes: patch.durationMinutes || item.durationMinutes,
+      pageCount: patch.pageCount || item.pageCount,
+      publisher: patch.publisher || item.publisher,
+      isbn: patch.isbn || item.isbn,
+      language: patch.language || item.language,
+      author: patch.author || item.author,
+      artist: patch.artist || item.artist,
+      volumeCount: patch.volumeCount || item.volumeCount,
+      chapterCount: patch.chapterCount || item.chapterCount,
+      seasonCount: patch.seasonCount || item.seasonCount,
+      episodeCount: patch.episodeCount || item.episodeCount,
+      durationMinutesPerEpisode: patch.durationMinutesPerEpisode || item.durationMinutesPerEpisode,
+      studio: patch.studio || item.studio,
+      imageUrl: patch.imageUrl || item.imageUrl,
+      subtype: getDefaultSubtype(patch.category || item.category, patch.subtype || item.subtype),
+    };
+  }
+
+  async function findBestLookupResultForItem(item) {
+    const providers = getLookupProviders(item.category, item.subtype);
+    const fallbackProviders = getFallbackLookupProviders(item.category, item.subtype, providers.map((provider) => provider.id));
+    const providerResults = [];
+
+    for (const provider of [...providers, ...fallbackProviders]) {
+      const providerSearch = await fetchProviderResults(item.title, provider, {
+        category: item.category,
+        language: item.category === "books" && item.subtype === "korean-book" ? "ko" : bookLanguage,
+        subtype: item.subtype,
+      });
+      providerResults.push(...providerSearch.results);
+    }
+
+    const dedupedResults = dedupeLookupResults(providerResults, providers[0]?.id);
+    return rankLookupResults(dedupedResults, item.title)[0];
+  }
+
+  async function getItemPatchFromLookupResult(item, lookupResult) {
+    if (lookupResult.source === "omdb") return getOmdbItemPatch(lookupResult.result, item.category);
+    if (lookupResult.source === "tmdb") return getTmdbItemPatch(lookupResult.result, item);
+    if (lookupResult.source === "open-library") return getOpenLibraryItemPatch(lookupResult.result, item);
+    if (lookupResult.source === "aladin") return getAladinItemPatch(lookupResult.result);
+    return getMangaItemPatch(lookupResult.result);
+  }
+
   function updateDraft(field, value) {
     setDraft((current) => ({
       ...current,
@@ -736,11 +889,11 @@ function App() {
 
     const runProviderSearches = async (activeProviders) => {
       const searches = activeProviders.map((provider) => {
-        if (provider.id === "omdb") return fetchOmdbResults(cleanedQuery);
-        if (provider.id === "tmdb") return fetchTmdbResults(cleanedQuery);
-        if (provider.id === "open-library") return fetchOpenLibraryResults(cleanedQuery);
-        if (provider.id === "aladin") return fetchAladinResults(cleanedQuery);
-        return fetchMangaResults(cleanedQuery);
+        return fetchProviderResults(cleanedQuery, provider, {
+          category: draft.category,
+          language: bookLanguage,
+          subtype: draft.subtype,
+        });
       });
 
       const settledResults = await Promise.allSettled(searches);
@@ -774,8 +927,16 @@ function App() {
     setLookupMessage(messages.length ? messages.join(" ") : "");
   }
 
-  async function fetchOmdbResults(searchText) {
-    const omdbType = omdbTypesByCategory[draft.category];
+  function fetchProviderResults(searchText, provider, context = {}) {
+    if (provider.id === "omdb") return fetchOmdbResults(searchText, context.category);
+    if (provider.id === "tmdb") return fetchTmdbResults(searchText, context.category);
+    if (provider.id === "open-library") return fetchOpenLibraryResults(searchText, context.language);
+    if (provider.id === "aladin") return fetchAladinResults(searchText);
+    return fetchMangaResults(searchText);
+  }
+
+  async function fetchOmdbResults(searchText, category = draft.category) {
+    const omdbType = omdbTypesByCategory[category];
 
     if (!omdbApiKey) {
       return { results: [], message: "Add VITE_OMDB_API_KEY to use OMDb." };
@@ -807,8 +968,8 @@ function App() {
     }
   }
 
-  async function fetchTmdbResults(searchText) {
-    const mediaType = draft.category === "movies" ? "movie" : draft.category === "tv" ? "tv" : "";
+  async function fetchTmdbResults(searchText, category = draft.category) {
+    const mediaType = category === "movies" ? "movie" : category === "tv" ? "tv" : "";
 
     if (!tmdbAccessToken && !tmdbApiKey) {
       return { results: [], message: "Add VITE_TMDB_ACCESS_TOKEN or VITE_TMDB_API_KEY to use TMDb." };
@@ -851,17 +1012,17 @@ function App() {
     }
   }
 
-  async function fetchOpenLibraryResults(searchText) {
+  async function fetchOpenLibraryResults(searchText, language = bookLanguage) {
     try {
       const url = new URL("https://openlibrary.org/search.json");
-      url.searchParams.set("q", buildOpenLibraryQuery(searchText, bookLanguage));
+      url.searchParams.set("q", buildOpenLibraryQuery(searchText, language));
       url.searchParams.set(
         "fields",
-        "key,title,author_name,first_publish_year,cover_i,language,publisher,subject,edition_count",
+        "key,title,author_name,first_publish_year,cover_i,language,publisher,subject,edition_count,number_of_pages_median",
       );
       url.searchParams.set("limit", "8");
-      if (bookLanguage !== "all") {
-        url.searchParams.set("lang", bookLanguage);
+      if (language !== "all") {
+        url.searchParams.set("lang", language);
       }
 
       const response = await fetch(url);
@@ -966,6 +1127,27 @@ function App() {
   }
 
   async function applyOmdbResult(result) {
+    const patch = await getOmdbItemPatch(result, draft.category);
+
+    setDraft((current) => ({
+      ...current,
+      title: patch.title || current.title,
+      creator: patch.creator || current.creator,
+      director: patch.director || current.director,
+      genre: patch.genre || current.genre,
+      durationMinutes: patch.durationMinutes || current.durationMinutes,
+      seasonCount: patch.seasonCount || current.seasonCount,
+      episodeCount: patch.episodeCount || current.episodeCount,
+      durationMinutesPerEpisode: patch.durationMinutesPerEpisode || current.durationMinutesPerEpisode,
+      imageUrl: patch.imageUrl || current.imageUrl,
+      notes: patch.notes || current.notes,
+    }));
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage("Details added from OMDb. You can edit anything before saving.");
+  }
+
+  async function getOmdbItemPatch(result, category) {
     const url = new URL("https://www.omdbapi.com/");
     url.searchParams.set("apikey", omdbApiKey);
     url.searchParams.set("i", result.imdbID);
@@ -978,22 +1160,55 @@ function App() {
       throw new Error(detail.Error || "Could not load OMDb details.");
     }
 
-    const creator = draft.category === "movies" ? detail.Director : detail.Writer || detail.Director;
-    const notes = buildOmdbNotes(detail);
+    const director = cleanOmdbValue(detail.Director);
+    const creator = category === "movies" ? director : director || detail.Writer;
+    const durationMinutes = parseOmdbRuntime(detail.Runtime);
+    const genre = cleanOmdbValue(detail.Genre);
+    const episodeCount = category === "tv" || category === "anime" ? await fetchOmdbEpisodeCount(result.imdbID, detail.totalSeasons) : "";
+    const title = cleanOmdbValue(detail.Title) || result.Title || "";
+    const notes =
+      category === "movies"
+        ? buildMovieNotes({ title, director, genre, durationMinutes })
+        : buildOmdbNotes(detail, episodeCount);
 
-    setDraft((current) => ({
-      ...current,
-      title: cleanOmdbValue(detail.Title) || result.Title || current.title,
-      creator: cleanOmdbValue(creator) || current.creator,
-      imageUrl: cleanOmdbValue(detail.Poster) || cleanOmdbValue(result.Poster) || current.imageUrl,
-      notes: notes || current.notes,
-    }));
-    setLookupStatus("success");
-    setLookupResults([]);
-    setLookupMessage("Details added from OMDb. You can edit anything before saving.");
+    return {
+      title,
+      creator: cleanOmdbValue(creator),
+      director: category === "movies" ? director : "",
+      genre: category === "movies" ? genre : "",
+      durationMinutes: category === "movies" ? durationMinutes : "",
+      seasonCount: category === "tv" || category === "anime" ? Number(cleanOmdbValue(detail.totalSeasons)) || "" : "",
+      episodeCount: category === "tv" || category === "anime" ? episodeCount : "",
+      durationMinutesPerEpisode: category === "tv" || category === "anime" ? durationMinutes : "",
+      imageUrl: cleanOmdbValue(detail.Poster) || cleanOmdbValue(result.Poster),
+      notes,
+    };
   }
 
   async function applyTmdbResult(result) {
+    const patch = await getTmdbItemPatch(result, draft);
+
+    setDraft((current) => ({
+      ...current,
+      category: patch.category || current.category,
+      subtype: patch.subtype || current.subtype,
+      title: patch.title || current.title,
+      creator: patch.creator || current.creator,
+      director: patch.director || current.director,
+      genre: patch.genre || current.genre,
+      durationMinutes: patch.durationMinutes || current.durationMinutes,
+      seasonCount: patch.seasonCount || current.seasonCount,
+      episodeCount: patch.episodeCount || current.episodeCount,
+      durationMinutesPerEpisode: patch.durationMinutesPerEpisode || current.durationMinutesPerEpisode,
+      imageUrl: patch.imageUrl || current.imageUrl,
+      notes: patch.notes || current.notes,
+    }));
+    setLookupStatus("success");
+    setLookupResults([]);
+    setLookupMessage(patch.subtype === "korean-movie" || patch.subtype === "kdrama" ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
+  }
+
+  async function getTmdbItemPatch(result, currentItem) {
     const url = new URL(`https://api.themoviedb.org/3/${result.mediaType}/${result.id}`);
     applyTmdbAuth(url);
     url.searchParams.set("language", tmdbLanguage);
@@ -1009,86 +1224,146 @@ function App() {
     const isKorean = getTmdbCountries(detail, result.mediaType).includes("KR");
     const title = cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
     const originalTitle = cleanTmdbValue(result.originalTitle) || cleanTmdbValue(detail.original_title || detail.original_name);
-    const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvCreator(detail);
-    const notes = buildTmdbNotes(detail, result.mediaType, originalTitle);
+    const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvDirector(detail) || getTmdbTvCreator(detail);
+    const genres = detail.genres?.map((genre) => genre.name).join(", ") || "";
+    const durationMinutes = result.mediaType === "movie" ? detail.runtime || "" : "";
+    const notes =
+      result.mediaType === "movie"
+        ? buildMovieNotes({ title, director: creator, genre: genres, durationMinutes })
+        : buildTmdbNotes(detail, result.mediaType, originalTitle);
 
-    setDraft((current) => ({
-      ...current,
+    return {
       category: result.mediaType === "movie" ? "movies" : "tv",
       subtype:
         result.mediaType === "movie"
           ? isKorean
             ? "korean-movie"
-            : current.subtype || "movie"
+            : currentItem.subtype || "movie"
           : isKorean
             ? "kdrama"
-            : current.subtype || "tv",
-      title: title || current.title,
-      creator: creator || current.creator,
-      imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath) || current.imageUrl,
-      notes: notes || current.notes,
-    }));
-    setLookupStatus("success");
-    setLookupResults([]);
-    setLookupMessage(isKorean ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
+            : currentItem.subtype || "tv",
+      title,
+      creator,
+      director: result.mediaType === "movie" ? creator : "",
+      genre: result.mediaType === "movie" ? genres : "",
+      durationMinutes: result.mediaType === "movie" ? durationMinutes : "",
+      seasonCount: result.mediaType === "tv" ? detail.number_of_seasons || "" : "",
+      episodeCount: result.mediaType === "tv" ? detail.number_of_episodes || "" : "",
+      durationMinutesPerEpisode: result.mediaType === "tv" ? getFirstRuntime(detail.episode_run_time) : "",
+      imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath),
+      notes,
+    };
   }
 
   function applyBookResult(result) {
-    const isKoreanBook = result.languages.includes("kor");
+    const patch = getOpenLibraryItemPatch(result, draft);
     setDraft((current) => ({
       ...current,
-      subtype: isKoreanBook ? "korean-book" : getDefaultSubtype("books", current.subtype),
-      title: result.title || current.title,
-      creator: result.authors || current.creator,
-      imageUrl: result.imageUrl || current.imageUrl,
-      notes: buildOpenLibraryBookNotes(result) || current.notes,
+      subtype: patch.subtype || current.subtype,
+      title: patch.title || current.title,
+      creator: patch.creator || current.creator,
+      imageUrl: patch.imageUrl || current.imageUrl,
+      pageCount: patch.pageCount || current.pageCount,
+      publisher: patch.publisher || current.publisher,
+      isbn: patch.isbn || current.isbn,
+      language: patch.language || current.language,
+      notes: patch.notes || current.notes,
     }));
     setLookupStatus("success");
     setLookupResults([]);
-    setLookupMessage(isKoreanBook ? "Korean book details added." : "Book details added. You can adjust the type before saving.");
+    setLookupMessage(patch.subtype === "korean-book" ? "Korean book details added." : "Book details added. You can adjust the type before saving.");
+  }
+
+  function getOpenLibraryItemPatch(result, currentItem) {
+    const isKoreanBook = result.languages.includes("kor");
+    return {
+      subtype: isKoreanBook ? "korean-book" : getDefaultSubtype("books", currentItem.subtype),
+      title: result.title,
+      creator: result.authors,
+      imageUrl: result.imageUrl,
+      pageCount: result.pageCount,
+      publisher: result.publishers,
+      language: result.languages.join(", "),
+      notes: buildOpenLibraryBookNotes(result),
+    };
   }
 
   function applyAladinBookResult(result) {
+    const patch = getAladinItemPatch(result);
     setDraft((current) => ({
       ...current,
-      subtype: "korean-book",
-      title: result.title || current.title,
-      creator: result.authors || current.creator,
-      imageUrl: result.imageUrl || current.imageUrl,
-      notes: buildAladinBookNotes(result) || current.notes,
+      subtype: patch.subtype || current.subtype,
+      title: patch.title || current.title,
+      creator: patch.creator || current.creator,
+      imageUrl: patch.imageUrl || current.imageUrl,
+      pageCount: patch.pageCount || current.pageCount,
+      publisher: patch.publisher || current.publisher,
+      isbn: patch.isbn || current.isbn,
+      language: patch.language || current.language,
+      notes: patch.notes || current.notes,
     }));
     setLookupStatus("success");
     setLookupResults([]);
     setLookupMessage("Korean book details added from Aladin.");
   }
 
+  function getAladinItemPatch(result) {
+    return {
+      subtype: "korean-book",
+      title: result.title,
+      creator: result.authors,
+      imageUrl: result.imageUrl,
+      pageCount: result.pageCount,
+      publisher: result.publisher,
+      isbn: result.isbn13,
+      language: "ko",
+      notes: buildAladinBookNotes(result),
+    };
+  }
+
   function applyMangaResult(result) {
+    const patch = getMangaItemPatch(result);
     setDraft((current) => ({
       ...current,
-      title: result.title || current.title,
-      creator: result.authors || current.creator,
-      imageUrl: result.imageUrl || current.imageUrl,
-      notes: buildJikanMangaNotes(result) || current.notes,
+      title: patch.title || current.title,
+      creator: patch.creator || current.creator,
+      imageUrl: patch.imageUrl || current.imageUrl,
+      author: patch.author || current.author,
+      volumeCount: patch.volumeCount || current.volumeCount,
+      chapterCount: patch.chapterCount || current.chapterCount,
+      notes: patch.notes || current.notes,
     }));
     setLookupStatus("success");
     setLookupResults([]);
     setLookupMessage("Manga details added from Jikan. You can edit anything before saving.");
   }
 
+  function getMangaItemPatch(result) {
+    return {
+      title: result.title,
+      creator: result.authors,
+      imageUrl: result.imageUrl,
+      author: result.authors,
+      volumeCount: result.volumes,
+      chapterCount: result.chapters,
+      notes: buildJikanMangaNotes(result),
+    };
+  }
+
   return (
-    <main className="min-h-screen bg-[#f7f4ee] pb-28 sm:pb-0">
-      <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur sm:static sm:bg-[#fffaf2]">
+    <main className="min-h-screen bg-[#f7f4ee] pb-28 dark:bg-stone-950 lg:pb-0">
+      <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur dark:border-stone-800 dark:bg-stone-950/95 sm:static sm:bg-[#fffaf2] sm:dark:bg-stone-950">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-start justify-between gap-3 lg:items-center">
             <div className="min-w-0">
               <BrandWordmark onClick={() => setActiveView("home")} />
-              <div className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-teal-700 sm:text-sm">
+              <div className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400 sm:text-sm">
                 <Library size={16} />
                 Track your media without the noise
               </div>
             </div>
             <button
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700 transition hover:border-teal-700 hover:text-teal-800 sm:hidden"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700 transition hover:border-teal-700 hover:text-teal-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-teal-500 dark:hover:text-teal-300 sm:hidden"
               onClick={() => (activeView === "home" ? showLibrary() : setActiveView("home"))}
               type="button"
               aria-label={activeView === "home" ? "Open library" : "Go home"}
@@ -1096,10 +1371,10 @@ function App() {
             >
               {activeView === "home" ? <Library size={18} /> : <Home size={18} />}
             </button>
-            <div className="hidden grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:grid sm:w-56">
+            <div className="hidden grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:grid sm:w-56">
               <button
                 className={`inline-flex h-9 items-center justify-center gap-2 rounded text-sm font-semibold transition ${
-                  activeView === "home" ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                  activeView === "home" ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
                 }`}
                 onClick={() => setActiveView("home")}
                 type="button"
@@ -1109,7 +1384,7 @@ function App() {
               </button>
               <button
                 className={`inline-flex h-9 items-center justify-center gap-2 rounded text-sm font-semibold transition ${
-                  activeView === "library" ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                  activeView === "library" ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
                 }`}
                 onClick={showLibrary}
                 type="button"
@@ -1120,7 +1395,7 @@ function App() {
             </div>
           </div>
 
-          <div className={`hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5 ${activeView === "home" ? "sm:hidden" : ""}`}>
+          <div className={`hidden grid-cols-5 gap-2 lg:grid ${activeView === "home" ? "lg:hidden" : ""}`}>
             {categories.map((entry) => {
               const Icon = entry.icon;
               const isActive = entry.id === activeCategory;
@@ -1129,15 +1404,15 @@ function App() {
                   key={entry.id}
                   className={`flex min-h-16 items-center justify-between rounded-md border px-3 py-3 text-left transition ${
                     isActive
-                      ? "border-teal-700 bg-teal-700 text-white shadow-lift"
-                      : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
+                      ? "border-teal-700 bg-teal-700 text-white shadow-lift dark:border-teal-500 dark:bg-teal-600"
+                      : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-stone-500"
                   }`}
                   onClick={() => showCategory(entry.id)}
                   type="button"
                 >
                   <span>
                     <span className="block text-sm font-semibold">{entry.label}</span>
-                    <span className={`mt-1 block text-xs ${isActive ? "text-teal-50" : "text-stone-500"}`}>
+                    <span className={`mt-1 block text-xs ${isActive ? "text-teal-50" : "text-stone-500 dark:text-stone-400"}`}>
                       {counts[entry.id]?.Completed || 0} done
                     </span>
                   </span>
@@ -1151,7 +1426,7 @@ function App() {
 
       {storageMessage && (
         <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
             {storageMessage}
           </p>
         </div>
@@ -1167,10 +1442,10 @@ function App() {
       ) : (
       <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <div className="min-w-0">
-          <div className="flex flex-col gap-3 border-b border-stone-300 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-stone-300 pb-4 dark:border-stone-800 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-stone-950">{category.label}</h2>
-              <p className="mt-1 text-sm text-stone-600">
+              <h2 className="text-xl font-semibold text-stone-950 dark:text-stone-100">{category.label}</h2>
+              <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
                 {counts[activeCategory]?.Completed || 0} completed,{" "}
                 {counts[activeCategory]?.["Want to Watch/Read"] || 0} planned
               </p>
@@ -1180,18 +1455,27 @@ function App() {
               <ShelfSearch query={query} onChange={setQuery} />
               <SortSelect sortOrder={sortOrder} onChange={setSortOrder} />
               <ViewToggle shelfView={shelfView} onChange={setShelfView} />
-              <div className="grid flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-64 sm:flex-none">
+              <button
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+                disabled={!items.length || refreshStatus === "loading"}
+                onClick={refreshExistingItems}
+                type="button"
+              >
+                <RefreshCw className={refreshStatus === "loading" ? "animate-spin" : ""} size={14} />
+                Update details
+              </button>
+              <div className="grid flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-64 sm:flex-none">
                 {statuses.map((status) => (
                   <button
                     key={status}
                     className={`min-h-8 rounded px-2 text-xs font-semibold transition ${
-                      activeStatus === status ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                      activeStatus === status ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
                     }`}
                     onClick={() => setActiveStatus(status)}
                     type="button"
                   >
                     <span>{statusLabels[status]}</span>
-                    <span className={`ml-1 hidden sm:inline ${activeStatus === status ? "text-stone-300" : "text-stone-400"}`}>
+                    <span className={`ml-1 hidden sm:inline ${activeStatus === status ? "text-stone-300 dark:text-stone-700" : "text-stone-400 dark:text-stone-500"}`}>
                       {counts[activeCategory]?.[status] || 0}
                     </span>
                   </button>
@@ -1200,7 +1484,15 @@ function App() {
             </div>
           </div>
 
-          <LibrarySnapshot counts={counts} onBrowseCategory={showCategory} />
+          {refreshMessage && (
+            <p className={`mt-3 rounded-md border px-3 py-2 text-sm font-medium ${
+              refreshStatus === "error"
+                ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+                : "border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-200"
+            }`}>
+              {refreshMessage}
+            </p>
+          )}
 
           {activeCategory === "books" && (
             <SubtypeFilter
@@ -1244,10 +1536,10 @@ function App() {
               </div>
             )
           ) : (
-            <div className="mt-5 flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-6 text-center">
-              <Library className="text-stone-400" size={36} />
-              <h3 className="mt-4 text-lg font-semibold text-stone-950">Nothing here yet</h3>
-              <p className="mt-2 max-w-sm text-sm leading-6 text-stone-600">
+            <div className="mt-5 flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-6 text-center dark:border-stone-700 dark:bg-stone-900">
+              <Library className="text-stone-400 dark:text-stone-500" size={36} />
+              <h3 className="mt-4 text-lg font-semibold text-stone-950 dark:text-stone-100">Nothing here yet</h3>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-stone-600 dark:text-stone-400">
                 Add a title to this shelf or switch categories to browse another part of your library.
               </p>
             </div>
@@ -1257,7 +1549,7 @@ function App() {
       )}
       {activeView === "library" && (
       <button
-        className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 sm:bottom-6 sm:right-6"
+        className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 lg:bottom-6 lg:right-6"
         onClick={startNewItem}
         type="button"
         aria-label="Add item"
@@ -1311,19 +1603,19 @@ function BrandWordmark({ onClick }) {
     <h1>
       <button
         aria-label="Go home"
-        className="relative inline-flex items-end pb-1 text-4xl font-semibold leading-none tracking-normal text-stone-950 transition hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 sm:text-5xl"
+        className="relative inline-flex items-end pb-1 text-4xl font-semibold leading-none tracking-normal text-stone-950 transition hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:text-stone-100 dark:hover:text-teal-300 dark:focus:ring-teal-950 sm:text-5xl"
         onClick={onClick}
         type="button"
       >
         <span>she</span>
         <span
           aria-hidden="true"
-          className="mx-0.5 inline-block origin-bottom -rotate-6 rounded-sm bg-teal-700 px-0.5 text-[#fffaf2] shadow-sm"
+          className="mx-0.5 inline-block origin-bottom -rotate-6 rounded-sm bg-teal-700 px-0.5 text-[#fffaf2] shadow-sm dark:bg-teal-500 dark:text-stone-950"
         >
           l
         </span>
         <span>vd</span>
-        <span aria-hidden="true" className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-stone-300" />
+        <span aria-hidden="true" className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-stone-300 dark:bg-stone-700" />
       </button>
     </h1>
   );
@@ -1335,6 +1627,32 @@ function cleanOmdbValue(value) {
 
 function cleanTmdbValue(value) {
   return value || "";
+}
+
+function parseOmdbRuntime(value) {
+  const match = cleanOmdbValue(value).match(/(\d+)/);
+  return match ? Number(match[1]) : "";
+}
+
+function formatDurationMinutes(value) {
+  return value ? `${value} min` : "";
+}
+
+function buildLabeledNotes(lines) {
+  return lines
+    .map(([label, value]) => [label, cleanTmdbValue(value)])
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join("\n");
+}
+
+function buildMovieNotes({ title, director, genre, durationMinutes }) {
+  return buildLabeledNotes([
+    ["Movie title", title],
+    ["Director", director],
+    ["Genre", genre],
+    ["Duration", formatDurationMinutes(durationMinutes)],
+  ]);
 }
 
 function applyTmdbAuth(url) {
@@ -1387,6 +1705,25 @@ function getTmdbTvCreator(detail) {
   return detail.networks?.map((network) => network.name).filter(Boolean).join(", ") || "";
 }
 
+function getTmdbTvDirector(detail) {
+  const directors = detail.credits?.crew
+    ?.filter((person) => person.job === "Director")
+    .map((person) => person.name)
+    .filter(Boolean) || [];
+  return [...new Set(directors)].slice(0, 3).join(", ");
+}
+
+function formatEpisodeRuntime(values) {
+  const runtimes = normalizeOpenLibraryList(values).filter(Boolean);
+  if (!runtimes.length) return "";
+  if (runtimes.length === 1) return `${runtimes[0]} min`;
+  return `${Math.min(...runtimes)}-${Math.max(...runtimes)} min`;
+}
+
+function getFirstRuntime(values) {
+  return normalizeOpenLibraryList(values).find(Boolean) || "";
+}
+
 function buildTmdbNotes(detail, mediaType, originalTitle) {
   const countries = getTmdbCountries(detail, mediaType).join(", ");
   const releaseDate = mediaType === "movie" ? detail.release_date : detail.first_air_date;
@@ -1395,25 +1732,24 @@ function buildTmdbNotes(detail, mediaType, originalTitle) {
       ? detail.runtime
         ? `${detail.runtime} min`
         : ""
-      : detail.number_of_seasons
-        ? `${detail.number_of_seasons} season${detail.number_of_seasons === 1 ? "" : "s"}`
-        : "";
+      : formatEpisodeRuntime(detail.episode_run_time);
+  const totalEpisodes = mediaType === "tv" ? detail.number_of_episodes : "";
+  const totalSeasons = mediaType === "tv" ? detail.number_of_seasons : "";
   const genres = detail.genres?.map((genre) => genre.name).join(", ");
   const tmdbRating = detail.vote_average ? `${detail.vote_average.toFixed(1)}/10` : "";
 
-  return [
+  return buildLabeledNotes([
     ["Original title", originalTitle],
     ["Year", releaseDate ? releaseDate.slice(0, 4) : ""],
     ["Country", countries],
+    ["Director", mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvDirector(detail)],
     ["Genre", genres],
-    ["Runtime", runtime],
+    [mediaType === "movie" ? "Duration" : "Duration per episode", runtime],
+    ["Episodes", totalEpisodes],
+    ["Seasons", totalSeasons],
     ["TMDb", tmdbRating],
     ["Overview", detail.overview],
-  ]
-    .map(([label, value]) => [label, cleanTmdbValue(value)])
-    .filter(([, value]) => value)
-    .map(([label, value]) => `${label}: ${value}`)
-    .join("\n");
+  ]);
 }
 
 function buildOpenLibraryQuery(query, language) {
@@ -1428,6 +1764,7 @@ function normalizeOpenLibraryBookResult(doc) {
     authors: normalizeOpenLibraryList(doc.author_name).join(", "),
     firstPublishYear: doc.first_publish_year || "",
     editionCount: doc.edition_count || "",
+    pageCount: doc.number_of_pages_median || "",
     languages: normalizeOpenLibraryList(doc.language),
     publishers: normalizeOpenLibraryList(doc.publisher).slice(0, 3).join(", "),
     subjects: normalizeOpenLibraryList(doc.subject).slice(0, 5).join(", "),
@@ -1446,6 +1783,9 @@ function getOpenLibraryCoverUrl(coverId) {
 
 function buildOpenLibraryBookNotes(result) {
   return [
+    ["Author", result.authors],
+    ["Genre", result.subjects],
+    ["Total pages", result.pageCount],
     ["First published", result.firstPublishYear],
     ["Editions", result.editionCount],
     ["Publisher", result.publishers],
@@ -1486,8 +1826,12 @@ function normalizeJikanNamedList(value) {
 
 function buildJikanMangaNotes(result) {
   return [
+    ["Author", result.authors],
+    ["Genre", [result.genres, result.themes, result.demographics].filter(Boolean).join(", ")],
     ["Volumes", result.volumes],
     ["Chapters", result.chapters],
+    ["Status", result.status],
+    ["Published", result.published],
   ]
     .filter(([, value]) => value)
     .map(([label, value]) => `${label}: ${value}`)
@@ -1502,6 +1846,7 @@ function normalizeAladinBookResult(item) {
     publisher: item.publisher || "",
     publishedDate: item.pubDate || "",
     category: item.categoryName || "",
+    pageCount: item.itemPage || item.subInfo?.itemPage || "",
     isbn13: item.isbn13 || "",
     description: item.description || "",
     imageUrl: item.cover || "",
@@ -1511,9 +1856,11 @@ function normalizeAladinBookResult(item) {
 
 function buildAladinBookNotes(result) {
   return [
+    ["Author", result.authors],
+    ["Genre", result.category],
+    ["Total pages", result.pageCount],
     ["Published", result.publishedDate],
     ["Publisher", result.publisher],
-    ["Category", result.category],
     ["ISBN13", result.isbn13],
     ["Description", result.description],
     ["Aladin", result.link],
@@ -1558,8 +1905,8 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
     <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="min-w-0">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700">Log something new</p>
-          <h2 className="mt-2 text-3xl font-semibold leading-tight text-stone-950 sm:text-5xl">Choose a media type.</h2>
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400">Log something new</p>
+          <h2 className="mt-2 text-3xl font-semibold leading-tight text-stone-950 dark:text-stone-100 sm:text-5xl">Choose a media type.</h2>
         </div>
 
         <div className="mt-5 flex justify-center gap-2 pb-1">
@@ -1571,8 +1918,8 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
                 key={entry.id}
                 className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition ${
                   isSelected
-                    ? "border-stone-950 bg-stone-950 text-white shadow-sm"
-                    : "border-stone-300 bg-white text-stone-700 hover:border-teal-700 hover:text-teal-800"
+                    ? "border-stone-950 bg-stone-950 text-white shadow-sm dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
+                    : "border-stone-300 bg-white text-stone-700 hover:border-teal-700 hover:text-teal-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-teal-500 dark:hover:text-teal-300"
                 }`}
                 onClick={() => setSelectedCategory(entry.id)}
                 type="button"
@@ -1587,14 +1934,14 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
 
         <form className="mx-auto mt-5 max-w-4xl" onSubmit={handleSubmit}>
           <div
-            className={`grid gap-2 rounded-md border bg-white p-1.5 shadow-sm md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center ${
-              selectedCategory ? "border-stone-300" : "border-dashed border-stone-300"
+            className={`grid gap-2 rounded-md border bg-white p-1.5 shadow-sm dark:bg-stone-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center ${
+              selectedCategory ? "border-stone-300 dark:border-stone-700" : "border-dashed border-stone-300 dark:border-stone-700"
             }`}
           >
             <label className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" size={18} />
               <input
-                className="h-12 w-full rounded border-0 bg-white pl-10 pr-3 text-sm font-medium text-stone-950 outline-none placeholder:text-stone-400 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-50"
+                className="h-12 w-full rounded border-0 bg-white pl-10 pr-3 text-sm font-medium text-stone-950 outline-none placeholder:text-stone-400 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-50 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:ring-teal-950 dark:disabled:bg-stone-800"
                 disabled={!selectedCategory}
                 value={homeQuery}
                 onChange={(event) => setHomeQuery(event.target.value)}
@@ -1602,12 +1949,12 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
               />
             </label>
 
-            <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-stone-50 p-0.5 md:w-32">
+            <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-stone-50 p-0.5 dark:border-stone-700 dark:bg-stone-950 md:w-32">
               {statuses.map((status) => (
                 <button
                   key={status}
                   className={`h-8 rounded px-2 text-xs font-semibold transition ${
-                    selectedStatus === status ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
+                    selectedStatus === status ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
                   }`}
                   onClick={() => setSelectedStatus(status)}
                   type="button"
@@ -1618,7 +1965,7 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
             </div>
 
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-teal-600 dark:hover:bg-teal-500 dark:focus:ring-teal-950 dark:disabled:bg-stone-700"
               disabled={!selectedCategory}
               type="submit"
             >
@@ -1629,25 +1976,25 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
         </form>
 
         {recentItems.length > 0 && (
-          <div className="mx-auto mt-10 max-w-5xl border-t border-stone-300 pt-6">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Recently added</h3>
+          <div className="mx-auto mt-10 max-w-5xl border-t border-stone-300 pt-6 dark:border-stone-800">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400">Recently added</h3>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {recentItems.map((item) => {
                 const itemCategory = categories.find((entry) => entry.id === item.category);
                 const Icon = itemCategory?.icon || Library;
                 return (
-                  <div key={item.id} className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 shadow-sm">
+                  <div key={item.id} className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 shadow-sm dark:border-stone-700 dark:bg-stone-900">
                     {item.imageUrl ? (
                       <img className="h-16 w-11 rounded object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
                     ) : (
                       <div className="cover-fallback h-16 w-11 rounded" />
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-stone-950">{item.title}</p>
-                      <p className="mt-1 truncate text-xs text-stone-600">{item.creator || "Unknown creator"}</p>
-                      <p className="mt-1 text-xs font-medium text-stone-500">{statusLabels[item.status] || item.status}</p>
+                      <p className="truncate text-sm font-semibold text-stone-950 dark:text-stone-100">{item.title}</p>
+                      <p className="mt-1 truncate text-xs text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>
+                      <p className="mt-1 text-xs font-medium text-stone-500 dark:text-stone-500">{statusLabels[item.status] || item.status}</p>
                     </div>
-                    <span className="inline-flex h-8 items-center gap-1 rounded bg-teal-50 px-2 text-[11px] font-semibold text-teal-800 ring-1 ring-teal-100">
+                    <span className="inline-flex h-8 items-center gap-1 rounded bg-teal-50 px-2 text-[11px] font-semibold text-teal-800 ring-1 ring-teal-100 dark:bg-teal-950/50 dark:text-teal-200 dark:ring-teal-900">
                       <Icon size={13} />
                       {itemCategory?.label.replace("TV Shows", "TV") || "Media"}
                     </span>
@@ -1664,8 +2011,8 @@ function HomeView({ counts, items, onStartLookup, searchResetToken }) {
 
 function LibrarySnapshot({ counts, onBrowseCategory }) {
   return (
-    <div className="mt-4 rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Library overview</h3>
+    <div className="mt-4 rounded-lg border border-stone-300 bg-white p-4 shadow-sm dark:border-stone-700 dark:bg-stone-900">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400">Library overview</h3>
       <div className="mt-4 grid grid-cols-6 gap-x-2 gap-y-5">
         {categories.map((entry, index) => {
           const Icon = entry.icon;
@@ -1675,20 +2022,20 @@ function LibrarySnapshot({ counts, onBrowseCategory }) {
           return (
             <button
               key={entry.id}
-              className={`group flex flex-col items-center text-center text-stone-700 transition sm:col-span-1 ${
+              className={`group flex flex-col items-center text-center text-stone-700 transition dark:text-stone-300 sm:col-span-1 ${
                 index < 3 ? "col-span-2" : "col-span-3"
               }`}
               onClick={() => onBrowseCategory(entry.id)}
               type="button"
             >
-              <Icon size={18} className="text-teal-700 transition group-hover:text-teal-800" />
-              <span className="mt-2 text-3xl font-semibold leading-none text-stone-950 transition group-hover:text-teal-800">
+              <Icon size={18} className="text-teal-700 transition group-hover:text-teal-800 dark:text-teal-400 dark:group-hover:text-teal-300" />
+              <span className="mt-2 text-3xl font-semibold leading-none text-stone-950 transition group-hover:text-teal-800 dark:text-stone-100 dark:group-hover:text-teal-300">
                 {totalCount}
               </span>
-              <span className="mt-2 max-w-full truncate text-xs font-semibold text-stone-700 underline-offset-4 transition group-hover:text-teal-800 group-hover:underline">
+              <span className="mt-2 max-w-full truncate text-xs font-semibold text-stone-700 underline-offset-4 transition group-hover:text-teal-800 group-hover:underline dark:text-stone-300 dark:group-hover:text-teal-300">
                 {entry.label.replace("TV Shows", "TV")}
               </span>
-              <span className="mt-1 text-[11px] font-medium text-stone-500">
+              <span className="mt-1 text-[11px] font-medium text-stone-500 dark:text-stone-500">
                 {completedCount} done / {plannedCount} want
               </span>
             </button>
@@ -1704,7 +2051,7 @@ function ShelfSearch({ query, onChange }) {
     <label className="relative block min-w-0 flex-1 sm:w-44 sm:flex-none md:w-52">
       <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" size={15} />
       <input
-        className="h-9 w-full rounded-md border border-stone-300 bg-white/80 pl-8 pr-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
+        className="h-9 w-full rounded-md border border-stone-300 bg-white/80 pl-8 pr-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900/80 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-teal-500 dark:focus:bg-stone-900 dark:focus:ring-teal-950"
         value={query}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Filter shelf"
@@ -1719,7 +2066,7 @@ function SortSelect({ sortOrder, onChange }) {
 
   return (
     <label
-      className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-100"
+      className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:focus-within:border-teal-500 dark:focus-within:ring-teal-950"
       title={`Sort: ${activeOption.label}`}
     >
       <span className="sr-only">Sort shelf</span>
@@ -1747,7 +2094,7 @@ function ViewToggle({ shelfView, onChange }) {
   ];
 
   return (
-    <div className="grid w-20 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5">
+    <div className="grid w-20 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = shelfView === option.value;
@@ -1755,7 +2102,7 @@ function ViewToggle({ shelfView, onChange }) {
           <button
             key={option.value}
             className={`inline-flex h-8 items-center justify-center rounded transition ${
-              isActive ? "bg-teal-700 text-white" : "text-stone-600 hover:bg-stone-100"
+              isActive ? "bg-teal-700 text-white dark:bg-teal-600" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
             }`}
             onClick={() => onChange(option.value)}
             type="button"
@@ -1774,8 +2121,8 @@ function MediaItemCard({ item, onDelete, onEdit }) {
   const subtypeLabel = getSubtypeLabel(item);
 
   return (
-    <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm sm:block">
-      <div className="h-28 w-[76px] overflow-hidden bg-stone-200 sm:aspect-[4/5] sm:h-auto sm:w-full">
+    <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm dark:border-stone-700 dark:bg-stone-900 sm:block">
+      <div className="h-28 w-[76px] overflow-hidden bg-stone-200 dark:bg-stone-800 sm:aspect-[4/5] sm:h-auto sm:w-full">
         {item.imageUrl ? (
           <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
         ) : (
@@ -1787,13 +2134,13 @@ function MediaItemCard({ item, onDelete, onEdit }) {
       <div className="min-w-0 p-3 sm:p-4">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
           <div className="min-w-0">
-            <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950">{item.title}</h3>
-            <p className="mt-1 truncate text-sm text-stone-600">{item.creator || "Unknown creator"}</p>
+            <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950 dark:text-stone-100">{item.title}</h3>
+            <p className="mt-1 truncate text-sm text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <div className="flex gap-1">
               <button
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
                 onClick={() => onEdit(item)}
                 type="button"
                 aria-label={`Edit ${item.title}`}
@@ -1802,7 +2149,7 @@ function MediaItemCard({ item, onDelete, onEdit }) {
                 <Edit3 size={14} />
               </button>
               <button
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
                 onClick={() => onDelete(item.id)}
                 type="button"
                 aria-label={`Delete ${item.title}`}
@@ -1817,11 +2164,11 @@ function MediaItemCard({ item, onDelete, onEdit }) {
 
         <div className="min-w-0">
           {subtypeLabel && (
-            <span className="mt-2 inline-flex rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+            <span className="mt-2 inline-flex rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
               {subtypeLabel}
             </span>
           )}
-          {item.notes && <p className="mt-2 line-clamp-2 text-sm leading-5 text-stone-700 sm:line-clamp-3">{item.notes}</p>}
+          {item.notes && <p className="mt-2 line-clamp-2 text-sm leading-5 text-stone-700 dark:text-stone-300 sm:line-clamp-3">{item.notes}</p>}
         </div>
       </div>
     </article>
@@ -1834,11 +2181,11 @@ function MediaPosterCard({ item, onDelete, onEdit }) {
   return (
     <article className="grid min-w-0 grid-rows-[auto_116px]">
       <button
-        className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-teal-600"
+        className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-teal-600 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500"
         onClick={() => onEdit(item)}
         type="button"
       >
-        <div className="aspect-[2/3] overflow-hidden bg-stone-200">
+        <div className="aspect-[2/3] overflow-hidden bg-stone-200 dark:bg-stone-800">
           {item.imageUrl ? (
             <img
               className="h-full w-full object-cover transition group-hover:scale-[1.02]"
@@ -1854,19 +2201,19 @@ function MediaPosterCard({ item, onDelete, onEdit }) {
       </button>
 
       <div className="mt-2 flex min-h-0 min-w-0 flex-col">
-        <h3 className="line-clamp-2 h-8 break-words text-xs font-semibold leading-4 text-stone-950 sm:text-sm">{item.title}</h3>
-        <p className="mt-1 h-4 truncate text-[11px] font-medium text-amber-700">{subtypeLabel}</p>
+        <h3 className="line-clamp-2 h-8 break-words text-xs font-semibold leading-4 text-stone-950 dark:text-stone-100 sm:text-sm">{item.title}</h3>
+        <p className="mt-1 h-4 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300">{subtypeLabel}</p>
         <div className="h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
         <div className="mt-auto grid grid-cols-[1fr_32px] gap-1">
           <button
-            className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
             onClick={() => onEdit(item)}
             type="button"
           >
             Edit
           </button>
           <button
-            className="inline-flex h-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
             onClick={() => onDelete(item.id)}
             type="button"
             aria-label={`Delete ${item.title}`}
@@ -1882,18 +2229,18 @@ function MediaPosterCard({ item, onDelete, onEdit }) {
 
 function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
   return (
-    <div className={`mt-4 grid rounded-md border border-stone-300 bg-white p-1 ${options.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+    <div className={`mt-4 grid rounded-md border border-stone-300 bg-white p-1 dark:border-stone-700 dark:bg-stone-900 ${options.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
       {options.map((option) => (
         <button
           key={option.value}
           className={`min-h-10 rounded px-2 text-sm font-medium transition ${
-            activeSubtype === option.value ? "bg-teal-700 text-white" : "text-stone-600 hover:bg-stone-100"
+            activeSubtype === option.value ? "bg-teal-700 text-white dark:bg-teal-600" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
           }`}
           onClick={() => onChange(option.value)}
           type="button"
         >
           <span className="block truncate">{option.label}</span>
-          <span className={`block text-xs ${activeSubtype === option.value ? "text-teal-50" : "text-stone-400"}`}>
+          <span className={`block text-xs ${activeSubtype === option.value ? "text-teal-50" : "text-stone-400 dark:text-stone-500"}`}>
             {counts[option.value] || 0}
           </span>
         </button>
@@ -1932,15 +2279,15 @@ function EditorSheet({
   const canLookupDetails = canUseBookLookup || canUseMangaLookup || canUseOmdb || canUseTmdb;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 sm:items-center sm:justify-center">
-      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-300 bg-white p-4 shadow-lift sm:max-w-xl sm:rounded-xl sm:p-5">
-        <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 sm:-mx-5 sm:-mt-5 sm:px-5">
+    <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 dark:bg-black/70 sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-300 bg-white p-4 shadow-lift dark:border-stone-700 dark:bg-stone-900 sm:max-w-xl sm:rounded-xl sm:p-5">
+        <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900 sm:-mx-5 sm:-mt-5 sm:px-5">
           <div>
-            <h2 className="text-lg font-semibold text-stone-950">{editingId ? "Edit item" : "Add item"}</h2>
-            <p className="mt-1 text-sm text-stone-600">{category.label} / {activeStatus}</p>
+            <h2 className="text-lg font-semibold text-stone-950 dark:text-stone-100">{editingId ? "Edit item" : "Add item"}</h2>
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{category.label} / {activeStatus}</p>
           </div>
           <button
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
             onClick={onClose}
             type="button"
             aria-label="Close editor"
@@ -2110,7 +2457,7 @@ function EditorSheet({
           </Field>
 
           <button
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:bg-teal-600 dark:hover:bg-teal-500 dark:focus:ring-teal-950"
             type="submit"
           >
             {editingId ? <Save size={17} /> : <Plus size={17} />}
@@ -2124,16 +2471,16 @@ function EditorSheet({
 
 function BottomNav({ activeCategory, counts, onShowCategory }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-300 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_35px_rgba(31,41,55,0.12)] backdrop-blur sm:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+    <nav className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 px-4 lg:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-xl border border-stone-300/80 bg-white/80 p-1 shadow-[0_18px_55px_rgba(31,41,55,0.22)] backdrop-blur-xl dark:border-stone-700/80 dark:bg-stone-950/80 dark:shadow-[0_18px_55px_rgba(0,0,0,0.5)]">
         {categories.map((entry) => {
           const Icon = entry.icon;
           const isActive = entry.id === activeCategory;
           return (
             <button
               key={entry.id}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition ${
-                isActive ? "bg-teal-700 text-white" : "text-stone-600 hover:bg-stone-100"
+              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-semibold transition ${
+                isActive ? "bg-teal-700 text-white shadow-sm dark:bg-teal-600" : "text-stone-600 hover:bg-white/70 dark:text-stone-300 dark:hover:bg-stone-800/80"
               }`}
               onClick={() => onShowCategory(entry.id)}
               type="button"
@@ -2148,20 +2495,41 @@ function BottomNav({ activeCategory, counts, onShowCategory }) {
   );
 }
 
-function buildOmdbNotes(detail) {
-  const lines = [
+async function fetchOmdbEpisodeCount(imdbId, totalSeasons) {
+  const seasonCount = Number(cleanOmdbValue(totalSeasons));
+  if (!omdbApiKey || !imdbId || !seasonCount) return "";
+
+  try {
+    const seasonRequests = Array.from({ length: seasonCount }, (_, index) => {
+      const url = new URL("https://www.omdbapi.com/");
+      url.searchParams.set("apikey", omdbApiKey);
+      url.searchParams.set("i", imdbId);
+      url.searchParams.set("Season", String(index + 1));
+      return fetch(url).then((response) => response.json());
+    });
+    const seasons = await Promise.all(seasonRequests);
+    const episodeTotal = seasons.reduce((total, season) => {
+      if (season.Response === "False" || !Array.isArray(season.Episodes)) return total;
+      return total + season.Episodes.length;
+    }, 0);
+    return episodeTotal || "";
+  } catch {
+    return "";
+  }
+}
+
+function buildOmdbNotes(detail, episodeCount = "") {
+  return buildLabeledNotes([
     ["Year", detail.Year],
+    ["Director", detail.Director],
     ["Genre", detail.Genre],
-    ["Runtime", detail.Runtime],
+    [detail.Type === "series" ? "Duration per episode" : "Duration", detail.Runtime],
+    ["Episodes", episodeCount],
+    ["Seasons", detail.totalSeasons],
     ["Rated", detail.Rated],
     ["IMDb", detail.imdbRating && detail.imdbRating !== "N/A" ? `${detail.imdbRating}/10` : ""],
     ["Plot", detail.Plot],
-  ]
-    .map(([label, value]) => [label, cleanOmdbValue(value)])
-    .filter(([, value]) => value)
-    .map(([label, value]) => `${label}: ${value}`);
-
-  return lines.join("\n");
+  ]);
 }
 
 function DetailsLookup({
@@ -2184,11 +2552,11 @@ function DetailsLookup({
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
 
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3">
+    <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3 dark:border-teal-900 dark:bg-teal-950/25">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-stone-800">Find details</span>
+        <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">Find details</span>
         {lookupProviders.map((provider) => (
-          <span key={provider.id} className="rounded bg-white px-2 py-1 text-xs font-semibold text-teal-800 ring-1 ring-teal-100">
+          <span key={provider.id} className="rounded bg-white px-2 py-1 text-xs font-semibold text-teal-800 ring-1 ring-teal-100 dark:bg-stone-900 dark:text-teal-200 dark:ring-teal-900">
             {provider.label}
           </span>
         ))}
@@ -2225,7 +2593,7 @@ function DetailsLookup({
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {canUseBookLookup && (
             <label>
-              <span className="mb-2 block text-sm font-medium text-stone-700">Book language</span>
+              <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">Book language</span>
               <select className="input bg-white" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
                 <option value="all">Any language</option>
                 <option value="ko">Korean</option>
@@ -2236,7 +2604,7 @@ function DetailsLookup({
 
           {canUseTmdb && (
             <label>
-              <span className="mb-2 block text-sm font-medium text-stone-700">TMDb language</span>
+              <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">TMDb language</span>
               <select className="input bg-white" value={tmdbLanguage} onChange={(event) => onTmdbLanguageChange(event.target.value)}>
                 <option value="en-US">English</option>
                 <option value="ko-KR">Korean</option>
@@ -2247,7 +2615,7 @@ function DetailsLookup({
       )}
 
       {message && (
-        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700" : "text-teal-800"}`}>
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700 dark:text-red-300" : "text-teal-800 dark:text-teal-200"}`}>
           {message}
         </p>
       )}
@@ -2260,7 +2628,7 @@ function DetailsLookup({
             return (
               <li key={lookupResult.id}>
                 <button
-                  className="grid w-full grid-cols-[42px_minmax(0,1fr)_auto] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-teal-500"
+                  className="grid w-full grid-cols-[42px_minmax(0,1fr)_auto] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-teal-500 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500"
                   onClick={() => onApply(lookupResult)}
                   type="button"
                 >
@@ -2270,10 +2638,10 @@ function DetailsLookup({
                     <div className="cover-fallback h-14 w-10 rounded" />
                   )}
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-stone-950">{title}</span>
-                    <span className="mt-1 block truncate text-xs text-stone-600">{getLookupResultMeta(lookupResult)}</span>
+                    <span className="block truncate text-sm font-semibold text-stone-950 dark:text-stone-100">{title}</span>
+                    <span className="mt-1 block truncate text-xs text-stone-600 dark:text-stone-400">{getLookupResultMeta(lookupResult)}</span>
                   </span>
-                  <span className="self-start rounded bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-600">
+                  <span className="self-start rounded bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-600 dark:bg-stone-800 dark:text-stone-300">
                     {lookupResult.sourceLabel}
                   </span>
                 </button>
@@ -2650,7 +3018,7 @@ function OmdbLookup({ categoryLabel, message, onApply, onQueryChange, onSearch, 
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-stone-700">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">{label}</span>
       {children}
     </label>
   );
@@ -2664,7 +3032,7 @@ function Rating({ value, onChange, readOnly = false, compact = false }) {
     <div className={`flex items-center gap-0.5 ${compact ? "mt-1 h-5" : "h-8 gap-1"}`} aria-label={`${value} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((rating) => {
         const filled = rating <= value;
-        const classes = filled ? "fill-amber-400 text-amber-500" : "text-stone-300";
+        const classes = filled ? "fill-amber-400 text-amber-500" : "text-stone-300 dark:text-stone-600";
         if (readOnly) {
           return <Star key={rating} className={classes} size={starSize} />;
         }
@@ -2672,7 +3040,7 @@ function Rating({ value, onChange, readOnly = false, compact = false }) {
         return (
           <button
             key={rating}
-            className={`inline-flex ${buttonSize} items-center justify-center rounded text-stone-400 transition hover:bg-amber-50 hover:text-amber-500`}
+            className={`inline-flex ${buttonSize} items-center justify-center rounded text-stone-400 transition hover:bg-amber-50 hover:text-amber-500 dark:text-stone-500 dark:hover:bg-amber-950/40 dark:hover:text-amber-300`}
             onClick={() => onChange(rating)}
             type="button"
             aria-label={`${rating} stars`}

@@ -40,6 +40,7 @@ function aladinApiPlugin(aladinTtbKey) {
       aladinUrl.searchParams.set("output", "js");
       aladinUrl.searchParams.set("Version", "20131101");
       aladinUrl.searchParams.set("Cover", "Big");
+      aladinUrl.searchParams.set("OptResult", "itemPage");
 
       const aladinResponse = await fetch(aladinUrl);
       const body = await aladinResponse.text();

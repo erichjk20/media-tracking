@@ -146,6 +146,7 @@ const emptyDraft = {
 
 const sortOptions = [
   { value: "recent", label: "Recently added", icon: ClockArrowDown },
+  { value: "rating-desc", label: "Highest rated", icon: Star },
   { value: "title-asc", label: "A to Z", icon: ArrowDownAZ },
   { value: "title-desc", label: "Z to A", icon: ArrowUpZA },
 ];
@@ -197,6 +198,13 @@ function getAddedSortValue(item, index) {
 function compareShelfItems(a, b, sortOrder) {
   if (sortOrder === "title-asc") return compareTitles(a.item, b.item);
   if (sortOrder === "title-desc") return compareTitles(b.item, a.item);
+  if (sortOrder === "rating-desc") {
+    return (
+      Number(b.item.rating || 0) - Number(a.item.rating || 0)
+      || compareTitles(a.item, b.item)
+      || getAddedSortValue(b.item, b.index) - getAddedSortValue(a.item, a.index)
+    );
+  }
 
   return getAddedSortValue(b.item, b.index) - getAddedSortValue(a.item, a.index) || compareTitles(a.item, b.item);
 }
@@ -416,7 +424,7 @@ function App() {
   const [activeBookSubtype, setActiveBookSubtype] = useState("all");
   const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
   const [activeTvSubtype, setActiveTvSubtype] = useState("all");
-  const [shelfView, setShelfView] = useState("list");
+  const [shelfView, setShelfView] = useState("grid");
   const [sortOrder, setSortOrder] = useState("recent");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState({ ...emptyDraft });
@@ -701,8 +709,13 @@ function App() {
     }));
   }
 
-  function showCategory(categoryId) {
+  function showLibrary() {
+    setShelfView("grid");
     setActiveView("library");
+  }
+
+  function showCategory(categoryId) {
+    showLibrary();
     setActiveCategory(categoryId);
   }
 
@@ -1066,15 +1079,24 @@ function App() {
     <main className="min-h-screen bg-[#f7f4ee] pb-28 sm:pb-0">
       <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur sm:static sm:bg-[#fffaf2]">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start justify-between gap-3 lg:items-center">
             <div className="min-w-0">
-              <BrandWordmark />
+              <BrandWordmark onClick={() => setActiveView("home")} />
               <div className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-teal-700 sm:text-sm">
                 <Library size={16} />
                 Track your media without the noise
               </div>
             </div>
-            <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:w-56">
+            <button
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700 transition hover:border-teal-700 hover:text-teal-800 sm:hidden"
+              onClick={() => (activeView === "home" ? showLibrary() : setActiveView("home"))}
+              type="button"
+              aria-label={activeView === "home" ? "Open library" : "Go home"}
+              title={activeView === "home" ? "Library" : "Home"}
+            >
+              {activeView === "home" ? <Library size={18} /> : <Home size={18} />}
+            </button>
+            <div className="hidden grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 sm:grid sm:w-56">
               <button
                 className={`inline-flex h-9 items-center justify-center gap-2 rounded text-sm font-semibold transition ${
                   activeView === "home" ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
@@ -1089,7 +1111,7 @@ function App() {
                 className={`inline-flex h-9 items-center justify-center gap-2 rounded text-sm font-semibold transition ${
                   activeView === "library" ? "bg-stone-950 text-white" : "text-stone-600 hover:bg-stone-100"
                 }`}
-                onClick={() => setActiveView("library")}
+                onClick={showLibrary}
                 type="button"
               >
                 <Library size={15} />
@@ -1139,7 +1161,6 @@ function App() {
         <HomeView
           counts={counts}
           items={items}
-          onBrowseCategory={showCategory}
           onStartLookup={startHomeLookup}
           searchResetToken={homeSearchResetToken}
         />
@@ -1170,7 +1191,7 @@ function App() {
                     type="button"
                   >
                     <span>{statusLabels[status]}</span>
-                    <span className={`ml-1 ${activeStatus === status ? "text-stone-300" : "text-stone-400"}`}>
+                    <span className={`ml-1 hidden sm:inline ${activeStatus === status ? "text-stone-300" : "text-stone-400"}`}>
                       {counts[activeCategory]?.[status] || 0}
                     </span>
                   </button>
@@ -1178,6 +1199,8 @@ function App() {
               </div>
             </div>
           </div>
+
+          <LibrarySnapshot counts={counts} onBrowseCategory={showCategory} />
 
           {activeCategory === "books" && (
             <SubtypeFilter
@@ -1283,21 +1306,25 @@ function App() {
   );
 }
 
-function BrandWordmark() {
+function BrandWordmark({ onClick }) {
   return (
-    <h1
-      aria-label="shelvd"
-      className="relative inline-flex items-end pb-1 text-4xl font-semibold leading-none tracking-normal text-stone-950 sm:text-5xl"
-    >
-      <span>she</span>
-      <span
-        aria-hidden="true"
-        className="mx-0.5 inline-block origin-bottom -rotate-6 rounded-sm bg-teal-700 px-0.5 text-[#fffaf2] shadow-sm"
+    <h1>
+      <button
+        aria-label="Go home"
+        className="relative inline-flex items-end pb-1 text-4xl font-semibold leading-none tracking-normal text-stone-950 transition hover:text-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 sm:text-5xl"
+        onClick={onClick}
+        type="button"
       >
-        l
-      </span>
-      <span>vd</span>
-      <span aria-hidden="true" className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-stone-300" />
+        <span>she</span>
+        <span
+          aria-hidden="true"
+          className="mx-0.5 inline-block origin-bottom -rotate-6 rounded-sm bg-teal-700 px-0.5 text-[#fffaf2] shadow-sm"
+        >
+          l
+        </span>
+        <span>vd</span>
+        <span aria-hidden="true" className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-stone-300" />
+      </button>
     </h1>
   );
 }
@@ -1504,7 +1531,7 @@ function getSubtypeLabel(item) {
   return "";
 }
 
-function HomeView({ counts, items, onBrowseCategory, onStartLookup, searchResetToken }) {
+function HomeView({ counts, items, onStartLookup, searchResetToken }) {
   const [homeQuery, setHomeQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Completed");
@@ -1535,14 +1562,14 @@ function HomeView({ counts, items, onBrowseCategory, onStartLookup, searchResetT
           <h2 className="mt-2 text-3xl font-semibold leading-tight text-stone-950 sm:text-5xl">Choose a media type.</h2>
         </div>
 
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1 sm:justify-center">
+        <div className="mt-5 flex justify-center gap-2 pb-1">
           {categories.map((entry) => {
             const Icon = entry.icon;
             const isSelected = entry.id === selectedCategory;
             return (
               <button
                 key={entry.id}
-                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-full border text-sm font-semibold transition sm:h-10 sm:w-auto sm:justify-start sm:px-3 ${
+                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition ${
                   isSelected
                     ? "border-stone-950 bg-stone-950 text-white shadow-sm"
                     : "border-stone-300 bg-white text-stone-700 hover:border-teal-700 hover:text-teal-800"
@@ -1553,12 +1580,6 @@ function HomeView({ counts, items, onBrowseCategory, onStartLookup, searchResetT
                 title={entry.label}
               >
                 <Icon size={17} />
-                <span className="hidden sm:inline">{entry.label}</span>
-                <span className={`hidden rounded-full px-1.5 py-0.5 text-[11px] sm:inline ${
-                  isSelected ? "bg-white/15 text-stone-100" : "bg-stone-100 text-stone-500"
-                }`}>
-                  {(counts[entry.id]?.Completed || 0) + (counts[entry.id]?.["Want to Watch/Read"] || 0)} saved
-                </span>
               </button>
             );
           })}
@@ -1607,37 +1628,6 @@ function HomeView({ counts, items, onBrowseCategory, onStartLookup, searchResetT
           </div>
         </form>
 
-        <div className="mx-auto mt-8 max-w-5xl rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Library snapshot</h3>
-          <div className="mt-4 grid grid-cols-6 gap-x-2 gap-y-5">
-            {categories.map((entry, index) => {
-              const Icon = entry.icon;
-              const completedCount = counts[entry.id]?.Completed || 0;
-              const plannedCount = counts[entry.id]?.["Want to Watch/Read"] || 0;
-              const totalCount = completedCount + plannedCount;
-              return (
-                <button
-                  key={entry.id}
-                  className={`group flex flex-col items-center text-center text-stone-700 transition sm:col-span-1 ${index < 3 ? "col-span-2" : "col-span-3"}`}
-                  onClick={() => onBrowseCategory(entry.id)}
-                  type="button"
-                >
-                  <Icon size={18} className="text-teal-700 transition group-hover:text-teal-800" />
-                  <span className="mt-2 text-3xl font-semibold leading-none text-stone-950 transition group-hover:text-teal-800">
-                    {totalCount}
-                  </span>
-                  <span className="mt-2 max-w-full truncate text-xs font-semibold text-stone-700 underline-offset-4 transition group-hover:text-teal-800 group-hover:underline">
-                    {entry.label.replace("TV Shows", "TV")}
-                  </span>
-                  <span className="mt-1 text-[11px] font-medium text-stone-500">
-                    {completedCount} done / {plannedCount} want
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {recentItems.length > 0 && (
           <div className="mx-auto mt-10 max-w-5xl border-t border-stone-300 pt-6">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Recently added</h3>
@@ -1669,6 +1659,43 @@ function HomeView({ counts, items, onBrowseCategory, onStartLookup, searchResetT
         )}
       </div>
     </section>
+  );
+}
+
+function LibrarySnapshot({ counts, onBrowseCategory }) {
+  return (
+    <div className="mt-4 rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500">Library overview</h3>
+      <div className="mt-4 grid grid-cols-6 gap-x-2 gap-y-5">
+        {categories.map((entry, index) => {
+          const Icon = entry.icon;
+          const completedCount = counts[entry.id]?.Completed || 0;
+          const plannedCount = counts[entry.id]?.["Want to Watch/Read"] || 0;
+          const totalCount = completedCount + plannedCount;
+          return (
+            <button
+              key={entry.id}
+              className={`group flex flex-col items-center text-center text-stone-700 transition sm:col-span-1 ${
+                index < 3 ? "col-span-2" : "col-span-3"
+              }`}
+              onClick={() => onBrowseCategory(entry.id)}
+              type="button"
+            >
+              <Icon size={18} className="text-teal-700 transition group-hover:text-teal-800" />
+              <span className="mt-2 text-3xl font-semibold leading-none text-stone-950 transition group-hover:text-teal-800">
+                {totalCount}
+              </span>
+              <span className="mt-2 max-w-full truncate text-xs font-semibold text-stone-700 underline-offset-4 transition group-hover:text-teal-800 group-hover:underline">
+                {entry.label.replace("TV Shows", "TV")}
+              </span>
+              <span className="mt-1 text-[11px] font-medium text-stone-500">
+                {completedCount} done / {plannedCount} want
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -2113,9 +2140,6 @@ function BottomNav({ activeCategory, counts, onShowCategory }) {
             >
               <Icon size={18} />
               <span className="max-w-full truncate">{entry.label.replace("TV Shows", "TV")}</span>
-              <span className={`text-[10px] ${isActive ? "text-teal-50" : "text-stone-400"}`}>
-                {counts[entry.id]?.Completed || 0}
-              </span>
             </button>
           );
         })}

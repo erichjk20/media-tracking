@@ -52,6 +52,7 @@ const omdbTypesByCategory = {
 const omdbApiKey = import.meta.env.VITE_OMDB_API_KEY;
 const tmdbApiKey = import.meta.env.VITE_TMDB_API_KEY;
 const tmdbAccessToken = import.meta.env.VITE_TMDB_ACCESS_TOKEN;
+const tmdbCanonicalMediaLanguage = "en-US";
 
 const movieSubtypeOptions = [
   { value: "all", label: "All" },
@@ -141,11 +142,11 @@ const emptyDraft = {
   creator: "",
   director: "",
   genre: "",
+  releaseYear: "",
   durationMinutes: "",
   pageCount: "",
   publisher: "",
   isbn: "",
-  language: "",
   author: "",
   artist: "",
   volumeCount: "",
@@ -190,11 +191,11 @@ function normalizeItems(items) {
     ...item,
     director: item.director || (item.category === "movies" ? item.creator || "" : ""),
     genre: item.genre || "",
+    releaseYear: item.releaseYear || "",
     durationMinutes: item.durationMinutes || "",
     pageCount: item.pageCount || "",
     publisher: item.publisher || "",
     isbn: item.isbn || "",
-    language: item.language || "",
     author: item.author || (item.category === "manga" ? item.creator || "" : ""),
     artist: item.artist || "",
     volumeCount: item.volumeCount || "",
@@ -242,26 +243,24 @@ function compareShelfItems(a, b, sortOrder) {
 
 function getLookupProviders(category, subtype = "") {
   if (category === "books") {
-    return [
-      { id: "aladin", label: "Aladin" },
-      { id: "open-library", label: "Open Library" },
-    ];
+    return subtype === "korean-book" ? [{ id: "aladin", label: "Aladin" }] : [{ id: "open-library", label: "Open Library" }];
   }
-  if (category === "movies" && subtype === "korean-movie") return [{ id: "tmdb", label: "TMDb" }];
-  if (category === "movies") return [{ id: "omdb", label: "OMDb" }];
-  if (category === "tv" && subtype === "kdrama") return [{ id: "tmdb", label: "TMDb" }];
-  if (category === "tv") return [{ id: "omdb", label: "OMDb" }];
+  if (category === "movies") return [{ id: "tmdb", label: "TMDb" }];
+  if (category === "tv") return [{ id: "tmdb", label: "TMDb" }];
   if (category === "anime") return [{ id: "omdb", label: "OMDb" }];
   if (category === "manga") return [{ id: "jikan", label: "Jikan" }];
   return [];
 }
 
 function getFallbackLookupProviders(category, subtype = "", attemptedProviderIds = []) {
-  if (category === "movies" && subtype !== "korean-movie" && !attemptedProviderIds.includes("tmdb")) {
-    return [{ id: "tmdb", label: "TMDb" }];
+  if (category === "books" && subtype === "korean-book" && !attemptedProviderIds.includes("open-library")) {
+    return [{ id: "open-library", label: "Open Library" }];
   }
-  if (category === "tv" && subtype !== "kdrama" && !attemptedProviderIds.includes("tmdb")) {
-    return [{ id: "tmdb", label: "TMDb" }];
+  if (category === "movies" && subtype !== "korean-movie" && !attemptedProviderIds.includes("omdb")) {
+    return [{ id: "omdb", label: "OMDb" }];
+  }
+  if (category === "tv" && subtype !== "kdrama" && !attemptedProviderIds.includes("omdb")) {
+    return [{ id: "omdb", label: "OMDb" }];
   }
   return [];
 }
@@ -645,11 +644,11 @@ function App() {
       creator: draft.creator.trim(),
       director: draft.director.trim(),
       genre: draft.genre.trim(),
+      releaseYear: draft.releaseYear ? Number(draft.releaseYear) : "",
       durationMinutes: draft.durationMinutes ? Number(draft.durationMinutes) : "",
       pageCount: draft.pageCount ? Number(draft.pageCount) : "",
       publisher: draft.publisher.trim(),
       isbn: draft.isbn.trim(),
-      language: draft.language.trim(),
       author: draft.author.trim(),
       artist: draft.artist.trim(),
       volumeCount: draft.volumeCount ? Number(draft.volumeCount) : "",
@@ -808,11 +807,11 @@ function App() {
       creator: patch.creator || item.creator,
       director: patch.director || item.director,
       genre: patch.genre || item.genre,
+      releaseYear: patch.releaseYear || item.releaseYear,
       durationMinutes: patch.durationMinutes || item.durationMinutes,
       pageCount: patch.pageCount || item.pageCount,
       publisher: patch.publisher || item.publisher,
       isbn: patch.isbn || item.isbn,
-      language: patch.language || item.language,
       author: patch.author || item.author,
       artist: patch.artist || item.artist,
       volumeCount: patch.volumeCount || item.volumeCount,
@@ -929,7 +928,7 @@ function App() {
 
   function fetchProviderResults(searchText, provider, context = {}) {
     if (provider.id === "omdb") return fetchOmdbResults(searchText, context.category);
-    if (provider.id === "tmdb") return fetchTmdbResults(searchText, context.category);
+    if (provider.id === "tmdb") return fetchTmdbResults(searchText, context.category, context.subtype);
     if (provider.id === "open-library") return fetchOpenLibraryResults(searchText, context.language);
     if (provider.id === "aladin") return fetchAladinResults(searchText);
     return fetchMangaResults(searchText);
@@ -968,7 +967,7 @@ function App() {
     }
   }
 
-  async function fetchTmdbResults(searchText, category = draft.category) {
+  async function fetchTmdbResults(searchText, category = draft.category, subtype = draft.subtype) {
     const mediaType = category === "movies" ? "movie" : category === "tv" ? "tv" : "";
 
     if (!tmdbAccessToken && !tmdbApiKey) {
@@ -979,37 +978,24 @@ function App() {
       return { results: [], message: "" };
     }
 
-    try {
-      const url = new URL(`https://api.themoviedb.org/3/search/${mediaType}`);
-      applyTmdbAuth(url);
-      url.searchParams.set("query", searchText);
-      url.searchParams.set("language", tmdbLanguage);
-      url.searchParams.set("include_adult", "false");
-      url.searchParams.set("page", "1");
-      if (mediaType === "movie") {
-        url.searchParams.set("region", "KR");
-      }
+    const languages = getTmdbSearchLanguages(mediaType, subtype, tmdbLanguage);
+    const settledSearches = await Promise.allSettled(
+      languages.map((language) => fetchTmdbSearchResults(searchText, mediaType, subtype, language)),
+    );
+    const failedSearches = settledSearches.filter((entry) => entry.status === "rejected");
+    const rawResults = settledSearches.flatMap((entry) => (entry.status === "fulfilled" ? entry.value : []));
 
-      const response = await fetch(url, getTmdbRequestOptions());
-      const data = await response.json();
+    const results = dedupeTmdbResults(rawResults)
+      .filter((result) => result.poster_path || result.title || result.name || result.original_title || result.original_name)
+      .slice(0, 8)
+      .map((result) => normalizeTmdbResult(result, mediaType));
 
-      if (!response.ok) {
-        throw new Error(data.status_message || "TMDb lookup failed.");
-      }
-
-      const results = (data.results || [])
-        .filter((result) => result.poster_path || result.title || result.name || result.original_title || result.original_name)
-        .slice(0, 8)
-        .map((result) => normalizeTmdbResult(result, mediaType));
-
-      if (!results.length) {
-        return { results: [], message: "No TMDb results found." };
-      }
-
-      return { results: results.map((result) => createLookupResult("tmdb", result)), message: "" };
-    } catch (error) {
-      return { results: [], message: error.message || "TMDb lookup failed." };
+    if (!results.length) {
+      const error = failedSearches[0]?.reason;
+      return { results: [], message: error?.message || "No TMDb results found." };
     }
+
+    return { results: results.map((result) => createLookupResult("tmdb", result)), message: "" };
   }
 
   async function fetchOpenLibraryResults(searchText, language = bookLanguage) {
@@ -1135,6 +1121,7 @@ function App() {
       creator: patch.creator || current.creator,
       director: patch.director || current.director,
       genre: patch.genre || current.genre,
+      releaseYear: patch.releaseYear || current.releaseYear,
       durationMinutes: patch.durationMinutes || current.durationMinutes,
       seasonCount: patch.seasonCount || current.seasonCount,
       episodeCount: patch.episodeCount || current.episodeCount,
@@ -1164,11 +1151,12 @@ function App() {
     const creator = category === "movies" ? director : director || detail.Writer;
     const durationMinutes = parseOmdbRuntime(detail.Runtime);
     const genre = cleanOmdbValue(detail.Genre);
+    const releaseYear = parseReleaseYear(detail.Year);
     const episodeCount = category === "tv" || category === "anime" ? await fetchOmdbEpisodeCount(result.imdbID, detail.totalSeasons) : "";
     const title = cleanOmdbValue(detail.Title) || result.Title || "";
     const notes =
       category === "movies"
-        ? buildMovieNotes({ title, director, genre, durationMinutes })
+        ? buildMovieNotes({ title, director, genre, releaseYear, durationMinutes })
         : buildOmdbNotes(detail, episodeCount);
 
     return {
@@ -1176,6 +1164,7 @@ function App() {
       creator: cleanOmdbValue(creator),
       director: category === "movies" ? director : "",
       genre: category === "movies" ? genre : "",
+      releaseYear: category === "movies" ? releaseYear : "",
       durationMinutes: category === "movies" ? durationMinutes : "",
       seasonCount: category === "tv" || category === "anime" ? Number(cleanOmdbValue(detail.totalSeasons)) || "" : "",
       episodeCount: category === "tv" || category === "anime" ? episodeCount : "",
@@ -1196,6 +1185,7 @@ function App() {
       creator: patch.creator || current.creator,
       director: patch.director || current.director,
       genre: patch.genre || current.genre,
+      releaseYear: patch.releaseYear || current.releaseYear,
       durationMinutes: patch.durationMinutes || current.durationMinutes,
       seasonCount: patch.seasonCount || current.seasonCount,
       episodeCount: patch.episodeCount || current.episodeCount,
@@ -1211,7 +1201,7 @@ function App() {
   async function getTmdbItemPatch(result, currentItem) {
     const url = new URL(`https://api.themoviedb.org/3/${result.mediaType}/${result.id}`);
     applyTmdbAuth(url);
-    url.searchParams.set("language", tmdbLanguage);
+    url.searchParams.set("language", result.mediaType === "movie" || result.mediaType === "tv" ? tmdbCanonicalMediaLanguage : tmdbLanguage);
     url.searchParams.set("append_to_response", "credits");
 
     const response = await fetch(url, getTmdbRequestOptions());
@@ -1221,15 +1211,24 @@ function App() {
       throw new Error(detail.status_message || "Could not load TMDb details.");
     }
 
-    const isKorean = getTmdbCountries(detail, result.mediaType).includes("KR");
-    const title = cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
-    const originalTitle = cleanTmdbValue(result.originalTitle) || cleanTmdbValue(detail.original_title || detail.original_name);
+    const countries = getTmdbCountries(detail, result.mediaType);
+    const country = countries.join(", ");
+    const isKorean = countries.includes("KR");
+    const title =
+      result.mediaType === "movie" || result.mediaType === "tv"
+        ? cleanTmdbValue(detail.title || detail.name) || cleanTmdbValue(result.title)
+        : cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
+    const originalTitle =
+      result.mediaType === "movie" || result.mediaType === "tv"
+        ? cleanTmdbValue(detail.original_title || detail.original_name) || cleanTmdbValue(result.originalTitle)
+        : cleanTmdbValue(result.originalTitle) || cleanTmdbValue(detail.original_title || detail.original_name);
     const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvDirector(detail) || getTmdbTvCreator(detail);
     const genres = detail.genres?.map((genre) => genre.name).join(", ") || "";
+    const releaseYear = parseReleaseYear(result.mediaType === "movie" ? detail.release_date || result.releaseDate : "");
     const durationMinutes = result.mediaType === "movie" ? detail.runtime || "" : "";
     const notes =
       result.mediaType === "movie"
-        ? buildMovieNotes({ title, director: creator, genre: genres, durationMinutes })
+        ? buildMovieNotes({ title, originalTitle, country, director: creator, genre: genres, releaseYear, durationMinutes })
         : buildTmdbNotes(detail, result.mediaType, originalTitle);
 
     return {
@@ -1246,6 +1245,7 @@ function App() {
       creator,
       director: result.mediaType === "movie" ? creator : "",
       genre: result.mediaType === "movie" ? genres : "",
+      releaseYear: result.mediaType === "movie" ? releaseYear : "",
       durationMinutes: result.mediaType === "movie" ? durationMinutes : "",
       seasonCount: result.mediaType === "tv" ? detail.number_of_seasons || "" : "",
       episodeCount: result.mediaType === "tv" ? detail.number_of_episodes || "" : "",
@@ -1266,7 +1266,6 @@ function App() {
       pageCount: patch.pageCount || current.pageCount,
       publisher: patch.publisher || current.publisher,
       isbn: patch.isbn || current.isbn,
-      language: patch.language || current.language,
       notes: patch.notes || current.notes,
     }));
     setLookupStatus("success");
@@ -1283,7 +1282,6 @@ function App() {
       imageUrl: result.imageUrl,
       pageCount: result.pageCount,
       publisher: result.publishers,
-      language: result.languages.join(", "),
       notes: buildOpenLibraryBookNotes(result),
     };
   }
@@ -1299,7 +1297,6 @@ function App() {
       pageCount: patch.pageCount || current.pageCount,
       publisher: patch.publisher || current.publisher,
       isbn: patch.isbn || current.isbn,
-      language: patch.language || current.language,
       notes: patch.notes || current.notes,
     }));
     setLookupStatus("success");
@@ -1316,7 +1313,6 @@ function App() {
       pageCount: result.pageCount,
       publisher: result.publisher,
       isbn: result.isbn13,
-      language: "ko",
       notes: buildAladinBookNotes(result),
     };
   }
@@ -1634,8 +1630,36 @@ function parseOmdbRuntime(value) {
   return match ? Number(match[1]) : "";
 }
 
+function parseReleaseYear(value) {
+  const match = cleanTmdbValue(value).match(/\d{4}/);
+  return match ? Number(match[0]) : "";
+}
+
 function formatDurationMinutes(value) {
   return value ? `${value} min` : "";
+}
+
+function formatCompactDurationMinutes(value) {
+  const minutes = Number(value);
+  if (!minutes) return "";
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (!hours) return `${remainingMinutes}m`;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+function getMovieTileMeta(item) {
+  if (item.category !== "movies") return "";
+
+  return [item.releaseYear, formatCompactDurationMinutes(item.durationMinutes)].filter(Boolean).join(" • ");
+}
+
+function getBookTileMeta(item) {
+  if (item.category !== "books" || !item.pageCount) return "";
+
+  return `${item.pageCount} pages`;
 }
 
 function buildLabeledNotes(lines) {
@@ -1646,9 +1670,14 @@ function buildLabeledNotes(lines) {
     .join("\n");
 }
 
-function buildMovieNotes({ title, director, genre, durationMinutes }) {
+function buildMovieNotes({ title, originalTitle, country, director, genre, releaseYear, durationMinutes }) {
+  const nativeTitle = originalTitle && originalTitle !== title ? originalTitle : "";
+
   return buildLabeledNotes([
     ["Movie title", title],
+    ["Original title", nativeTitle],
+    ["Year", releaseYear],
+    ["Country", country],
     ["Director", director],
     ["Genre", genre],
     ["Duration", formatDurationMinutes(durationMinutes)],
@@ -1668,6 +1697,47 @@ function getTmdbRequestOptions() {
       Authorization: `Bearer ${tmdbAccessToken}`,
     },
   };
+}
+
+function getTmdbSearchLanguages(mediaType, subtype, selectedLanguage) {
+  const languages = [selectedLanguage || tmdbCanonicalMediaLanguage];
+
+  if ((mediaType === "movie" && subtype === "korean-movie") || (mediaType === "tv" && subtype === "kdrama")) {
+    languages.push(selectedLanguage === "ko-KR" ? tmdbCanonicalMediaLanguage : "ko-KR");
+  }
+
+  return [...new Set(languages)];
+}
+
+async function fetchTmdbSearchResults(searchText, mediaType, subtype, language) {
+  const url = new URL(`https://api.themoviedb.org/3/search/${mediaType}`);
+  applyTmdbAuth(url);
+  url.searchParams.set("query", searchText);
+  url.searchParams.set("language", language);
+  url.searchParams.set("include_adult", "false");
+  url.searchParams.set("page", "1");
+  if (mediaType === "movie" && subtype === "korean-movie") {
+    url.searchParams.set("region", "KR");
+  }
+
+  const response = await fetch(url, getTmdbRequestOptions());
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.status_message || "TMDb lookup failed.");
+  }
+
+  return data.results || [];
+}
+
+function dedupeTmdbResults(results) {
+  const seenIds = new Set();
+
+  return results.filter((result) => {
+    if (!result.id || seenIds.has(result.id)) return false;
+    seenIds.add(result.id);
+    return true;
+  });
 }
 
 function normalizeTmdbResult(result, mediaType) {
@@ -2119,6 +2189,8 @@ function ViewToggle({ shelfView, onChange }) {
 
 function MediaItemCard({ item, onDelete, onEdit }) {
   const subtypeLabel = getSubtypeLabel(item);
+  const movieTileMeta = getMovieTileMeta(item);
+  const bookTileMeta = getBookTileMeta(item);
 
   return (
     <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm dark:border-stone-700 dark:bg-stone-900 sm:block">
@@ -2135,7 +2207,9 @@ function MediaItemCard({ item, onDelete, onEdit }) {
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
           <div className="min-w-0">
             <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950 dark:text-stone-100">{item.title}</h3>
-            <p className="mt-1 truncate text-sm text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>
+            {movieTileMeta && <p className="mt-1 truncate text-sm font-medium text-stone-500 dark:text-stone-400">{movieTileMeta}</p>}
+            {bookTileMeta && <p className="mt-1 truncate text-sm font-medium text-stone-500 dark:text-stone-400">{bookTileMeta}</p>}
+            {item.category !== "movies" && <p className="mt-1 truncate text-sm text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <div className="flex gap-1">
@@ -2168,7 +2242,6 @@ function MediaItemCard({ item, onDelete, onEdit }) {
               {subtypeLabel}
             </span>
           )}
-          {item.notes && <p className="mt-2 line-clamp-2 text-sm leading-5 text-stone-700 dark:text-stone-300 sm:line-clamp-3">{item.notes}</p>}
         </div>
       </div>
     </article>
@@ -2177,9 +2250,12 @@ function MediaItemCard({ item, onDelete, onEdit }) {
 
 function MediaPosterCard({ item, onDelete, onEdit }) {
   const subtypeLabel = getSubtypeLabel(item);
+  const movieTileMeta = getMovieTileMeta(item);
+  const bookTileMeta = getBookTileMeta(item);
+  const compactTileMeta = movieTileMeta || bookTileMeta;
 
   return (
-    <article className="grid min-w-0 grid-rows-[auto_116px]">
+    <article className="grid min-w-0 grid-rows-[auto_128px]">
       <button
         className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-teal-600 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500"
         onClick={() => onEdit(item)}
@@ -2202,6 +2278,7 @@ function MediaPosterCard({ item, onDelete, onEdit }) {
 
       <div className="mt-2 flex min-h-0 min-w-0 flex-col">
         <h3 className="line-clamp-2 h-8 break-words text-xs font-semibold leading-4 text-stone-950 dark:text-stone-100 sm:text-sm">{item.title}</h3>
+        <p className="mt-1 h-4 truncate text-[11px] font-medium text-stone-500 dark:text-stone-400">{compactTileMeta}</p>
         <p className="mt-1 h-4 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300">{subtypeLabel}</p>
         <div className="h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
         <div className="mt-auto grid grid-cols-[1fr_32px] gap-1">

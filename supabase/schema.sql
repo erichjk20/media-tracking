@@ -39,20 +39,33 @@ create table if not exists public.movie_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
   director text,
   genre text,
+  release_year integer check (release_year is null or release_year between 1800 and 2100),
   duration_minutes integer check (duration_minutes is null or duration_minutes > 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.movie_details
+add column if not exists release_year integer;
+
+alter table public.movie_details
+drop constraint if exists movie_details_release_year_check;
+
+alter table public.movie_details
+add constraint movie_details_release_year_check
+check (release_year is null or release_year between 1800 and 2100);
 
 create table if not exists public.book_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
   page_count integer check (page_count is null or page_count > 0),
   publisher text,
   isbn text,
-  language text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.book_details
+drop column if exists language;
 
 create table if not exists public.manga_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
@@ -91,12 +104,14 @@ insert into public.movie_details (
   library_item_id,
   director,
   genre,
+  release_year,
   duration_minutes
 )
 select
   id,
-  director,
-  genre,
+  nullif(substring(notes from '(?im)^Director:\s*(.+)$'), ''),
+  nullif(substring(notes from '(?im)^Genre:\s*(.+)$'), ''),
+  nullif(substring(notes from '(?im)^Year:\s*([0-9]{4})'), '')::integer,
   duration_minutes
 from public.library_items
 where category = 'movies'
@@ -104,6 +119,7 @@ on conflict (library_item_id) do update
 set
   director = excluded.director,
   genre = excluded.genre,
+  release_year = excluded.release_year,
   duration_minutes = excluded.duration_minutes,
   updated_at = now();
 
@@ -131,6 +147,72 @@ set
   artist = excluded.artist,
   volume_count = excluded.volume_count,
   chapter_count = excluded.chapter_count,
+  updated_at = now();
+
+insert into public.book_details (
+  library_item_id,
+  page_count,
+  publisher,
+  isbn
+)
+select
+  id,
+  nullif(substring(notes from '(?im)^Total pages:\s*([0-9]+)'), '')::integer,
+  nullif(substring(notes from '(?im)^Publisher:\s*(.+)$'), ''),
+  coalesce(
+    nullif(substring(notes from '(?im)^ISBN13:\s*(.+)$'), ''),
+    nullif(substring(notes from '(?im)^ISBN:\s*(.+)$'), '')
+  )
+from public.library_items
+where category = 'books'
+on conflict (library_item_id) do update
+set
+  page_count = excluded.page_count,
+  publisher = excluded.publisher,
+  isbn = excluded.isbn,
+  updated_at = now();
+
+insert into public.tv_details (
+  library_item_id,
+  season_count,
+  episode_count,
+  duration_minutes_per_episode
+)
+select
+  id,
+  nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
+  nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
+  nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
+from public.library_items
+where category = 'tv'
+on conflict (library_item_id) do update
+set
+  season_count = excluded.season_count,
+  episode_count = excluded.episode_count,
+  duration_minutes_per_episode = excluded.duration_minutes_per_episode,
+  updated_at = now();
+
+insert into public.anime_details (
+  library_item_id,
+  studio,
+  season_count,
+  episode_count,
+  duration_minutes_per_episode
+)
+select
+  id,
+  nullif(substring(notes from '(?im)^Studio:\s*(.+)$'), ''),
+  nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
+  nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
+  nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
+from public.library_items
+where category = 'anime'
+on conflict (library_item_id) do update
+set
+  studio = excluded.studio,
+  season_count = excluded.season_count,
+  episode_count = excluded.episode_count,
+  duration_minutes_per_episode = excluded.duration_minutes_per_episode,
   updated_at = now();
 
 create index if not exists library_items_category_status_idx

@@ -79,11 +79,11 @@ function dbRowToMediaItem(row) {
     creator: row.creator || "",
     director: movieDetails.director || row.director || "",
     genre: movieDetails.genre || row.genre || "",
+    releaseYear: movieDetails.release_year || "",
     durationMinutes: movieDetails.duration_minutes || row.duration_minutes || "",
     pageCount: bookDetails.page_count || "",
     publisher: bookDetails.publisher || "",
     isbn: bookDetails.isbn || "",
-    language: bookDetails.language || "",
     author: mangaDetails.author || "",
     artist: mangaDetails.artist || "",
     volumeCount: mangaDetails.volume_count || "",
@@ -162,6 +162,7 @@ function mediaItemToDetailRow(item) {
       library_item_id: item.id,
       director: item.director || getLabeledNoteValue(item.notes, "Director") || item.creator || null,
       genre: item.genre || getLabeledNoteValue(item.notes, "Genre") || null,
+      release_year: validYearOrNull(item.releaseYear) || validYearOrNull(getLabeledNoteValue(item.notes, "Year")),
       duration_minutes: positiveNumberOrNull(item.durationMinutes) || parseDurationMinutes(getLabeledNoteValue(item.notes, "Duration")),
       updated_at: new Date().toISOString(),
     };
@@ -170,10 +171,9 @@ function mediaItemToDetailRow(item) {
   if (item.category === "books") {
     return {
       library_item_id: item.id,
-      page_count: positiveNumberOrNull(item.pageCount),
-      publisher: item.publisher || null,
-      isbn: item.isbn || null,
-      language: item.language || null,
+      page_count: positiveNumberOrNull(item.pageCount) || parsePositiveInteger(getLabeledNoteValue(item.notes, "Total pages")),
+      publisher: item.publisher || getLabeledNoteValue(item.notes, "Publisher") || null,
+      isbn: item.isbn || getLabeledNoteValue(item.notes, "ISBN13") || getLabeledNoteValue(item.notes, "ISBN") || null,
       updated_at: new Date().toISOString(),
     };
   }
@@ -192,9 +192,10 @@ function mediaItemToDetailRow(item) {
   if (item.category === "tv") {
     return {
       library_item_id: item.id,
-      season_count: nonNegativeNumberOrNull(item.seasonCount),
-      episode_count: nonNegativeNumberOrNull(item.episodeCount),
-      duration_minutes_per_episode: positiveNumberOrNull(item.durationMinutesPerEpisode),
+      season_count: nonNegativeNumberOrNull(item.seasonCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Seasons")),
+      episode_count: nonNegativeNumberOrNull(item.episodeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Episodes")),
+      duration_minutes_per_episode:
+        positiveNumberOrNull(item.durationMinutesPerEpisode) || parseDurationMinutes(getLabeledNoteValue(item.notes, "Duration per episode")),
       updated_at: new Date().toISOString(),
     };
   }
@@ -202,10 +203,11 @@ function mediaItemToDetailRow(item) {
   if (item.category === "anime") {
     return {
       library_item_id: item.id,
-      studio: item.studio || null,
-      season_count: nonNegativeNumberOrNull(item.seasonCount),
-      episode_count: nonNegativeNumberOrNull(item.episodeCount),
-      duration_minutes_per_episode: positiveNumberOrNull(item.durationMinutesPerEpisode),
+      studio: item.studio || getLabeledNoteValue(item.notes, "Studio") || null,
+      season_count: nonNegativeNumberOrNull(item.seasonCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Seasons")),
+      episode_count: nonNegativeNumberOrNull(item.episodeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Episodes")),
+      duration_minutes_per_episode:
+        positiveNumberOrNull(item.durationMinutesPerEpisode) || parseDurationMinutes(getLabeledNoteValue(item.notes, "Duration per episode")),
       updated_at: new Date().toISOString(),
     };
   }
@@ -239,9 +241,21 @@ function parseDurationMinutes(value) {
   return match ? positiveNumberOrNull(match[0]) : null;
 }
 
+function parsePositiveInteger(value) {
+  const match = String(value || "").match(/\d+/);
+  return match ? positiveNumberOrNull(match[0]) : null;
+}
+
 function parseNonNegativeInteger(value) {
   const match = String(value || "").match(/\d+/);
   return match ? nonNegativeNumberOrNull(match[0]) : null;
+}
+
+function validYearOrNull(value) {
+  const match = String(value || "").match(/\d{4}/);
+  if (!match) return null;
+  const year = Number(match[0]);
+  return year >= 1800 && year <= 2100 ? year : null;
 }
 
 function isUuid(value) {

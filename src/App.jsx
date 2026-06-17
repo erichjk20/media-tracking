@@ -53,6 +53,7 @@ const omdbApiKey = import.meta.env.VITE_OMDB_API_KEY;
 const tmdbApiKey = import.meta.env.VITE_TMDB_API_KEY;
 const tmdbAccessToken = import.meta.env.VITE_TMDB_ACCESS_TOKEN;
 const tmdbCanonicalMediaLanguage = "en-US";
+const openLibraryCanonicalBookLanguage = "en";
 
 const movieSubtypeOptions = [
   { value: "all", label: "All" },
@@ -432,14 +433,25 @@ function rankLookupResults(results, query) {
       result,
       index,
       score: getKeywordMatchScore(getLookupSearchText(result), tokens),
+      priority: getLookupResultPriority(result),
     }))
     .filter(({ score }) => score >= tokens.length)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .sort((a, b) => b.score - a.score || b.priority - a.priority || a.index - b.index)
     .map(({ result }) => result);
+}
+
+function getLookupResultPriority(lookupResult) {
+  if (lookupResult.source === "open-library" && hasOpenLibraryLanguage(lookupResult.result, "eng")) return 1;
+  return 0;
 }
 
 function getLookupMessage(entry) {
   return entry.status === "fulfilled" ? entry.value.message : entry.reason?.message;
+}
+
+function getBookLookupLanguage(subtype, selectedLanguage = openLibraryCanonicalBookLanguage) {
+  if (subtype === "korean-book") return "ko";
+  return selectedLanguage || openLibraryCanonicalBookLanguage;
 }
 
 function mergeApiNotes(existingNotes, apiNotes) {
@@ -476,7 +488,7 @@ function App() {
   const [lookupStatus, setLookupStatus] = useState("idle");
   const [lookupMessage, setLookupMessage] = useState("");
   const [tmdbLanguage, setTmdbLanguage] = useState("en-US");
-  const [bookLanguage, setBookLanguage] = useState("all");
+  const [bookLanguage, setBookLanguage] = useState(openLibraryCanonicalBookLanguage);
   const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
   const [homeSearchResetToken, setHomeSearchResetToken] = useState(0);
@@ -833,7 +845,7 @@ function App() {
     for (const provider of [...providers, ...fallbackProviders]) {
       const providerSearch = await fetchProviderResults(item.title, provider, {
         category: item.category,
-        language: item.category === "books" && item.subtype === "korean-book" ? "ko" : bookLanguage,
+        language: item.category === "books" ? getBookLookupLanguage(item.subtype, bookLanguage) : bookLanguage,
         subtype: item.subtype,
       });
       providerResults.push(...providerSearch.results);
@@ -890,7 +902,7 @@ function App() {
       const searches = activeProviders.map((provider) => {
         return fetchProviderResults(cleanedQuery, provider, {
           category: draft.category,
-          language: bookLanguage,
+          language: draft.category === "books" ? getBookLookupLanguage(draft.subtype, bookLanguage) : bookLanguage,
           subtype: draft.subtype,
         });
       });
@@ -1847,6 +1859,10 @@ function normalizeOpenLibraryList(value) {
   return value ? [value] : [];
 }
 
+function hasOpenLibraryLanguage(result, languageCode) {
+  return normalizeOpenLibraryList(result.languages).includes(languageCode);
+}
+
 function getOpenLibraryCoverUrl(coverId) {
   return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : "";
 }
@@ -2188,7 +2204,6 @@ function ViewToggle({ shelfView, onChange }) {
 }
 
 function MediaItemCard({ item, onDelete, onEdit }) {
-  const subtypeLabel = getSubtypeLabel(item);
   const movieTileMeta = getMovieTileMeta(item);
   const bookTileMeta = getBookTileMeta(item);
 
@@ -2211,7 +2226,7 @@ function MediaItemCard({ item, onDelete, onEdit }) {
             {bookTileMeta && <p className="mt-1 truncate text-sm font-medium text-stone-500 dark:text-stone-400">{bookTileMeta}</p>}
             {item.category !== "movies" && <p className="mt-1 truncate text-sm text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>}
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex shrink-0 flex-col items-end gap-2">
             <div className="flex gap-1">
               <button
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
@@ -2236,26 +2251,18 @@ function MediaItemCard({ item, onDelete, onEdit }) {
           </div>
         </div>
 
-        <div className="min-w-0">
-          {subtypeLabel && (
-            <span className="mt-2 inline-flex rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-              {subtypeLabel}
-            </span>
-          )}
-        </div>
       </div>
     </article>
   );
 }
 
 function MediaPosterCard({ item, onDelete, onEdit }) {
-  const subtypeLabel = getSubtypeLabel(item);
   const movieTileMeta = getMovieTileMeta(item);
   const bookTileMeta = getBookTileMeta(item);
   const compactTileMeta = movieTileMeta || bookTileMeta;
 
   return (
-    <article className="grid min-w-0 grid-rows-[auto_128px]">
+    <article className="grid min-w-0 grid-rows-[auto_124px]">
       <button
         className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-teal-600 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500"
         onClick={() => onEdit(item)}
@@ -2277,11 +2284,10 @@ function MediaPosterCard({ item, onDelete, onEdit }) {
       </button>
 
       <div className="mt-2 flex min-h-0 min-w-0 flex-col">
-        <h3 className="line-clamp-2 h-8 break-words text-xs font-semibold leading-4 text-stone-950 dark:text-stone-100 sm:text-sm">{item.title}</h3>
+        <h3 className="line-clamp-2 break-words text-xs font-semibold leading-4 text-stone-950 dark:text-stone-100 sm:text-sm">{item.title}</h3>
         <p className="mt-1 h-4 truncate text-[11px] font-medium text-stone-500 dark:text-stone-400">{compactTileMeta}</p>
-        <p className="mt-1 h-4 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300">{subtypeLabel}</p>
-        <div className="h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
-        <div className="mt-auto grid grid-cols-[1fr_32px] gap-1">
+        <div className="mt-2 h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
+        <div className="mt-auto grid grid-cols-[1fr_32px] gap-2 pt-3">
           <button
             className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
             onClick={() => onEdit(item)}
@@ -2672,9 +2678,9 @@ function DetailsLookup({
             <label>
               <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">Book language</span>
               <select className="input bg-white" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
+                <option value="en">English</option>
                 <option value="all">Any language</option>
                 <option value="ko">Korean</option>
-                <option value="en">English</option>
               </select>
             </label>
           )}
@@ -2765,9 +2771,9 @@ function BookLookup({ language, message, onApply, onLanguageChange, onQueryChang
         <label>
           <span className="mb-2 block text-sm font-medium text-stone-700">Language filter</span>
           <select className="input bg-white" value={language} onChange={(event) => onLanguageChange(event.target.value)}>
+            <option value="en">English</option>
             <option value="all">Any language</option>
             <option value="ko">Korean</option>
-            <option value="en">English</option>
           </select>
         </label>
       </div>

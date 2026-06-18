@@ -1,9 +1,9 @@
 create table if not exists public.library_items (
   id uuid primary key default gen_random_uuid(),
-  category text not null check (category in ('books', 'movies', 'tv', 'anime', 'manga')),
+  category text not null check (category in ('books', 'movies', 'tv', 'manga')),
   subtype text check (
     subtype is null
-    or subtype in ('book', 'korean-book', 'movie', 'anime-movie', 'korean-movie', 'tv', 'kdrama')
+    or subtype in ('book', 'korean-book', 'movie', 'anime-movie', 'korean-movie', 'tv', 'anime', 'kdrama')
   ),
   status text not null check (status in ('completed', 'want')),
   title text not null,
@@ -27,6 +27,16 @@ add column if not exists genre text;
 
 alter table public.library_items
 add column if not exists duration_minutes integer;
+
+alter table public.library_items
+drop constraint if exists library_items_subtype_check;
+
+alter table public.library_items
+add constraint library_items_subtype_check
+check (
+  subtype is null
+  or subtype in ('book', 'korean-book', 'movie', 'anime-movie', 'korean-movie', 'tv', 'anime', 'kdrama')
+);
 
 alter table public.library_items
 drop constraint if exists library_items_duration_minutes_check;
@@ -79,17 +89,6 @@ create table if not exists public.manga_details (
 
 create table if not exists public.tv_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
-  season_count integer check (season_count is null or season_count >= 0),
-  episode_count integer check (episode_count is null or episode_count >= 0),
-  duration_minutes_per_episode integer check (
-    duration_minutes_per_episode is null or duration_minutes_per_episode > 0
-  ),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.anime_details (
-  library_item_id uuid primary key references public.library_items(id) on delete cascade,
   studio text,
   season_count integer check (season_count is null or season_count >= 0),
   episode_count integer check (episode_count is null or episode_count >= 0),
@@ -99,6 +98,9 @@ create table if not exists public.anime_details (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.tv_details
+add column if not exists studio text;
 
 insert into public.movie_details (
   library_item_id,
@@ -174,26 +176,6 @@ set
 
 insert into public.tv_details (
   library_item_id,
-  season_count,
-  episode_count,
-  duration_minutes_per_episode
-)
-select
-  id,
-  nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
-  nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
-  nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
-from public.library_items
-where category = 'tv'
-on conflict (library_item_id) do update
-set
-  season_count = excluded.season_count,
-  episode_count = excluded.episode_count,
-  duration_minutes_per_episode = excluded.duration_minutes_per_episode,
-  updated_at = now();
-
-insert into public.anime_details (
-  library_item_id,
   studio,
   season_count,
   episode_count,
@@ -206,14 +188,88 @@ select
   nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
   nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
 from public.library_items
-where category = 'anime'
+where category = 'tv'
 on conflict (library_item_id) do update
 set
-  studio = excluded.studio,
+  studio = coalesce(excluded.studio, public.tv_details.studio),
   season_count = excluded.season_count,
   episode_count = excluded.episode_count,
   duration_minutes_per_episode = excluded.duration_minutes_per_episode,
   updated_at = now();
+
+do $$
+begin
+  if to_regclass('public.anime_details') is not null then
+    execute $migration$
+      insert into public.tv_details (
+        library_item_id,
+        studio,
+        season_count,
+        episode_count,
+        duration_minutes_per_episode
+      )
+      select
+        library_items.id,
+        coalesce(anime_details.studio, nullif(substring(library_items.notes from '(?im)^Studio:\s*(.+)$'), '')),
+        coalesce(anime_details.season_count, nullif(substring(library_items.notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer),
+        coalesce(anime_details.episode_count, nullif(substring(library_items.notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer),
+        coalesce(
+          anime_details.duration_minutes_per_episode,
+          nullif(substring(library_items.notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
+        )
+      from public.library_items
+      left join public.anime_details
+        on anime_details.library_item_id = library_items.id
+      where library_items.category = 'anime'
+      on conflict (library_item_id) do update
+      set
+        studio = coalesce(excluded.studio, public.tv_details.studio),
+        season_count = excluded.season_count,
+        episode_count = excluded.episode_count,
+        duration_minutes_per_episode = excluded.duration_minutes_per_episode,
+        updated_at = now()
+    $migration$;
+  else
+    insert into public.tv_details (
+      library_item_id,
+      studio,
+      season_count,
+      episode_count,
+      duration_minutes_per_episode
+    )
+    select
+      id,
+      nullif(substring(notes from '(?im)^Studio:\s*(.+)$'), ''),
+      nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
+      nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
+      nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
+    from public.library_items
+    where category = 'anime'
+    on conflict (library_item_id) do update
+    set
+      studio = coalesce(excluded.studio, public.tv_details.studio),
+      season_count = excluded.season_count,
+      episode_count = excluded.episode_count,
+      duration_minutes_per_episode = excluded.duration_minutes_per_episode,
+      updated_at = now();
+  end if;
+end $$;
+
+update public.library_items
+set
+  category = 'tv',
+  subtype = 'anime',
+  updated_at = now()
+where category = 'anime';
+
+alter table public.library_items
+drop constraint if exists library_items_category_check;
+
+alter table public.library_items
+add constraint library_items_category_check
+check (category in ('books', 'movies', 'tv', 'manga'));
+
+drop table if exists public.anime_details;
 
 create index if not exists library_items_category_status_idx
 on public.library_items (category, status);
@@ -238,7 +294,6 @@ alter table public.movie_details disable row level security;
 alter table public.book_details disable row level security;
 alter table public.manga_details disable row level security;
 alter table public.tv_details disable row level security;
-alter table public.anime_details disable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.library_items to anon, authenticated;
@@ -246,4 +301,3 @@ grant select, insert, update, delete on public.movie_details to anon, authentica
 grant select, insert, update, delete on public.book_details to anon, authenticated;
 grant select, insert, update, delete on public.manga_details to anon, authenticated;
 grant select, insert, update, delete on public.tv_details to anon, authenticated;
-grant select, insert, update, delete on public.anime_details to anon, authenticated;

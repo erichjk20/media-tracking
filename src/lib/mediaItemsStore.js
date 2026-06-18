@@ -3,7 +3,6 @@ import { isSupabaseConfigured, supabase } from "./supabase";
 const tableName = "library_items";
 
 const detailTableNames = {
-  anime: "anime_details",
   books: "book_details",
   manga: "manga_details",
   movies: "movie_details",
@@ -27,7 +26,7 @@ export async function fetchMediaItems() {
 
   const { data, error } = await supabase
     .from(tableName)
-    .select("*, movie_details(*), book_details(*), manga_details(*), tv_details(*), anime_details(*)")
+    .select("*, movie_details(*), book_details(*), manga_details(*), tv_details(*)")
     .order("added_at", { ascending: true });
 
   if (error) throw error;
@@ -38,10 +37,17 @@ export async function saveMediaItem(item) {
   if (!supabase) return item;
 
   const itemId = isUuid(item.id) ? item.id : crypto.randomUUID();
-  const itemToSave = { ...item, id: itemId };
+  const itemToSave = {
+    ...item,
+    id: itemId,
+    category: item.category === "anime" ? "tv" : item.category,
+    subtype: item.category === "anime" ? "anime" : item.subtype,
+  };
+  const row = mediaItemToDbRow(itemToSave);
+
   const { data, error } = await supabase
     .from(tableName)
-    .upsert(mediaItemToDbRow(itemToSave))
+    .upsert(row)
     .select()
     .single();
 
@@ -68,12 +74,13 @@ function dbRowToMediaItem(row) {
   const bookDetails = firstRelatedRow(row.book_details);
   const mangaDetails = firstRelatedRow(row.manga_details);
   const tvDetails = firstRelatedRow(row.tv_details);
-  const animeDetails = firstRelatedRow(row.anime_details);
+  const category = row.category === "anime" ? "tv" : row.category;
+  const subtype = row.category === "anime" ? "anime" : row.subtype || "";
 
   return {
     id: row.id,
-    category: row.category,
-    subtype: row.subtype || "",
+    category,
+    subtype,
     status: appStatusByDbStatus[row.status] || row.status,
     title: row.title || "",
     creator: row.creator || "",
@@ -88,10 +95,10 @@ function dbRowToMediaItem(row) {
     artist: mangaDetails.artist || "",
     volumeCount: mangaDetails.volume_count || "",
     chapterCount: mangaDetails.chapter_count || "",
-    seasonCount: tvDetails.season_count || animeDetails.season_count || "",
-    episodeCount: tvDetails.episode_count || animeDetails.episode_count || "",
-    durationMinutesPerEpisode: tvDetails.duration_minutes_per_episode || animeDetails.duration_minutes_per_episode || "",
-    studio: animeDetails.studio || "",
+    seasonCount: tvDetails.season_count || "",
+    episodeCount: tvDetails.episode_count || "",
+    durationMinutesPerEpisode: tvDetails.duration_minutes_per_episode || "",
+    studio: tvDetails.studio || "",
     rating: row.rating || 0,
     notes: row.notes || "",
     imageUrl: row.image_url || "",
@@ -102,11 +109,13 @@ function dbRowToMediaItem(row) {
 
 function mediaItemToDbRow(item) {
   const isCompleted = item.status === "Completed";
+  const category = item.category === "anime" ? "tv" : item.category;
+  const subtype = item.category === "anime" ? "anime" : item.subtype || null;
 
   return {
     id: item.id,
-    category: item.category,
-    subtype: item.subtype || null,
+    category,
+    subtype,
     status: dbStatusByAppStatus[item.status] || item.status,
     title: item.title,
     creator: item.creator || null,
@@ -126,7 +135,16 @@ async function saveMediaItemDetails(item) {
   if (!table || !row) return;
 
   const { error } = await supabase.from(table).upsert(row);
-  if (error) throw error;
+  if (!error) return;
+
+  if (table === "tv_details" && row.studio !== undefined && isMissingColumnError(error, "studio")) {
+    const { studio, ...rowWithoutStudio } = row;
+    const { error: retryError } = await supabase.from(table).upsert(rowWithoutStudio);
+    if (!retryError) return;
+    throw retryError;
+  }
+
+  throw error;
 }
 
 async function removeStaleDetailRows(itemId, category) {
@@ -192,17 +210,6 @@ function mediaItemToDetailRow(item) {
   if (item.category === "tv") {
     return {
       library_item_id: item.id,
-      season_count: nonNegativeNumberOrNull(item.seasonCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Seasons")),
-      episode_count: nonNegativeNumberOrNull(item.episodeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Episodes")),
-      duration_minutes_per_episode:
-        positiveNumberOrNull(item.durationMinutesPerEpisode) || parseDurationMinutes(getLabeledNoteValue(item.notes, "Duration per episode")),
-      updated_at: new Date().toISOString(),
-    };
-  }
-
-  if (item.category === "anime") {
-    return {
-      library_item_id: item.id,
       studio: item.studio || getLabeledNoteValue(item.notes, "Studio") || null,
       season_count: nonNegativeNumberOrNull(item.seasonCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Seasons")),
       episode_count: nonNegativeNumberOrNull(item.episodeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Episodes")),
@@ -218,6 +225,14 @@ function mediaItemToDetailRow(item) {
 function firstRelatedRow(value) {
   if (Array.isArray(value)) return value[0] || {};
   return value || {};
+}
+
+function isMissingColumnError(error, columnName) {
+  return (
+    error?.code === "PGRST204"
+    || String(error?.message || "").includes(`'${columnName}' column`)
+    || String(error?.message || "").includes(`column "${columnName}"`)
+  );
 }
 
 function positiveNumberOrNull(value) {

@@ -81,12 +81,12 @@ function LibraryView({
         )}
 
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
-          <div className="grid min-w-0 flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:max-w-80">
+          <div className="grid h-9 w-40 shrink-0 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-48">
             {statuses.map((status) => (
               <button
                 key={status}
-                className={`min-h-9 rounded px-2 text-xs font-semibold transition sm:px-3 sm:text-sm ${
-                  activeStatus === status ? "bg-teal-800 text-white dark:bg-teal-600 dark:text-white" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
+                className={`h-8 rounded px-2 text-xs font-semibold transition sm:px-3 ${
+                  activeStatus === status ? "bg-teal-700 text-white dark:bg-teal-700/80 dark:text-white" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
                 }`}
                 onClick={() => onActiveStatusChange(status)}
                 type="button"

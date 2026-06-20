@@ -768,8 +768,13 @@ function App() {
     }
   }
 
+  function withoutPersonalNotes(patch) {
+    const { notes, ...safePatch } = patch;
+    return safePatch;
+  }
+
   async function applyOmdbResult(result) {
-    const patch = await getOmdbItemPatch(result, draft.category, draft.subtype);
+    const patch = withoutPersonalNotes(await getOmdbItemPatch(result, draft.category, draft.subtype));
 
     setDraft((current) => ({
       ...current,
@@ -826,7 +831,7 @@ function App() {
   }
 
   async function applyTmdbResult(result) {
-    const patch = await getTmdbItemPatch(result, draft);
+    const patch = withoutPersonalNotes(await getTmdbItemPatch(result, draft));
 
     setDraft((current) => ({
       ...current,
@@ -896,7 +901,7 @@ function App() {
   }
 
   function applyBookResult(result) {
-    const patch = getOpenLibraryItemPatch(result, draft);
+    const patch = withoutPersonalNotes(getOpenLibraryItemPatch(result, draft));
     setDraft((current) => ({
       ...current,
       subtype: patch.subtype || current.subtype,
@@ -925,7 +930,7 @@ function App() {
   }
 
   function applyAladinBookResult(result) {
-    const patch = getAladinItemPatch(result);
+    const patch = withoutPersonalNotes(getAladinItemPatch(result));
     setDraft((current) => ({
       ...current,
       subtype: patch.subtype || current.subtype,
@@ -954,7 +959,7 @@ function App() {
   }
 
   function applyAnimeResult(result) {
-    const patch = getAnimeItemPatch(result);
+    const patch = withoutPersonalNotes(getAnimeItemPatch(result));
     setDraft((current) => ({
       ...current,
       category: "tv",
@@ -987,7 +992,7 @@ function App() {
   }
 
   function applyMangaResult(result) {
-    const patch = getMangaItemPatch(result);
+    const patch = withoutPersonalNotes(getMangaItemPatch(result));
     setDraft((current) => ({
       ...current,
       title: patch.title || current.title,

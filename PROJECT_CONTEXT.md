@@ -243,7 +243,7 @@ TV Shows support a lightweight `subtype` field:
 
 Existing saved book items without a subtype are normalized to `book` at load time. Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
 
-The Books shelf includes an `All / Books / Korean` filter. The Movies shelf includes an `All / Movies / Anime / Korean` filter. The TV Shows shelf includes an `All / TV / K-Drama` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, K-Dramas stay under TV Shows, and the Anime category is reserved for anime series.
+The Books shelf includes an `All / General / Korean` filter. The Movies shelf includes an `All / General / Anime / Korean` filter. The TV Shows shelf includes an `All / General / K-Drama` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, K-Dramas stay under TV Shows, and the Anime category is reserved for anime series.
 
 The local API key is read from:
 

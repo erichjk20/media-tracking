@@ -43,36 +43,13 @@ function LibraryView({
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
       <div className="min-w-0">
-        <div className="flex flex-col gap-3 border-b border-stone-300 pb-4 dark:border-stone-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-b border-stone-300 pb-4 dark:border-stone-800">
           <div>
             <h2 className="text-xl font-semibold text-stone-950 dark:text-stone-100">{category.label}</h2>
             <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
               {counts[activeCategory]?.Completed || 0} completed,{" "}
               {counts[activeCategory]?.["Want to Watch/Read"] || 0} planned
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <ShelfSearch query={query} onChange={onQueryChange} />
-            <SortSelect sortOrder={sortOrder} onChange={onSortOrderChange} />
-            <ViewToggle shelfView={shelfView} onChange={onShelfViewChange} />
-            <div className="grid flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-64 sm:flex-none">
-              {statuses.map((status) => (
-                <button
-                  key={status}
-                  className={`min-h-8 rounded px-2 text-xs font-semibold transition ${
-                    activeStatus === status ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
-                  }`}
-                  onClick={() => onActiveStatusChange(status)}
-                  type="button"
-                >
-                  <span>{statusLabels[status]}</span>
-                  <span className={`ml-1 hidden sm:inline ${activeStatus === status ? "text-stone-300 dark:text-stone-700" : "text-stone-400 dark:text-stone-500"}`}>
-                    {counts[activeCategory]?.[status] || 0}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -102,6 +79,30 @@ function LibraryView({
             options={tvSubtypeOptions}
           />
         )}
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
+          <div className="grid min-w-0 flex-1 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:max-w-80">
+            {statuses.map((status) => (
+              <button
+                key={status}
+                className={`min-h-9 rounded px-2 text-xs font-semibold transition sm:px-3 sm:text-sm ${
+                  activeStatus === status ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
+                }`}
+                onClick={() => onActiveStatusChange(status)}
+                type="button"
+              >
+                <span>{statusLabels[status]}</span>
+                <span className={`ml-1 ${activeStatus === status ? "text-stone-300 dark:text-stone-700" : "text-stone-400 dark:text-stone-500"}`}>
+                  {counts[activeCategory]?.[status] || 0}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <ShelfSearch query={query} onChange={onQueryChange} />
+          <SortSelect sortOrder={sortOrder} onChange={onSortOrderChange} />
+          <ViewToggle shelfView={shelfView} onChange={onShelfViewChange} />
+        </div>
 
         {visibleItems.length > 0 ? (
           shelfView === "grid" ? (

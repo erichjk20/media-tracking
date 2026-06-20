@@ -1,17 +1,48 @@
+import { useEffect, useRef, useState } from "react";
 import { LayoutGrid, List as ListIcon, Search } from "lucide-react";
 import { sortOptions } from "../lib/mediaConfig";
 
 export function ShelfSearch({ query, onChange }) {
+  const [isExpanded, setIsExpanded] = useState(Boolean(query));
+  const inputRef = useRef(null);
+  const showInput = isExpanded || Boolean(query);
+
+  useEffect(() => {
+    if (query) setIsExpanded(true);
+  }, [query]);
+
+  useEffect(() => {
+    if (isExpanded) inputRef.current?.focus();
+  }, [isExpanded]);
+
   return (
-    <label className="relative block min-w-0 flex-1 sm:w-44 sm:flex-none md:w-52">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" size={15} />
-      <input
-        className="h-9 w-full rounded-md border border-stone-300 bg-white/80 pl-8 pr-2 text-xs text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900/80 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-teal-500 dark:focus:bg-stone-900 dark:focus:ring-teal-950"
-        value={query}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Filter shelf"
-      />
-    </label>
+    <div className={`min-w-0 ${showInput ? "basis-full" : "shrink-0"} sm:min-w-64 sm:flex-1 sm:basis-auto sm:shrink`}>
+      <button
+        className={`h-9 w-9 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus:border-teal-600 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:focus:border-teal-500 dark:focus:ring-teal-950 sm:hidden ${
+          showInput ? "hidden" : "inline-flex"
+        }`}
+        onClick={() => setIsExpanded(true)}
+        type="button"
+        aria-label="Search shelf"
+        title="Search shelf"
+      >
+        <Search size={16} />
+      </button>
+
+      <label className={`relative min-w-0 ${showInput ? "block" : "hidden"} sm:block`}>
+        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
+        <input
+          ref={inputRef}
+          className="h-9 w-full rounded-md border border-stone-300 bg-white/85 pl-9 pr-3 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900/80 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-teal-500 dark:focus:bg-stone-900 dark:focus:ring-teal-950 sm:text-xs"
+          value={query}
+          onBlur={() => {
+            if (!query) setIsExpanded(false);
+          }}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Search shelf"
+        />
+      </label>
+    </div>
   );
 }
 

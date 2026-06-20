@@ -33,20 +33,20 @@ export const openLibraryCanonicalBookLanguage = "en";
 
 export const movieSubtypeOptions = [
   { value: "all", label: "All" },
-  { value: "movie", label: "Movies" },
+  { value: "movie", label: "General" },
   { value: "anime-movie", label: "Anime" },
   { value: "korean-movie", label: "Korean" },
 ];
 
 export const bookSubtypeOptions = [
   { value: "all", label: "All" },
-  { value: "book", label: "Books" },
+  { value: "book", label: "General" },
   { value: "korean-book", label: "Korean" },
 ];
 
 export const tvSubtypeOptions = [
   { value: "all", label: "All" },
-  { value: "tv", label: "TV" },
+  { value: "tv", label: "General" },
   { value: "anime", label: "Anime" },
   { value: "kdrama", label: "Korean" },
 ];

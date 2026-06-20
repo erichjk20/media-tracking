@@ -148,7 +148,7 @@ function EditorSheet({
                         ? "Anime movie"
                         : option.value === "korean-movie"
                           ? "Korean movie"
-                          : "Movie"}
+                          : "General"}
                     </option>
                   ))}
               </select>
@@ -166,7 +166,7 @@ function EditorSheet({
                   .filter((option) => option.value !== "all")
                   .map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.value === "korean-book" ? "Korean book" : "Book"}
+                      {option.value === "korean-book" ? "Korean book" : "General"}
                     </option>
                   ))}
               </select>
@@ -184,7 +184,7 @@ function EditorSheet({
                   .filter((option) => option.value !== "all")
                   .map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.value === "anime" ? "Anime" : option.value === "kdrama" ? "Korean" : "TV show"}
+                      {option.value === "anime" ? "Anime" : option.value === "kdrama" ? "Korean" : "General"}
                     </option>
                   ))}
               </select>

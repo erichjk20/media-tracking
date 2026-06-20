@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Library, Search } from "lucide-react";
 import { categories, statuses, statusLabels } from "../lib/mediaConfig";
 
-function HomeView({ items, onStartLookup, searchResetToken }) {
+function HomeView({ items, onOpenItem, onStartLookup, searchResetToken }) {
   const [homeQuery, setHomeQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Completed");
@@ -107,7 +107,13 @@ function HomeView({ items, onStartLookup, searchResetToken }) {
                 const itemCategory = categories.find((entry) => entry.id === item.category);
                 const Icon = itemCategory?.icon || Library;
                 return (
-                  <div key={item.id} className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 shadow-sm dark:border-stone-700 dark:bg-stone-900">
+                  <button
+                    key={item.id}
+                    className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 text-left shadow-sm transition hover:border-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500 dark:focus:ring-teal-950"
+                    onClick={() => onOpenItem(item)}
+                    type="button"
+                    aria-label={`Open ${item.title}`}
+                  >
                     {item.imageUrl ? (
                       <img className="h-16 w-11 rounded object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
                     ) : (
@@ -122,7 +128,7 @@ function HomeView({ items, onStartLookup, searchResetToken }) {
                       <Icon size={13} />
                       {itemCategory?.label.replace("TV Shows", "TV") || "Media"}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>

@@ -1040,6 +1040,7 @@ function App() {
       {activeView === "home" ? (
         <HomeView
           items={items}
+          onOpenItem={startEdit}
           onStartLookup={startHomeLookup}
           searchResetToken={homeSearchResetToken}
         />

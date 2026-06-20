@@ -1019,7 +1019,7 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f4ee] pb-28 dark:bg-stone-950 lg:pb-0">
+    <main className="min-h-screen bg-[#f4f6f5] pb-28 dark:bg-stone-950 lg:pb-0">
       <AppHeader
         activeCategory={activeCategory}
         activeView={activeView}

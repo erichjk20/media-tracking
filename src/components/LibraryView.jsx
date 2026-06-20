@@ -41,12 +41,12 @@ function LibraryView({
   visibleItems,
 }) {
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+    <section className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
       <div className="min-w-0">
-        <div className="border-b border-stone-300 pb-4 dark:border-stone-800">
+        <div className="border-b border-stone-300 pb-3 dark:border-stone-800">
           <div>
-            <h2 className="text-xl font-semibold text-stone-950 dark:text-stone-100">{category.label}</h2>
-            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
+            <h2 className="text-[1.65rem] font-semibold leading-tight text-stone-950 dark:text-stone-100 sm:text-3xl">{category.label}</h2>
+            <p className="mt-0.5 text-sm text-stone-600 dark:text-stone-400">
               {counts[activeCategory]?.Completed || 0} completed,{" "}
               {counts[activeCategory]?.["Want to Watch/Read"] || 0} planned
             </p>
@@ -86,13 +86,13 @@ function LibraryView({
               <button
                 key={status}
                 className={`min-h-9 rounded px-2 text-xs font-semibold transition sm:px-3 sm:text-sm ${
-                  activeStatus === status ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
+                  activeStatus === status ? "bg-teal-800 text-white dark:bg-teal-600 dark:text-white" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
                 }`}
                 onClick={() => onActiveStatusChange(status)}
                 type="button"
               >
                 <span>{statusLabels[status]}</span>
-                <span className={`ml-1 ${activeStatus === status ? "text-stone-300 dark:text-stone-700" : "text-stone-400 dark:text-stone-500"}`}>
+                <span className={`ml-1 ${activeStatus === status ? "text-teal-100 dark:text-teal-100" : "text-stone-400 dark:text-stone-500"}`}>
                   {counts[activeCategory]?.[status] || 0}
                 </span>
               </button>
@@ -106,13 +106,13 @@ function LibraryView({
 
         {visibleItems.length > 0 ? (
           shelfView === "grid" ? (
-            <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
+            <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
               {visibleItems.map((item) => (
                 <MediaPosterCard key={item.id} item={item} onDelete={onDeleteItem} onEdit={onEditItem} />
               ))}
             </div>
           ) : (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
               {visibleItems.map((item) => (
                 <MediaItemCard key={item.id} item={item} onDelete={onDeleteItem} onEdit={onEditItem} />
               ))}

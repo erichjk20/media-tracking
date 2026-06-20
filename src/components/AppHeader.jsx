@@ -11,13 +11,13 @@ function AppHeader({
   onShowLibrary,
 }) {
   return (
-    <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fffaf2]/95 backdrop-blur dark:border-stone-800 dark:bg-stone-950/95 sm:static sm:bg-[#fffaf2] sm:dark:bg-stone-950">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
+    <section className="sticky top-0 z-20 border-b border-stone-300/80 bg-[#fafbf8]/95 backdrop-blur dark:border-stone-800 dark:bg-stone-950/95 sm:static sm:bg-[#fafbf8] sm:dark:bg-stone-950">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
         <div className="flex items-start justify-between gap-3 lg:items-center">
           <div className="min-w-0">
             <BrandWordmark onClick={onGoHome} />
-            <div className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400 sm:text-sm">
-              <Library size={16} />
+            <div className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-800/80 dark:text-teal-400 sm:mt-2 sm:text-sm sm:tracking-[0.14em]">
+              <Library size={15} />
               Track your media without the noise
             </div>
           </div>

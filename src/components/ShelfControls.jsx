@@ -8,10 +8,6 @@ export function ShelfSearch({ query, onChange }) {
   const showInput = isExpanded || Boolean(query);
 
   useEffect(() => {
-    if (query) setIsExpanded(true);
-  }, [query]);
-
-  useEffect(() => {
     if (isExpanded) inputRef.current?.focus();
   }, [isExpanded]);
 

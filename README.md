@@ -15,3 +15,10 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 If those variables are missing or Supabase is unavailable, the app falls back to browser `localStorage`.
+
+## Development Checks
+
+```bash
+npm run lint
+npm run build
+```

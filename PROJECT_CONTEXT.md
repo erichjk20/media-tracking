@@ -58,8 +58,9 @@ The main app supports:
 ## Tech Stack
 
 - React 19
-- Vite 7
+- Vite 8
 - Tailwind CSS 3
+- ESLint flat config for React, Hooks, and Vite React Refresh checks
 - lucide-react for icons
 - OMDb API for movie, TV show, and anime lookup
 - Open Library API for book lookup
@@ -80,15 +81,30 @@ Tracked/source files:
 ├── package-lock.json
 ├── package.json
 ├── postcss.config.js
+├── eslint.config.js
 ├── supabase
 │   └── schema.sql
 ├── tailwind.config.js
 ├── vite.config.js
 └── src
     ├── App.jsx
+    ├── components
+    │   ├── AppHeader.jsx
+    │   ├── BottomNav.jsx
+    │   ├── BrandWordmark.jsx
+    │   ├── DetailsLookup.jsx
+    │   ├── EditorSheet.jsx
+    │   ├── HomeView.jsx
+    │   ├── LibraryView.jsx
+    │   ├── MediaCards.jsx
+    │   ├── Rating.jsx
+    │   └── ShelfControls.jsx
     ├── index.css
     ├── lib
+    │   ├── mediaConfig.js
     │   ├── mediaItemsStore.js
+    │   ├── mediaLookup.js
+    │   ├── mediaUtils.js
     │   └── supabase.js
     └── main.jsx
 ```
@@ -106,9 +122,24 @@ Both are ignored by Git.
 
 `src/App.jsx`
 
-- Contains the full application UI and state logic.
-- Defines categories, statuses, sample data, item CRUD behavior, filtering, search, rating component, and form handling.
+- Coordinates top-level app state, storage fallback, view switching, item CRUD behavior, filtering, and add/edit form handling.
 - Loads and saves media items through the Supabase/localStorage persistence layer.
+
+`src/components/`
+
+- Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
+
+`src/lib/mediaConfig.js`
+
+- Defines categories, shelves, subtypes, sort options, starter sample data, and empty draft shape.
+
+`src/lib/mediaLookup.js`
+
+- Owns external lookup provider selection, API requests, result normalization, and item patch creation for OMDb, TMDb, Open Library, Aladin, and Jikan.
+
+`src/lib/mediaUtils.js`
+
+- Contains storage normalization, search ranking/deduping, parsing, tile metadata, subtype labels, and shared formatting helpers.
 
 `src/lib/supabase.js`
 
@@ -134,8 +165,9 @@ Both are ignored by Git.
 
 `package.json`
 
-- Contains Vite scripts:
+- Contains Vite and verification scripts:
   - `npm run dev`
+  - `npm run lint`
   - `npm run build`
   - `npm run preview`
 
@@ -168,7 +200,13 @@ Build for production:
 npm run build
 ```
 
-The production build was last verified successfully after the initial implementation.
+Run lint checks:
+
+```bash
+npm run lint
+```
+
+The production build and lint checks were last verified successfully after the React/Vite/CSS cleanup.
 
 ## Supabase Persistence
 

@@ -41,7 +41,7 @@ function DetailsLookup({
         <label className="min-w-0 flex-1">
           <span className="sr-only">Search title details</span>
           <input
-            className="input bg-white"
+            className="input"
             autoFocus
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
@@ -70,7 +70,7 @@ function DetailsLookup({
           {canUseBookLookup && (
             <label>
               <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">Book language</span>
-              <select className="input bg-white" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
+              <select className="input" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
                 <option value="en">English</option>
                 <option value="all">Any language</option>
                 <option value="ko">Korean</option>
@@ -81,7 +81,7 @@ function DetailsLookup({
           {canUseTmdb && (
             <label>
               <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">TMDb language</span>
-              <select className="input bg-white" value={tmdbLanguage} onChange={(event) => onTmdbLanguageChange(event.target.value)}>
+              <select className="input" value={tmdbLanguage} onChange={(event) => onTmdbLanguageChange(event.target.value)}>
                 <option value="en-US">English</option>
                 <option value="ko-KR">Korean</option>
               </select>

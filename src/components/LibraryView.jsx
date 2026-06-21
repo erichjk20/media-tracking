@@ -23,7 +23,6 @@ function LibraryView({
   bookSubtypeCounts,
   category,
   counts,
-  items,
   movieSubtypeCounts,
   onActiveBookSubtypeChange,
   onActiveMovieSubtypeChange,

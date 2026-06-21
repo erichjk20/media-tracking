@@ -1,17 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Library, Search } from "lucide-react";
 import { categories, statuses, statusLabels } from "../lib/mediaConfig";
 
-function HomeView({ items, onOpenItem, onStartLookup, searchResetToken }) {
+function HomeView({ items, onOpenItem, onStartLookup }) {
   const [homeQuery, setHomeQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("Completed");
   const selectedCategoryDetails = categories.find((entry) => entry.id === selectedCategory);
   const recentItems = items.slice(-6).reverse();
-
-  useEffect(() => {
-    setHomeQuery("");
-  }, [searchResetToken]);
 
   function handleSubmit(event) {
     event.preventDefault();

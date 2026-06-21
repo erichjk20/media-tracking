@@ -117,12 +117,13 @@ Both are ignored by Git.
 `src/lib/mediaItemsStore.js`
 
 - Maps app media items to/from the Supabase `library_items` table.
+- Saves category-specific details to `movie_details`, `book_details`, `manga_details`, and `tv_details`.
 - Provides fetch, upsert, and delete helpers.
 - Converts legacy non-UUID local item IDs to UUIDs before writing to Supabase.
 
 `supabase/schema.sql`
 
-- Defines the `library_items` table, category/status constraints, rating rules, useful indexes, and personal-app anon CRUD grants.
+- Defines the `library_items` table, category detail tables, category/status constraints, rating rules, useful indexes, and personal-app anon CRUD grants.
 
 `src/index.css`
 
@@ -171,7 +172,21 @@ The production build was last verified successfully after the initial implementa
 
 ## Supabase Persistence
 
-The app uses the `library_items` table defined in `supabase/schema.sql`.
+The app uses the `library_items` table and category detail tables defined in `supabase/schema.sql`.
+
+`library_items.title` remains the main entry title. The detail tables also mirror the visible title for easier table-level inspection:
+
+- `movie_details.movie_title`
+- `book_details.book_title`
+- `manga_details.manga_title`
+- `tv_details.tv_show_title`
+
+For easier manual querying in Supabase, the schema also defines read-only views with title columns immediately after `library_item_id`:
+
+- `movie_details_view`
+- `book_details_view`
+- `manga_details_view`
+- `tv_details_view`
 
 The database stores status values as:
 

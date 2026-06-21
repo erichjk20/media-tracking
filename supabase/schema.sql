@@ -47,6 +47,7 @@ check (duration_minutes is null or duration_minutes > 0);
 
 create table if not exists public.movie_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
+  movie_title text,
   director text,
   genre text,
   release_year integer check (release_year is null or release_year between 1800 and 2100),
@@ -54,6 +55,9 @@ create table if not exists public.movie_details (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.movie_details
+add column if not exists movie_title text;
 
 alter table public.movie_details
 add column if not exists release_year integer;
@@ -67,6 +71,7 @@ check (release_year is null or release_year between 1800 and 2100);
 
 create table if not exists public.book_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
+  book_title text,
   page_count integer check (page_count is null or page_count > 0),
   publisher text,
   isbn text,
@@ -75,10 +80,14 @@ create table if not exists public.book_details (
 );
 
 alter table public.book_details
+add column if not exists book_title text;
+
+alter table public.book_details
 drop column if exists language;
 
 create table if not exists public.manga_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
+  manga_title text,
   author text,
   artist text,
   volume_count integer check (volume_count is null or volume_count >= 0),
@@ -87,8 +96,12 @@ create table if not exists public.manga_details (
   updated_at timestamptz not null default now()
 );
 
+alter table public.manga_details
+add column if not exists manga_title text;
+
 create table if not exists public.tv_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
+  tv_show_title text,
   studio text,
   season_count integer check (season_count is null or season_count >= 0),
   episode_count integer check (episode_count is null or episode_count >= 0),
@@ -100,10 +113,14 @@ create table if not exists public.tv_details (
 );
 
 alter table public.tv_details
+add column if not exists tv_show_title text;
+
+alter table public.tv_details
 add column if not exists studio text;
 
 insert into public.movie_details (
   library_item_id,
+  movie_title,
   director,
   genre,
   release_year,
@@ -111,6 +128,7 @@ insert into public.movie_details (
 )
 select
   id,
+  title,
   nullif(substring(notes from '(?im)^Director:\s*(.+)$'), ''),
   nullif(substring(notes from '(?im)^Genre:\s*(.+)$'), ''),
   nullif(substring(notes from '(?im)^Year:\s*([0-9]{4})'), '')::integer,
@@ -119,6 +137,7 @@ from public.library_items
 where category = 'movies'
 on conflict (library_item_id) do update
 set
+  movie_title = excluded.movie_title,
   director = excluded.director,
   genre = excluded.genre,
   release_year = excluded.release_year,
@@ -127,6 +146,7 @@ set
 
 insert into public.manga_details (
   library_item_id,
+  manga_title,
   author,
   artist,
   volume_count,
@@ -134,6 +154,7 @@ insert into public.manga_details (
 )
 select
   id,
+  title,
   coalesce(
     nullif(substring(notes from '(?im)^Author:\s*(.+)$'), ''),
     nullif(creator, '')
@@ -145,6 +166,7 @@ from public.library_items
 where category = 'manga'
 on conflict (library_item_id) do update
 set
+  manga_title = excluded.manga_title,
   author = excluded.author,
   artist = excluded.artist,
   volume_count = excluded.volume_count,
@@ -153,12 +175,14 @@ set
 
 insert into public.book_details (
   library_item_id,
+  book_title,
   page_count,
   publisher,
   isbn
 )
 select
   id,
+  title,
   nullif(substring(notes from '(?im)^Total pages:\s*([0-9]+)'), '')::integer,
   nullif(substring(notes from '(?im)^Publisher:\s*(.+)$'), ''),
   coalesce(
@@ -169,6 +193,7 @@ from public.library_items
 where category = 'books'
 on conflict (library_item_id) do update
 set
+  book_title = excluded.book_title,
   page_count = excluded.page_count,
   publisher = excluded.publisher,
   isbn = excluded.isbn,
@@ -176,6 +201,7 @@ set
 
 insert into public.tv_details (
   library_item_id,
+  tv_show_title,
   studio,
   season_count,
   episode_count,
@@ -183,6 +209,7 @@ insert into public.tv_details (
 )
 select
   id,
+  title,
   nullif(substring(notes from '(?im)^Studio:\s*(.+)$'), ''),
   nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
   nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
@@ -191,6 +218,7 @@ from public.library_items
 where category = 'tv'
 on conflict (library_item_id) do update
 set
+  tv_show_title = excluded.tv_show_title,
   studio = coalesce(excluded.studio, public.tv_details.studio),
   season_count = excluded.season_count,
   episode_count = excluded.episode_count,
@@ -203,6 +231,7 @@ begin
     execute $migration$
       insert into public.tv_details (
         library_item_id,
+        tv_show_title,
         studio,
         season_count,
         episode_count,
@@ -210,6 +239,7 @@ begin
       )
       select
         library_items.id,
+        library_items.title,
         coalesce(anime_details.studio, nullif(substring(library_items.notes from '(?im)^Studio:\s*(.+)$'), '')),
         coalesce(anime_details.season_count, nullif(substring(library_items.notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer),
         coalesce(anime_details.episode_count, nullif(substring(library_items.notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer),
@@ -223,6 +253,7 @@ begin
       where library_items.category = 'anime'
       on conflict (library_item_id) do update
       set
+        tv_show_title = excluded.tv_show_title,
         studio = coalesce(excluded.studio, public.tv_details.studio),
         season_count = excluded.season_count,
         episode_count = excluded.episode_count,
@@ -232,6 +263,7 @@ begin
   else
     insert into public.tv_details (
       library_item_id,
+      tv_show_title,
       studio,
       season_count,
       episode_count,
@@ -239,6 +271,7 @@ begin
     )
     select
       id,
+      title,
       nullif(substring(notes from '(?im)^Studio:\s*(.+)$'), ''),
       nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
       nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
@@ -247,6 +280,7 @@ begin
     where category = 'anime'
     on conflict (library_item_id) do update
     set
+      tv_show_title = excluded.tv_show_title,
       studio = coalesce(excluded.studio, public.tv_details.studio),
       season_count = excluded.season_count,
       episode_count = excluded.episode_count,
@@ -289,6 +323,53 @@ on public.book_details (isbn);
 create index if not exists manga_details_author_idx
 on public.manga_details (lower(author));
 
+create or replace view public.movie_details_view as
+select
+  library_item_id,
+  movie_title,
+  director,
+  genre,
+  release_year,
+  duration_minutes,
+  created_at,
+  updated_at
+from public.movie_details;
+
+create or replace view public.book_details_view as
+select
+  library_item_id,
+  book_title,
+  page_count,
+  publisher,
+  isbn,
+  created_at,
+  updated_at
+from public.book_details;
+
+create or replace view public.manga_details_view as
+select
+  library_item_id,
+  manga_title,
+  author,
+  artist,
+  volume_count,
+  chapter_count,
+  created_at,
+  updated_at
+from public.manga_details;
+
+create or replace view public.tv_details_view as
+select
+  library_item_id,
+  tv_show_title,
+  studio,
+  season_count,
+  episode_count,
+  duration_minutes_per_episode,
+  created_at,
+  updated_at
+from public.tv_details;
+
 alter table public.library_items disable row level security;
 alter table public.movie_details disable row level security;
 alter table public.book_details disable row level security;
@@ -301,3 +382,7 @@ grant select, insert, update, delete on public.movie_details to anon, authentica
 grant select, insert, update, delete on public.book_details to anon, authenticated;
 grant select, insert, update, delete on public.manga_details to anon, authenticated;
 grant select, insert, update, delete on public.tv_details to anon, authenticated;
+grant select on public.movie_details_view to anon, authenticated;
+grant select on public.book_details_view to anon, authenticated;
+grant select on public.manga_details_view to anon, authenticated;
+grant select on public.tv_details_view to anon, authenticated;

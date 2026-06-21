@@ -9,6 +9,13 @@ const detailTableNames = {
   tv: "tv_details",
 };
 
+const detailTitleColumns = {
+  book_details: "book_title",
+  manga_details: "manga_title",
+  movie_details: "movie_title",
+  tv_details: "tv_show_title",
+};
+
 const appStatusByDbStatus = {
   completed: "Completed",
   want: "Want to Watch/Read",
@@ -82,7 +89,7 @@ function dbRowToMediaItem(row) {
     category,
     subtype,
     status: appStatusByDbStatus[row.status] || row.status,
-    title: row.title || "",
+    title: row.title || movieDetails.movie_title || bookDetails.book_title || mangaDetails.manga_title || tvDetails.tv_show_title || "",
     creator: row.creator || "",
     director: movieDetails.director || row.director || "",
     genre: movieDetails.genre || row.genre || "",
@@ -137,6 +144,20 @@ async function saveMediaItemDetails(item) {
   const { error } = await supabase.from(table).upsert(row);
   if (!error) return;
 
+  const detailTitleColumn = detailTitleColumns[table];
+  if (detailTitleColumn && row[detailTitleColumn] !== undefined && isMissingColumnError(error, detailTitleColumn)) {
+    const { [detailTitleColumn]: _detailTitle, ...rowWithoutDetailTitle } = row;
+    const { error: retryError } = await supabase.from(table).upsert(rowWithoutDetailTitle);
+    if (!retryError) return;
+    if (table === "tv_details" && rowWithoutDetailTitle.studio !== undefined && isMissingColumnError(retryError, "studio")) {
+      const { studio, ...rowWithoutDetailTitleOrStudio } = rowWithoutDetailTitle;
+      const { error: secondRetryError } = await supabase.from(table).upsert(rowWithoutDetailTitleOrStudio);
+      if (!secondRetryError) return;
+      throw secondRetryError;
+    }
+    throw retryError;
+  }
+
   if (table === "tv_details" && row.studio !== undefined && isMissingColumnError(error, "studio")) {
     const { studio, ...rowWithoutStudio } = row;
     const { error: retryError } = await supabase.from(table).upsert(rowWithoutStudio);
@@ -178,6 +199,7 @@ function mediaItemToDetailRow(item) {
   if (item.category === "movies") {
     return {
       library_item_id: item.id,
+      movie_title: item.title || null,
       director: item.director || getLabeledNoteValue(item.notes, "Director") || item.creator || null,
       genre: item.genre || getLabeledNoteValue(item.notes, "Genre") || null,
       release_year: validYearOrNull(item.releaseYear) || validYearOrNull(getLabeledNoteValue(item.notes, "Year")),
@@ -189,6 +211,7 @@ function mediaItemToDetailRow(item) {
   if (item.category === "books") {
     return {
       library_item_id: item.id,
+      book_title: item.title || null,
       page_count: positiveNumberOrNull(item.pageCount) || parsePositiveInteger(getLabeledNoteValue(item.notes, "Total pages")),
       publisher: item.publisher || getLabeledNoteValue(item.notes, "Publisher") || null,
       isbn: item.isbn || getLabeledNoteValue(item.notes, "ISBN13") || getLabeledNoteValue(item.notes, "ISBN") || null,
@@ -199,6 +222,7 @@ function mediaItemToDetailRow(item) {
   if (item.category === "manga") {
     return {
       library_item_id: item.id,
+      manga_title: item.title || null,
       author: item.author || getLabeledNoteValue(item.notes, "Author") || item.creator || null,
       artist: item.artist || null,
       volume_count: nonNegativeNumberOrNull(item.volumeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Volumes")),
@@ -210,6 +234,7 @@ function mediaItemToDetailRow(item) {
   if (item.category === "tv") {
     return {
       library_item_id: item.id,
+      tv_show_title: item.title || null,
       studio: item.studio || getLabeledNoteValue(item.notes, "Studio") || null,
       season_count: nonNegativeNumberOrNull(item.seasonCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Seasons")),
       episode_count: nonNegativeNumberOrNull(item.episodeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Episodes")),

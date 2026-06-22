@@ -60,6 +60,7 @@ export const defaultItems = [
     title: "Piranesi",
     creator: "Susanna Clarke",
     rating: 5,
+    synopsis: "",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
@@ -71,7 +72,12 @@ export const defaultItems = [
     status: "Completed",
     title: "Arrival",
     creator: "Denis Villeneuve",
+    director: "Denis Villeneuve",
+    genre: "Drama, Sci-Fi",
+    releaseYear: 2016,
+    durationMinutes: 116,
     rating: 5,
+    synopsis: "",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=600&q=80",
@@ -83,6 +89,7 @@ export const defaultItems = [
     title: "Severance",
     creator: "Dan Erickson",
     rating: 0,
+    synopsis: "",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?auto=format&fit=crop&w=600&q=80",
@@ -95,6 +102,7 @@ export const defaultItems = [
     title: "Frieren: Beyond Journey's End",
     creator: "Madhouse",
     rating: 5,
+    synopsis: "",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80",
@@ -106,6 +114,7 @@ export const defaultItems = [
     title: "Witch Hat Atelier",
     creator: "Kamome Shirahama",
     rating: 0,
+    synopsis: "",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?auto=format&fit=crop&w=600&q=80",
@@ -135,6 +144,7 @@ export const emptyDraft = {
   durationMinutesPerEpisode: "",
   studio: "",
   rating: 3,
+  synopsis: "",
   notes: "",
   imageUrl: "",
   addedAt: "",

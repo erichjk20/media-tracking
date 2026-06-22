@@ -52,11 +52,23 @@ export async function saveMediaItem(item) {
   };
   const row = mediaItemToDbRow(itemToSave);
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from(tableName)
     .upsert(row)
     .select()
     .single();
+
+  if (error && isMissingColumnError(error, "synopsis")) {
+    const rowWithoutSynopsis = { ...row };
+    delete rowWithoutSynopsis.synopsis;
+    const retry = await supabase
+      .from(tableName)
+      .upsert(rowWithoutSynopsis)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) throw error;
 
@@ -93,7 +105,7 @@ function dbRowToMediaItem(row) {
     creator: row.creator || "",
     director: movieDetails.director || row.director || "",
     genre: movieDetails.genre || row.genre || "",
-    releaseYear: movieDetails.release_year || "",
+    releaseYear: movieDetails.release_year || row.release_year || "",
     durationMinutes: movieDetails.duration_minutes || row.duration_minutes || "",
     pageCount: bookDetails.page_count || "",
     publisher: bookDetails.publisher || "",
@@ -107,6 +119,7 @@ function dbRowToMediaItem(row) {
     durationMinutesPerEpisode: tvDetails.duration_minutes_per_episode || "",
     studio: tvDetails.studio || "",
     rating: row.rating || 0,
+    synopsis: row.synopsis || "",
     notes: row.notes || "",
     imageUrl: row.image_url || "",
     addedAt: row.added_at || "",
@@ -127,6 +140,7 @@ function mediaItemToDbRow(item) {
     title: item.title,
     creator: item.creator || null,
     rating: isCompleted ? Number(item.rating) : null,
+    synopsis: item.synopsis || null,
     notes: item.notes || null,
     image_url: item.imageUrl || null,
     added_at: item.addedAt || new Date().toISOString(),

@@ -47,6 +47,7 @@ export function normalizeItems(items) {
       episodeCount: item.episodeCount || "",
       durationMinutesPerEpisode: item.durationMinutesPerEpisode || "",
       studio: item.studio || "",
+      synopsis: item.synopsis || "",
       subtype: getDefaultSubtype(category, subtype),
     };
   });
@@ -308,7 +309,18 @@ export function parseReleaseYear(value) {
 export function getMovieTileMeta(item) {
   if (item.category !== "movies") return "";
 
-  return [item.releaseYear, formatCompactDurationMinutes(item.durationMinutes)].filter(Boolean).join(" • ");
+  return [
+    getMovieReleaseYear(item),
+    formatCompactDurationMinutes(getMovieDurationMinutes(item)),
+  ].filter(Boolean).join(" • ");
+}
+
+function getMovieReleaseYear(item) {
+  return item.releaseYear || getLabeledNoteValue(item.notes, "Year");
+}
+
+function getMovieDurationMinutes(item) {
+  return item.durationMinutes || getLabeledNoteValue(item.notes, "Duration") || getLabeledNoteValue(item.notes, "Runtime");
 }
 
 export function getTvTileMeta(item) {

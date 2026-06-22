@@ -30,6 +30,7 @@ function LibraryView({
   onActiveTvSubtypeChange,
   onDeleteItem,
   onEditItem,
+  onOpenItem,
   onShelfViewChange,
   onSortOrderChange,
   onQueryChange,
@@ -107,13 +108,13 @@ function LibraryView({
           shelfView === "grid" ? (
             <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
               {visibleItems.map((item) => (
-                <MediaPosterCard key={item.id} item={item} onDelete={onDeleteItem} onEdit={onEditItem} />
+                <MediaPosterCard key={item.id} item={item} onDelete={onDeleteItem} onEdit={onEditItem} onOpen={onOpenItem} />
               ))}
             </div>
           ) : (
             <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
               {visibleItems.map((item) => (
-                <MediaItemCard key={item.id} item={item} onDelete={onDeleteItem} onEdit={onEditItem} />
+                <MediaItemCard key={item.id} item={item} onDelete={onDeleteItem} onEdit={onEditItem} onOpen={onOpenItem} />
               ))}
             </div>
           )

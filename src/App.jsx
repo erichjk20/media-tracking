@@ -5,6 +5,7 @@ import BottomNav from "./components/BottomNav";
 import EditorSheet from "./components/EditorSheet";
 import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
+import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import {
   fetchMediaItems,
   isSupabaseConfigured,
@@ -68,6 +69,7 @@ function App() {
   const [lookupResults, setLookupResults] = useState([]);
   const [lookupStatus, setLookupStatus] = useState("idle");
   const [lookupMessage, setLookupMessage] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState(null);
   const [tmdbLanguage, setTmdbLanguage] = useState("en-US");
   const [bookLanguage, setBookLanguage] = useState(openLibraryCanonicalBookLanguage);
   const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
@@ -80,6 +82,10 @@ function App() {
   const lookupProviders = getLookupProviders(draft.category, draft.subtype);
   const canUseOmdb = lookupProviders.some((provider) => provider.id === "omdb");
   const canUseTmdb = lookupProviders.some((provider) => provider.id === "tmdb");
+  const selectedItem = useMemo(
+    () => items.find((item) => item.id === selectedItemId) || null,
+    [items, selectedItemId],
+  );
   const visibleItems = useMemo(() => {
     const queryTokens = getSearchTokens(query);
     return items
@@ -99,7 +105,7 @@ function App() {
       })
       .filter(({ item }) => {
         if (!queryTokens.length) return true;
-        return getKeywordMatchScore([item.title, item.creator, item.notes].join(" "), queryTokens) >= queryTokens.length;
+        return getKeywordMatchScore([item.title, item.creator, item.synopsis, item.notes].join(" "), queryTokens) >= queryTokens.length;
       })
       .sort((a, b) => compareShelfItems(a, b, sortOrder))
       .map(({ item }) => item);
@@ -241,6 +247,7 @@ function App() {
       studio: draft.studio.trim(),
       subtype: getDefaultSubtype(draft.category, draft.subtype),
       rating: draft.status === "Completed" ? Number(draft.rating) : 0,
+      synopsis: draft.synopsis.trim(),
       notes: draft.notes.trim(),
       imageUrl: draft.imageUrl.trim(),
     };
@@ -295,6 +302,15 @@ function App() {
     setIsEditorOpen(true);
   }
 
+  function openItemDetails(item) {
+    setSelectedItemId(item.id);
+  }
+
+  function editItem(item) {
+    setSelectedItemId(null);
+    startEdit(item);
+  }
+
   function startNewItem() {
     const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
@@ -343,6 +359,7 @@ function App() {
     try {
       if (storageMode === "supabase") await removeMediaItem(id);
       setItems((current) => current.filter((item) => item.id !== id));
+      if (selectedItemId === id) setSelectedItemId(null);
       if (editingId === id) resetForm();
     } catch {
       setStorageMessage("Could not delete from Supabase. Try again in a moment.");
@@ -471,6 +488,7 @@ function App() {
       episodeCount: patch.episodeCount || current.episodeCount,
       durationMinutesPerEpisode: patch.durationMinutesPerEpisode || current.durationMinutesPerEpisode,
       imageUrl: patch.imageUrl || current.imageUrl,
+      synopsis: patch.synopsis || current.synopsis,
     }));
     setLookupStatus("success");
     setLookupResults([]);
@@ -494,6 +512,7 @@ function App() {
       episodeCount: patch.episodeCount || current.episodeCount,
       durationMinutesPerEpisode: patch.durationMinutesPerEpisode || current.durationMinutesPerEpisode,
       imageUrl: patch.imageUrl || current.imageUrl,
+      synopsis: patch.synopsis || current.synopsis,
     }));
     setLookupStatus("success");
     setLookupResults([]);
@@ -511,6 +530,7 @@ function App() {
       pageCount: patch.pageCount || current.pageCount,
       publisher: patch.publisher || current.publisher,
       isbn: patch.isbn || current.isbn,
+      synopsis: patch.synopsis || current.synopsis,
     }));
     setLookupStatus("success");
     setLookupResults([]);
@@ -528,6 +548,7 @@ function App() {
       pageCount: patch.pageCount || current.pageCount,
       publisher: patch.publisher || current.publisher,
       isbn: patch.isbn || current.isbn,
+      synopsis: patch.synopsis || current.synopsis,
     }));
     setLookupStatus("success");
     setLookupResults([]);
@@ -547,6 +568,7 @@ function App() {
       episodeCount: patch.episodeCount || current.episodeCount,
       durationMinutesPerEpisode: patch.durationMinutesPerEpisode || current.durationMinutesPerEpisode,
       studio: patch.studio || current.studio,
+      synopsis: patch.synopsis || current.synopsis,
     }));
     setLookupStatus("success");
     setLookupResults([]);
@@ -563,6 +585,7 @@ function App() {
       author: patch.author || current.author,
       volumeCount: patch.volumeCount || current.volumeCount,
       chapterCount: patch.chapterCount || current.chapterCount,
+      synopsis: patch.synopsis || current.synopsis,
     }));
     setLookupStatus("success");
     setLookupResults([]);
@@ -592,7 +615,7 @@ function App() {
         <HomeView
           key={homeSearchResetToken}
           items={items}
-          onOpenItem={startEdit}
+          onOpenItem={openItemDetails}
           onStartLookup={startHomeLookup}
         />
       ) : (
@@ -611,7 +634,8 @@ function App() {
           onActiveStatusChange={setActiveStatus}
           onActiveTvSubtypeChange={setActiveTvSubtype}
           onDeleteItem={deleteItem}
-          onEditItem={startEdit}
+          onEditItem={editItem}
+          onOpenItem={openItemDetails}
           onQueryChange={setQuery}
           onShelfViewChange={setShelfView}
           onSortOrderChange={setSortOrder}
@@ -633,6 +657,15 @@ function App() {
         >
           <Plus size={24} />
         </button>
+      )}
+
+      {selectedItem && (
+        <MediaDetailOverlay
+          item={selectedItem}
+          onClose={() => setSelectedItemId(null)}
+          onDelete={deleteItem}
+          onEdit={editItem}
+        />
       )}
 
       {isEditorOpen && (

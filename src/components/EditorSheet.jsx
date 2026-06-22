@@ -207,6 +207,15 @@ function EditorSheet({
             />
           </Field>
 
+          <Field label="Synopsis">
+            <textarea
+              className="input min-h-32 resize-y py-3"
+              value={draft.synopsis}
+              onChange={(event) => onUpdateDraft("synopsis", event.target.value)}
+              placeholder="What is this about?"
+            />
+          </Field>
+
           <Field label="Personal notes">
             <textarea
               className="input min-h-28 resize-y py-3"

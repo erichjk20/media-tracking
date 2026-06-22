@@ -278,6 +278,7 @@ export async function getOmdbItemPatch(result, category, subtype = "") {
     episodeCount: category === "tv" ? episodeCount : "",
     durationMinutesPerEpisode: category === "tv" ? durationMinutes : "",
     imageUrl: cleanOmdbValue(detail.Poster) || cleanOmdbValue(result.Poster),
+    synopsis: cleanOmdbValue(detail.Plot),
   };
 }
 
@@ -326,6 +327,7 @@ export async function getTmdbItemPatch(result, currentItem, options = {}) {
     episodeCount: result.mediaType === "tv" ? detail.number_of_episodes || "" : "",
     durationMinutesPerEpisode: result.mediaType === "tv" ? getFirstRuntime(detail.episode_run_time) : "",
     imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath),
+    synopsis: cleanTmdbValue(detail.overview || result.overview),
   };
 }
 
@@ -338,6 +340,7 @@ export function getOpenLibraryItemPatch(result, currentItem) {
     imageUrl: result.imageUrl,
     pageCount: result.pageCount,
     publisher: result.publishers,
+    synopsis: result.description || "",
   };
 }
 
@@ -350,6 +353,7 @@ export function getAladinItemPatch(result) {
     pageCount: result.pageCount,
     publisher: result.publisher,
     isbn: result.isbn13,
+    synopsis: result.description,
   };
 }
 
@@ -364,6 +368,7 @@ export function getAnimeItemPatch(result) {
     episodeCount: result.episodes,
     durationMinutesPerEpisode: parseOmdbRuntime(result.duration),
     studio: result.studios,
+    synopsis: result.synopsis,
   };
 }
 
@@ -375,6 +380,7 @@ export function getMangaItemPatch(result) {
     author: result.authors,
     volumeCount: result.volumes,
     chapterCount: result.chapters,
+    synopsis: result.synopsis,
   };
 }
 

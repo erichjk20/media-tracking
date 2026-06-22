@@ -12,6 +12,7 @@ create table if not exists public.library_items (
   genre text,
   duration_minutes integer check (duration_minutes is null or duration_minutes > 0),
   rating integer check (rating between 1 and 5),
+  synopsis text,
   notes text,
   image_url text,
   added_at timestamptz not null default now(),
@@ -27,6 +28,9 @@ add column if not exists genre text;
 
 alter table public.library_items
 add column if not exists duration_minutes integer;
+
+alter table public.library_items
+add column if not exists synopsis text;
 
 alter table public.library_items
 drop constraint if exists library_items_subtype_check;

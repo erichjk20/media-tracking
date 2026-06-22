@@ -28,15 +28,20 @@ function getFactLabel(item, movieTileMeta, tvTileMeta) {
   return movieTileMeta || tvTileMeta || "";
 }
 
-export function MediaItemCard({ item, onDelete, onEdit }) {
+export function MediaItemCard({ item, onDelete, onEdit, onOpen }) {
   const movieTileMeta = getMovieTileMeta(item);
   const tvTileMeta = getTvTileMeta(item);
   const creatorLabel = getCreatorLabel(item);
   const factLabel = getFactLabel(item, movieTileMeta, tvTileMeta);
 
   return (
-    <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm dark:border-stone-700 dark:bg-stone-900 sm:block">
-      <div className="h-28 w-[76px] overflow-hidden bg-stone-200 dark:bg-stone-800 sm:aspect-[4/5] sm:h-auto sm:w-full">
+    <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm transition hover:border-teal-600 hover:shadow-lift dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500 sm:block">
+      <button
+        className="block h-28 w-[76px] overflow-hidden bg-stone-200 text-left focus:outline-none focus:ring-4 focus:ring-inset focus:ring-teal-100 dark:bg-stone-800 dark:focus:ring-teal-950 sm:aspect-[4/5] sm:h-auto sm:w-full"
+        onClick={() => onOpen(item)}
+        type="button"
+        aria-label={`Open ${item.title}`}
+      >
         {item.imageUrl ? (
           <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
         ) : (
@@ -44,14 +49,18 @@ export function MediaItemCard({ item, onDelete, onEdit }) {
             {item.title}
           </div>
         )}
-      </div>
+      </button>
       <div className="min-w-0 p-3 sm:p-4">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <div className="min-w-0">
+          <button
+            className="min-w-0 text-left focus:outline-none focus:ring-4 focus:ring-teal-100 dark:focus:ring-teal-950"
+            onClick={() => onOpen(item)}
+            type="button"
+          >
             <h3 className="line-clamp-2 break-words text-base font-semibold leading-5 text-stone-950 dark:text-stone-100">{item.title}</h3>
             {creatorLabel && <p className="mt-1 truncate text-sm text-stone-600 dark:text-stone-400" title={creatorLabel}>{creatorLabel}</p>}
             <p className="mt-1 truncate text-sm font-medium text-stone-500 dark:text-stone-400" title={factLabel}>{factLabel}</p>
-          </div>
+          </button>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <div className="flex gap-1">
               <button
@@ -81,7 +90,7 @@ export function MediaItemCard({ item, onDelete, onEdit }) {
   );
 }
 
-export function MediaPosterCard({ item, onDelete, onEdit }) {
+export function MediaPosterCard({ item, onDelete, onEdit, onOpen }) {
   const movieTileMeta = getMovieTileMeta(item);
   const tvTileMeta = getTvTileMeta(item);
   const creatorLabel = getCreatorLabel(item);
@@ -91,8 +100,9 @@ export function MediaPosterCard({ item, onDelete, onEdit }) {
     <article className="grid min-w-0 grid-rows-[auto_minmax(132px,auto)]">
       <button
         className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-teal-600 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500"
-        onClick={() => onEdit(item)}
+        onClick={() => onOpen(item)}
         type="button"
+        aria-label={`Open ${item.title}`}
       >
         <div className="aspect-[2/3] overflow-hidden bg-stone-200 dark:bg-stone-800">
           {item.imageUrl ? (

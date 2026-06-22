@@ -252,16 +252,22 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
     setIsFlipped(false);
   }
 
+  function handleOverlayClick(event) {
+    const clickedElement = event.target instanceof Element ? event.target : null;
+    if (clickedElement?.closest("[data-media-detail-content]")) return;
+
+    onClose();
+  }
+
   return (
     <div
       className="fixed inset-0 z-40 overflow-y-auto bg-stone-950/70 px-4 py-5 backdrop-blur-md sm:px-6 sm:py-8"
-      onClick={onClose}
+      onClick={handleOverlayClick}
       role="presentation"
     >
       <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
         <section
           className="media-detail-panel relative w-full max-w-[560px]"
-          onClick={(event) => event.stopPropagation()}
           role="dialog"
           aria-modal="true"
           aria-labelledby="media-detail-title"
@@ -270,6 +276,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
             className="absolute right-0 top-0 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-stone-700 shadow-lg transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-teal-100 dark:bg-stone-950/95 dark:text-stone-200 dark:hover:bg-stone-900 dark:focus:ring-teal-950"
             onClick={onClose}
             type="button"
+            data-media-detail-content
             aria-label="Close details"
             title="Close details"
           >
@@ -277,7 +284,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
           </button>
 
           <div className="pt-12">
-            <div className="media-flip-scene mx-auto aspect-[2/3] w-full max-w-[340px] sm:max-w-[460px]">
+            <div className="media-flip-scene mx-auto aspect-[2/3] w-full max-w-[340px] sm:max-w-[460px]" data-media-detail-content>
               <div className={`media-flip-object h-full w-full ${isFlipped ? "is-flipped" : ""}`}>
                 <div className="media-flip-face media-flip-front">
                   <button
@@ -316,7 +323,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
 
             <div className="mx-auto mt-4 max-w-[460px] text-center">
               <h2 id="media-detail-title" className="sr-only">{item.title}</h2>
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2" data-media-detail-content>
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-stone-900 shadow-lg transition hover:bg-stone-100 focus:outline-none focus:ring-4 focus:ring-teal-200 dark:bg-stone-100 dark:hover:bg-white"
                   onClick={() => setIsFlipped((current) => !current)}

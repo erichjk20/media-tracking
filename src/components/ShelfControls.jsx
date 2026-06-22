@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LayoutGrid, List as ListIcon, Search } from "lucide-react";
+import { ChevronDown, LayoutGrid, List as ListIcon, Search } from "lucide-react";
 import { sortOptions } from "../lib/mediaConfig";
 
 export function ShelfSearch({ query, onChange }) {
@@ -100,23 +100,29 @@ export function ViewToggle({ shelfView, onChange }) {
 }
 
 export function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
+  const activeOption = options.find((option) => option.value === activeSubtype) || options[0];
+  const activeLabel = activeOption.value === "all" ? "All types" : activeOption.label;
+
   return (
-    <div className={`mt-4 grid rounded-md border border-stone-300 bg-white p-1 dark:border-stone-700 dark:bg-stone-900 ${options.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          className={`min-h-10 rounded px-2 text-sm font-medium transition ${
-            activeSubtype === option.value ? "bg-teal-700 text-white dark:bg-teal-600" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
-          }`}
-          onClick={() => onChange(option.value)}
-          type="button"
-        >
-          <span className="block truncate">{option.label}</span>
-          <span className={`block text-xs ${activeSubtype === option.value ? "text-teal-50" : "text-stone-400 dark:text-stone-500"}`}>
-            {counts[option.value] || 0}
-          </span>
-        </button>
-      ))}
-    </div>
+    <label
+      className="relative inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-stone-300/80 bg-white/70 px-2.5 pr-7 text-xs font-medium text-stone-600 transition hover:border-stone-400 hover:bg-white focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-100 dark:border-stone-700/80 dark:bg-stone-900/70 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:bg-stone-900 dark:focus-within:border-teal-500 dark:focus-within:ring-teal-950"
+      title={`Type: ${activeLabel}`}
+    >
+      <span className="sr-only">Filter subtype</span>
+      <span aria-hidden="true">{activeLabel}</span>
+      <ChevronDown className="pointer-events-none absolute right-2 text-stone-400 dark:text-stone-500" size={13} />
+      <select
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        value={activeSubtype}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label="Filter subtype"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.value === "all" ? "All types" : option.label} ({counts[option.value] || 0})
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

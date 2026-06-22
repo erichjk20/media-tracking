@@ -152,6 +152,27 @@ function App() {
     }, {});
   }, [activeStatus, items]);
 
+  const activeShelfCounts = useMemo(() => {
+    let activeSubtype = "all";
+
+    if (activeCategory === "books") activeSubtype = activeBookSubtype;
+    if (activeCategory === "movies") activeSubtype = activeMovieSubtype;
+    if (activeCategory === "tv") activeSubtype = activeTvSubtype;
+
+    const shelfItems = items.filter((item) => {
+      if (item.category !== activeCategory) return false;
+      if (activeCategory === "books" && activeSubtype !== "all") return (item.subtype || "book") === activeSubtype;
+      if (activeCategory === "movies" && activeSubtype !== "all") return (item.subtype || "movie") === activeSubtype;
+      if (activeCategory === "tv" && activeSubtype !== "all") return (item.subtype || "tv") === activeSubtype;
+      return true;
+    });
+
+    return statuses.reduce((statusCounts, status) => {
+      statusCounts[status] = shelfItems.filter((item) => item.status === status).length;
+      return statusCounts;
+    }, {});
+  }, [activeBookSubtype, activeCategory, activeMovieSubtype, activeTvSubtype, items]);
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -623,11 +644,11 @@ function App() {
           activeBookSubtype={activeBookSubtype}
           activeCategory={activeCategory}
           activeMovieSubtype={activeMovieSubtype}
+          activeShelfCounts={activeShelfCounts}
           activeStatus={activeStatus}
           activeTvSubtype={activeTvSubtype}
           bookSubtypeCounts={bookSubtypeCounts}
           category={category}
-          counts={counts}
           movieSubtypeCounts={movieSubtypeCounts}
           onActiveBookSubtypeChange={setActiveBookSubtype}
           onActiveMovieSubtypeChange={setActiveMovieSubtype}

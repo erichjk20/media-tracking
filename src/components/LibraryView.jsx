@@ -18,11 +18,11 @@ function LibraryView({
   activeBookSubtype,
   activeCategory,
   activeMovieSubtype,
+  activeShelfCounts,
   activeStatus,
   activeTvSubtype,
   bookSubtypeCounts,
   category,
-  counts,
   movieSubtypeCounts,
   onActiveBookSubtypeChange,
   onActiveMovieSubtypeChange,
@@ -40,45 +40,64 @@ function LibraryView({
   tvSubtypeCounts,
   visibleItems,
 }) {
+  const completedCount = activeShelfCounts?.Completed || 0;
+  const plannedCount = activeShelfCounts?.["Want to Watch/Read"] || 0;
+  let subtypeFilter = null;
+
+  if (activeCategory === "books") {
+    subtypeFilter = (
+      <SubtypeFilter
+        activeSubtype={activeBookSubtype}
+        counts={bookSubtypeCounts}
+        onChange={onActiveBookSubtypeChange}
+        options={bookSubtypeOptions}
+      />
+    );
+  }
+
+  if (activeCategory === "movies") {
+    subtypeFilter = (
+      <SubtypeFilter
+        activeSubtype={activeMovieSubtype}
+        counts={movieSubtypeCounts}
+        onChange={onActiveMovieSubtypeChange}
+        options={movieSubtypeOptions}
+      />
+    );
+  }
+
+  if (activeCategory === "tv") {
+    subtypeFilter = (
+      <SubtypeFilter
+        activeSubtype={activeTvSubtype}
+        counts={tvSubtypeCounts}
+        onChange={onActiveTvSubtypeChange}
+        options={tvSubtypeOptions}
+      />
+    );
+  }
+
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
       <div className="min-w-0">
         <div className="border-b border-stone-300 pb-3 dark:border-stone-800">
           <div>
             <h2 className="text-[1.65rem] font-semibold leading-tight text-stone-950 dark:text-stone-100 sm:text-3xl">{category.label}</h2>
-            <p className="mt-0.5 text-sm text-stone-600 dark:text-stone-400">
-              {counts[activeCategory]?.Completed || 0} completed,{" "}
-              {counts[activeCategory]?.["Want to Watch/Read"] || 0} planned
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-600 dark:text-stone-400">
+              <span>
+                {completedCount} completed, {plannedCount} planned
+              </span>
+              {subtypeFilter && (
+                <>
+                  <span className="text-stone-300 dark:text-stone-700" aria-hidden="true">
+                    /
+                  </span>
+                  {subtypeFilter}
+                </>
+              )}
+            </div>
           </div>
         </div>
-
-        {activeCategory === "books" && (
-          <SubtypeFilter
-            activeSubtype={activeBookSubtype}
-            counts={bookSubtypeCounts}
-            onChange={onActiveBookSubtypeChange}
-            options={bookSubtypeOptions}
-          />
-        )}
-
-        {activeCategory === "movies" && (
-          <SubtypeFilter
-            activeSubtype={activeMovieSubtype}
-            counts={movieSubtypeCounts}
-            onChange={onActiveMovieSubtypeChange}
-            options={movieSubtypeOptions}
-          />
-        )}
-
-        {activeCategory === "tv" && (
-          <SubtypeFilter
-            activeSubtype={activeTvSubtype}
-            counts={tvSubtypeCounts}
-            onChange={onActiveTvSubtypeChange}
-            options={tvSubtypeOptions}
-          />
-        )}
 
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
           <div className="grid h-9 w-40 shrink-0 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-48">
@@ -93,7 +112,7 @@ function LibraryView({
               >
                 <span>{statusLabels[status]}</span>
                 <span className={`ml-1 ${activeStatus === status ? "text-teal-100 dark:text-teal-100" : "text-stone-400 dark:text-stone-500"}`}>
-                  {counts[activeCategory]?.[status] || 0}
+                  {activeShelfCounts?.[status] || 0}
                 </span>
               </button>
             ))}

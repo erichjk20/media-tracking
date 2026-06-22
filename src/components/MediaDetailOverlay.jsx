@@ -153,7 +153,7 @@ function DetailRow({ icon: Icon, label, value }) {
 
 function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, setIsFlipped, subtypeLabel, synopsis }) {
   return (
-    <div className="media-detail-back h-full w-full overflow-hidden rounded bg-[#fbfaf7] p-5 text-stone-950 dark:bg-stone-900 dark:text-stone-100 sm:p-6">
+    <div className="media-detail-back h-full w-full overflow-hidden bg-[#fbfaf7] p-5 text-stone-950 dark:bg-stone-900 dark:text-stone-100 sm:p-6">
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-700 px-2 text-[10px] font-semibold text-white dark:bg-teal-600">
@@ -245,6 +245,13 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
     setIsFlipped(false);
   }, [item.id]);
 
+  function handleBackCoverKeyDown(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    setIsFlipped(false);
+  }
+
   return (
     <div
       className="fixed inset-0 z-40 overflow-y-auto bg-stone-950/70 px-4 py-5 backdrop-blur-md sm:px-6 sm:py-8"
@@ -283,7 +290,14 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
                   </button>
                 </div>
                 <div className="media-flip-face media-flip-back">
-                  <div className="h-full w-full">
+                  <div
+                    className="h-full w-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-teal-300 dark:focus:ring-teal-700"
+                    onClick={() => setIsFlipped(false)}
+                    onKeyDown={handleBackCoverKeyDown}
+                    role="button"
+                    tabIndex={isFlipped ? 0 : -1}
+                    aria-label={`Flip ${item.title} to cover`}
+                  >
                     <BackCover
                       category={category}
                       CategoryIcon={CategoryIcon}

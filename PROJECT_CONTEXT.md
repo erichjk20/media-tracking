@@ -26,6 +26,7 @@ Each media item contains:
 - Title
 - Creator/Author
 - Rating, from 1 to 5 stars, only for Completed items
+- Synopsis
 - Personal Notes
 - Image URL for cover art
 
@@ -40,9 +41,11 @@ The main app supports:
 - Category switching
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
-- Search across title, creator, and notes
+- Search across title, creator, synopsis, and notes
 - A unified add/edit lookup search that queries the relevant APIs for the selected category
 - Homepage search prefill that opens the add sheet and runs the same unified lookup flow
+- Synopsis population from supported lookup providers
+- A physical media detail overlay that opens on the cover and flips to a same-size back cover with synopsis, facts, and notes
 - OMDb lookup behind the unified search for Movies, TV Shows, and Anime
 - TMDb lookup behind the unified search for Movies and TV Shows
 - Open Library and Aladin lookup behind the unified search for Books
@@ -97,6 +100,7 @@ Tracked/source files:
     │   ├── HomeView.jsx
     │   ├── LibraryView.jsx
     │   ├── MediaCards.jsx
+    │   ├── MediaDetailOverlay.jsx
     │   ├── Rating.jsx
     │   └── ShelfControls.jsx
     ├── index.css
@@ -128,6 +132,7 @@ Both are ignored by Git.
 `src/components/`
 
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
+- `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view.
 
 `src/lib/mediaConfig.js`
 
@@ -148,6 +153,7 @@ Both are ignored by Git.
 `src/lib/mediaItemsStore.js`
 
 - Maps app media items to/from the Supabase `library_items` table.
+- Stores shared item fields, including `synopsis`, in `library_items`.
 - Saves category-specific details to `movie_details`, `book_details`, `manga_details`, and `tv_details`.
 - Provides fetch, upsert, and delete helpers.
 - Converts legacy non-UUID local item IDs to UUIDs before writing to Supabase.
@@ -212,7 +218,7 @@ The production build and lint checks were last verified successfully after the R
 
 The app uses the `library_items` table and category detail tables defined in `supabase/schema.sql`.
 
-`library_items.title` remains the main entry title. The detail tables also mirror the visible title for easier table-level inspection:
+`library_items.title` remains the main entry title, and `library_items.synopsis` stores the shared back-cover synopsis for all media categories. The detail tables also mirror the visible title for easier table-level inspection:
 
 - `movie_details.movie_title`
 - `book_details.book_title`

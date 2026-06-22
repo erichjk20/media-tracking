@@ -60,7 +60,7 @@ export const defaultItems = [
     title: "Piranesi",
     creator: "Susanna Clarke",
     rating: 5,
-    synopsis: "",
+    synopsis: "A man living in an endless house of halls and tides records its wonders while slowly uncovering the truth of who he is and how he arrived there.",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80",
@@ -77,7 +77,7 @@ export const defaultItems = [
     releaseYear: 2016,
     durationMinutes: 116,
     rating: 5,
-    synopsis: "",
+    synopsis: "A linguist is recruited by the military to communicate with mysterious alien visitors, forcing her to rethink language, time, and the shape of her own life.",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=600&q=80",
@@ -89,7 +89,7 @@ export const defaultItems = [
     title: "Severance",
     creator: "Dan Erickson",
     rating: 0,
-    synopsis: "",
+    synopsis: "Employees at Lumon Industries undergo a procedure that splits work memories from personal memories, exposing a strange corporate world beneath the office routine.",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?auto=format&fit=crop&w=600&q=80",
@@ -102,7 +102,7 @@ export const defaultItems = [
     title: "Frieren: Beyond Journey's End",
     creator: "Madhouse",
     rating: 5,
-    synopsis: "",
+    synopsis: "An elf mage reflects on time, grief, and companionship as she retraces the journey she once shared with the heroes who defeated the Demon King.",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80",
@@ -114,7 +114,7 @@ export const defaultItems = [
     title: "Witch Hat Atelier",
     creator: "Kamome Shirahama",
     rating: 0,
-    synopsis: "",
+    synopsis: "A young girl who dreams of magic discovers a hidden world of spells and apprenticeships after a forbidden act changes her life.",
     notes: "",
     imageUrl:
       "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?auto=format&fit=crop&w=600&q=80",

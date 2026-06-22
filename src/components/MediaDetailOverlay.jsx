@@ -23,17 +23,6 @@ import {
 } from "../lib/mediaUtils";
 import Rating from "./Rating";
 
-function formatDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
 function formatDuration(value) {
   const minutes = Number(value);
   if (!minutes) return "";
@@ -118,9 +107,22 @@ function getDetailRows(item) {
     );
   }
 
-  rows.push({ label: "Added", value: formatDate(item.addedAt), icon: Calendar });
-
   return rows.filter((row) => row.value);
+}
+
+function getSynopsisText(item) {
+  return (
+    item.synopsis?.trim()
+    || getLabeledDetailValue(item.notes, "Synopsis")
+    || getLabeledDetailValue(item.notes, "Summary")
+    || getLabeledDetailValue(item.notes, "Plot")
+    || ""
+  );
+}
+
+function getLabeledDetailValue(notes, label) {
+  const match = String(notes || "").match(new RegExp(`(?:^|\\n)${label}:\\s*([\\s\\S]+?)(?=\\n[A-Z][A-Za-z ]{1,24}:\\s*|$)`, "i"));
+  return match?.[1]?.trim() || "";
 }
 
 function CoverArt({ item }) {
@@ -139,11 +141,11 @@ function CoverArt({ item }) {
 
 function DetailRow({ icon: Icon, label, value }) {
   return (
-    <div className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] gap-2">
-      <Icon className="mt-0.5 text-stone-500 dark:text-stone-500" size={13} />
+    <div className="grid min-w-0 grid-cols-[20px_minmax(0,1fr)] gap-2">
+      <Icon className="mt-0.5 text-stone-500 dark:text-stone-500" size={14} />
       <div className="min-w-0">
         <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-stone-500 dark:text-stone-500">{label}</p>
-        <p className="truncate text-[11px] font-medium leading-4 text-stone-900 dark:text-stone-100" title={value}>{value}</p>
+        <p className="break-words text-xs font-medium leading-4 text-stone-900 dark:text-stone-100">{value}</p>
       </div>
     </div>
   );
@@ -151,7 +153,7 @@ function DetailRow({ icon: Icon, label, value }) {
 
 function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, setIsFlipped, subtypeLabel, synopsis }) {
   return (
-    <div className="media-detail-back h-full w-full overflow-hidden rounded bg-[#fbfaf7] p-5 text-stone-950 dark:bg-stone-900 dark:text-stone-100">
+    <div className="media-detail-back h-full w-full overflow-hidden rounded bg-[#fbfaf7] p-5 text-stone-950 dark:bg-stone-900 dark:text-stone-100 sm:p-6">
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="inline-flex h-6 items-center gap-1 rounded-full bg-teal-700 px-2 text-[10px] font-semibold text-white dark:bg-teal-600">
@@ -169,7 +171,7 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
         </div>
 
         <div className="mt-4">
-          <h2 className="line-clamp-2 break-words text-2xl font-semibold leading-tight sm:text-[1.7rem]">
+          <h2 className="line-clamp-2 break-words text-xl font-semibold leading-tight sm:text-2xl">
             {item.title}
           </h2>
           {headerMeta && <p className="mt-1 truncate text-xs font-medium text-stone-600 dark:text-stone-400">{headerMeta}</p>}
@@ -180,9 +182,17 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
           )}
         </div>
 
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+        {detailRows.length > 0 && (
+          <div className="mt-4 grid shrink-0 grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-300/80 pt-3 dark:border-stone-700/80">
+            {detailRows.map((row) => (
+              <DetailRow key={`${row.label}-${row.value}`} {...row} />
+            ))}
+          </div>
+        )}
+
+        <div className="media-back-scroll mt-4 min-h-0 flex-1 overflow-y-auto border-t border-stone-300/80 pt-3 pr-1 dark:border-stone-700/80">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-500 dark:text-stone-400">Synopsis</h3>
-          <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-5 text-stone-800 dark:text-stone-200">
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-stone-800 dark:text-stone-200">
             {synopsis || "No synopsis saved yet."}
           </p>
 
@@ -196,14 +206,6 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
             </div>
           )}
         </div>
-
-        {detailRows.length > 0 && (
-          <div className="mt-4 grid shrink-0 grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-300/80 pt-3 dark:border-stone-700/80">
-            {detailRows.slice(0, 6).map((row) => (
-              <DetailRow key={`${row.label}-${row.value}`} {...row} />
-            ))}
-          </div>
-        )}
 
         <div className="mt-4 shrink-0">
           <button
@@ -227,7 +229,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
   const subtypeLabel = getSubtypeLabel(item);
   const headerMeta = getHeaderMeta(item);
   const detailRows = getDetailRows(item);
-  const synopsis = item.synopsis?.trim();
+  const synopsis = getSynopsisText(item);
   const notes = item.notes?.trim();
 
   useEffect(() => {
@@ -251,7 +253,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
     >
       <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
         <section
-          className="media-detail-panel relative w-full max-w-[420px]"
+          className="media-detail-panel relative w-full max-w-[560px]"
           onClick={(event) => event.stopPropagation()}
           role="dialog"
           aria-modal="true"
@@ -268,7 +270,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
           </button>
 
           <div className="pt-12">
-            <div className="media-flip-scene mx-auto aspect-[2/3] w-full max-w-[320px] sm:max-w-[360px]">
+            <div className="media-flip-scene mx-auto aspect-[2/3] w-full max-w-[340px] sm:max-w-[460px]">
               <div className={`media-flip-object h-full w-full ${isFlipped ? "is-flipped" : ""}`}>
                 <div className="media-flip-face media-flip-front">
                   <button
@@ -298,12 +300,9 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
               </div>
             </div>
 
-            <div className="mx-auto mt-5 max-w-[360px] text-center">
-              <h2 id="media-detail-title" className="break-words text-2xl font-semibold leading-tight text-white sm:text-3xl">
-                {item.title}
-              </h2>
-              {headerMeta && <p className="mt-2 text-sm font-medium text-stone-200">{headerMeta}</p>}
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <div className="mx-auto mt-4 max-w-[460px] text-center">
+              <h2 id="media-detail-title" className="sr-only">{item.title}</h2>
+              <div className="flex flex-wrap justify-center gap-2">
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-stone-900 shadow-lg transition hover:bg-stone-100 focus:outline-none focus:ring-4 focus:ring-teal-200 dark:bg-stone-100 dark:hover:bg-white"
                   onClick={() => setIsFlipped((current) => !current)}

@@ -126,6 +126,20 @@ select {
   pointer-events: none;
 }
 
+.media-back-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.55) transparent;
+}
+
+.media-back-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.media-back-scroll::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.55);
+  border-radius: 999px;
+}
+
 @keyframes media-detail-panel-in {
   from {
     opacity: 0;

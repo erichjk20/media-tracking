@@ -151,7 +151,7 @@ function DetailRow({ icon: Icon, label, value }) {
   );
 }
 
-function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, setIsFlipped, subtypeLabel, synopsis }) {
+function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, subtypeLabel, synopsis }) {
   return (
     <div className="media-detail-back h-full w-full overflow-hidden bg-[#fbfaf7] p-5 text-stone-950 dark:bg-stone-900 dark:text-stone-100 sm:p-6">
       <div className="flex h-full min-h-0 flex-col">
@@ -205,17 +205,6 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
               <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-stone-700 dark:text-stone-300">{notes}</p>
             </div>
           )}
-        </div>
-
-        <div className="mt-4 shrink-0">
-          <button
-            className="inline-flex h-8 items-center justify-center gap-1 rounded-md bg-stone-950 px-3 text-[11px] font-semibold text-white transition hover:bg-stone-800 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-white dark:focus:ring-teal-950"
-            onClick={() => setIsFlipped(false)}
-            type="button"
-          >
-            <RefreshCw size={13} />
-            Front
-          </button>
         </div>
       </div>
     </div>
@@ -312,7 +301,6 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
                       headerMeta={headerMeta}
                       item={item}
                       notes={notes}
-                      setIsFlipped={setIsFlipped}
                       subtypeLabel={subtypeLabel}
                       synopsis={synopsis}
                     />

@@ -54,11 +54,7 @@ select {
 .media-detail-cover {
   height: 100%;
   border-radius: 0.75rem;
-  box-shadow:
-    0 34px 70px rgba(15, 23, 42, 0.42),
-    0 12px 22px rgba(15, 23, 42, 0.28),
-    inset 10px 0 14px rgba(255, 255, 255, 0.16),
-    inset -1px 0 0 rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   animation: media-detail-cover-in 220ms ease-out both;
   transform-origin: center left;
 }
@@ -104,10 +100,10 @@ select {
 .media-detail-cover::before {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 18px;
+  width: 28px;
   content: "";
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.14) 45%, rgba(0, 0, 0, 0.06));
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.16) 38%, rgba(255, 255, 255, 0.08) 68%, transparent);
   mix-blend-mode: multiply;
   pointer-events: none;
 }
@@ -116,27 +112,23 @@ select {
   position: absolute;
   inset: 0;
   content: "";
-  background: linear-gradient(115deg, rgba(255, 255, 255, 0.22), transparent 26%, transparent 68%, rgba(0, 0, 0, 0.18));
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.14), transparent 25%, transparent 74%, rgba(0, 0, 0, 0.1));
   pointer-events: none;
 }
 
 .media-detail-back {
   position: relative;
   border-radius: 0.75rem;
-  box-shadow:
-    0 34px 70px rgba(15, 23, 42, 0.42),
-    0 12px 22px rgba(15, 23, 42, 0.28),
-    inset 10px 0 14px rgba(255, 255, 255, 0.2),
-    inset -1px 0 0 rgba(0, 0, 0, 0.16);
+  box-shadow: none;
 }
 
 .media-detail-back::before {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 18px;
+  width: 28px;
   content: "";
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.16) 45%, rgba(0, 0, 0, 0.04));
+    linear-gradient(90deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.08) 38%, rgba(255, 255, 255, 0.12) 68%, transparent);
   pointer-events: none;
 }
 

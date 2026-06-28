@@ -6,13 +6,14 @@ Build shelvd, a lightweight personal media library tracker web app using React, 
 
 Tagline: Track your media without the noise.
 
-The app tracks exactly five media categories:
+The app tracks exactly four top-level media categories:
 
 - Books
 - Movies
-- TV Shows
-- Anime
+- TV / Anime
 - Manga
+
+Anime series are tracked inside the TV / Anime category with an Anime subtype. Anime movies stay inside Movies with an Anime Movie subtype.
 
 Each category has exactly two shelves:
 
@@ -41,13 +42,14 @@ The main app supports:
 - Category switching
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
+- Delete confirmation before removing media items
 - Search across title, creator, synopsis, and notes
 - A unified add/edit lookup search that queries the relevant APIs for the selected category
 - Homepage search prefill that opens the add sheet and runs the same unified lookup flow
 - Synopsis population from supported lookup providers
 - A physical media detail overlay that opens on the cover and flips to a same-size back cover with synopsis, facts, and notes
-- OMDb lookup behind the unified search for Movies, TV Shows, and Anime
-- TMDb lookup behind the unified search for Movies and TV Shows
+- OMDb lookup behind the unified search for Movies and TV / Anime
+- TMDb lookup behind the unified search for Movies and TV / Anime
 - Open Library and Aladin lookup behind the unified search for Books
 - Jikan lookup behind the unified search for Manga
 - Per-category counts
@@ -56,7 +58,8 @@ The main app supports:
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
 - Star rating input for Completed items only
-- Starter sample data for all categories
+- Quick completion flow that moves Want items to Completed with a rating
+- Starter sample data across the library
 
 ## Tech Stack
 
@@ -65,7 +68,7 @@ The main app supports:
 - Tailwind CSS 3
 - ESLint flat config for React, Hooks, and Vite React Refresh checks
 - lucide-react for icons
-- OMDb API for movie, TV show, and anime lookup
+- OMDb API for movie and TV / Anime lookup
 - Open Library API for book lookup
 - Aladin API for Korean book lookup
 - Jikan API for manga lookup
@@ -95,6 +98,8 @@ Tracked/source files:
     │   ├── AppHeader.jsx
     │   ├── BottomNav.jsx
     │   ├── BrandWordmark.jsx
+    │   ├── CompleteItemDialog.jsx
+    │   ├── DeleteItemDialog.jsx
     │   ├── DetailsLookup.jsx
     │   ├── EditorSheet.jsx
     │   ├── HomeView.jsx
@@ -250,26 +255,26 @@ When Supabase is first configured, the app loads from the database. If the datab
 
 ## OMDb Integration
 
-Movies, TV Shows, and Anime include OMDb results in the unified add/edit lookup.
+Movies and TV / Anime include OMDb results in the unified add/edit lookup.
 
 The lookup:
 
 - Searches OMDb by title with `s`.
-- Restricts results to `type=movie` for Movies and `type=series` for TV Shows.
-- Restricts Anime searches to `type=series` so the Anime category stays focused on shows.
+- Restricts results to `type=movie` for Movies and `type=series` for TV / Anime.
+- Uses the Anime subtype under TV / Anime for anime series.
 - Fetches selected result details by IMDb id with `i`.
 - Fills title, creator/director, poster URL, and notes with relevant OMDb metadata.
 - Leaves the user's personal 1-5 star rating separate from OMDb's IMDb score.
 
 ## TMDb Korean Lookup
 
-Movies and TV Shows include TMDb-powered Korean media results in the unified add/edit lookup.
+Movies and TV / Anime include TMDb-powered Korean media results in the unified add/edit lookup.
 
 The lookup:
 
 - Accepts English or Korean search text.
 - Searches TMDb movie results for Movies.
-- Searches TMDb TV results for TV Shows.
+- Searches TMDb TV results for TV / Anime.
 - Supports English or Korean result language display.
 - Fills title, creator/director, poster URL, and notes with TMDb metadata.
 - Automatically marks Korean movie results as `korean-movie` when TMDb country data includes `KR`.
@@ -295,14 +300,15 @@ Movies support a lightweight `subtype` field:
 - `anime-movie`
 - `korean-movie`
 
-TV Shows support a lightweight `subtype` field:
+TV / Anime supports a lightweight `subtype` field:
 
 - `tv`
+- `anime`
 - `kdrama`
 
 Existing saved book items without a subtype are normalized to `book` at load time. Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
 
-The Books shelf includes an `All / General / Korean` filter. The Movies shelf includes an `All / General / Anime / Korean` filter. The TV Shows shelf includes an `All / General / K-Drama` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, K-Dramas stay under TV Shows, and the Anime category is reserved for anime series.
+The Books shelf includes an `All / General / Korean` filter. The Movies shelf includes an `All / General / Anime / Korean` filter. The TV / Anime shelf includes an `All / General / Anime / Korean` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, and anime series and K-Dramas stay under TV / Anime.
 
 The local API key is read from:
 
@@ -370,9 +376,11 @@ The lookup:
 - The add/edit form opens as a modal sheet instead of living as a permanent sidebar.
 - A floating add button is available on shelf views.
 - Completed items show ratings; planned items do not.
+- Want items can be moved to Completed from the shelf cards or detail overlay; the app asks for a rating before saving the move.
+- Delete actions use a confirmation dialog before removing an item.
 - The display label adapts to category intent:
   - Books and Manga use "Want to Read"
-  - Movies, TV Shows, and Anime use "Want to Watch"
+  - Movies and TV / Anime use "Want to Watch"
 - The stored status value remains the exact shared value: `Want to Watch/Read`.
 
 ## Current Git State Notes

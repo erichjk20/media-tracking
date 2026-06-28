@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   BookOpen,
   Calendar,
+  Check,
   Clock3,
   Edit3,
   Hash,
@@ -211,7 +212,7 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
   );
 }
 
-function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
+function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const category = categories.find((entry) => entry.id === item.category);
   const CategoryIcon = category?.icon || Library;
@@ -220,6 +221,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
   const detailRows = getDetailRows(item);
   const synopsis = getSynopsisText(item);
   const notes = item.notes?.trim();
+  const canComplete = item.status === "Want to Watch/Read";
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -320,6 +322,16 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
                   <RefreshCw size={16} />
                   {isFlipped ? "Front" : "Details"}
                 </button>
+                {canComplete && (
+                  <button
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white shadow-lg transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-200 dark:bg-teal-600 dark:hover:bg-teal-500"
+                    onClick={() => onComplete(item)}
+                    type="button"
+                  >
+                    <Check size={16} />
+                    Done
+                  </button>
+                )}
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-stone-950/70 px-4 text-sm font-semibold text-white shadow-lg ring-1 ring-white/15 transition hover:bg-stone-900 focus:outline-none focus:ring-4 focus:ring-teal-200"
                   onClick={() => onEdit(item)}
@@ -329,7 +341,7 @@ function MediaDetailOverlay({ item, onClose, onDelete, onEdit }) {
                   Edit
                 </button>
                 <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-stone-950/70 px-4 text-sm font-semibold text-red-100 shadow-lg ring-1 ring-red-200/30 transition hover:bg-red-950/80 focus:outline-none focus:ring-4 focus:ring-red-200"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-red-700 px-4 text-sm font-semibold text-white shadow-lg transition hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-200 dark:bg-red-700 dark:hover:bg-red-600"
                   onClick={() => onDelete(item.id)}
                   type="button"
                 >

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import AppHeader from "./components/AppHeader";
 import BottomNav from "./components/BottomNav";
+import CompleteItemDialog from "./components/CompleteItemDialog";
+import DeleteItemDialog from "./components/DeleteItemDialog";
 import EditorSheet from "./components/EditorSheet";
 import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
@@ -70,6 +72,9 @@ function App() {
   const [lookupStatus, setLookupStatus] = useState("idle");
   const [lookupMessage, setLookupMessage] = useState("");
   const [selectedItemId, setSelectedItemId] = useState(null);
+  const [completingItemId, setCompletingItemId] = useState(null);
+  const [completionRating, setCompletionRating] = useState(3);
+  const [deletingItemId, setDeletingItemId] = useState(null);
   const [tmdbLanguage, setTmdbLanguage] = useState("en-US");
   const [bookLanguage, setBookLanguage] = useState(openLibraryCanonicalBookLanguage);
   const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
@@ -85,6 +90,14 @@ function App() {
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) || null,
     [items, selectedItemId],
+  );
+  const completingItem = useMemo(
+    () => items.find((item) => item.id === completingItemId) || null,
+    [completingItemId, items],
+  );
+  const deletingItem = useMemo(
+    () => items.find((item) => item.id === deletingItemId) || null,
+    [deletingItemId, items],
   );
   const visibleItems = useMemo(() => {
     const queryTokens = getSearchTokens(query);
@@ -332,6 +345,38 @@ function App() {
     startEdit(item);
   }
 
+  function startCompleteItem(item) {
+    setCompletionRating(Number(item.rating) || 3);
+    setCompletingItemId(item.id);
+  }
+
+  function closeCompleteDialog() {
+    setCompletingItemId(null);
+    setCompletionRating(3);
+  }
+
+  async function completeItem() {
+    if (!completingItem) return;
+
+    const completedItem = {
+      ...completingItem,
+      status: "Completed",
+      rating: Number(completionRating) || 3,
+    };
+
+    try {
+      const savedItem = storageMode === "supabase" ? await saveMediaItem(completedItem) : completedItem;
+      setItems((current) => current.map((item) => (item.id === completingItem.id ? savedItem : item)));
+      closeCompleteDialog();
+    } catch (error) {
+      console.error("Supabase completion save failed", error);
+      setStorageMode("local");
+      setStorageMessage(`Could not save to Supabase. This change was saved in this browser instead. ${error.message || ""}`.trim());
+      setItems((current) => current.map((item) => (item.id === completingItem.id ? completedItem : item)));
+      closeCompleteDialog();
+    }
+  }
+
   function startNewItem() {
     const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
@@ -374,6 +419,21 @@ function App() {
     resetForm();
     resetLookupState();
     setIsEditorOpen(false);
+  }
+
+  function requestDeleteItem(id) {
+    setDeletingItemId(id);
+  }
+
+  function closeDeleteDialog() {
+    setDeletingItemId(null);
+  }
+
+  async function confirmDeleteItem() {
+    if (!deletingItem) return;
+
+    await deleteItem(deletingItem.id);
+    setDeletingItemId(null);
   }
 
   async function deleteItem(id) {
@@ -654,7 +714,8 @@ function App() {
           onActiveMovieSubtypeChange={setActiveMovieSubtype}
           onActiveStatusChange={setActiveStatus}
           onActiveTvSubtypeChange={setActiveTvSubtype}
-          onDeleteItem={deleteItem}
+          onCompleteItem={startCompleteItem}
+          onDeleteItem={requestDeleteItem}
           onEditItem={editItem}
           onOpenItem={openItemDetails}
           onQueryChange={setQuery}
@@ -684,8 +745,27 @@ function App() {
         <MediaDetailOverlay
           item={selectedItem}
           onClose={() => setSelectedItemId(null)}
-          onDelete={deleteItem}
+          onComplete={startCompleteItem}
+          onDelete={requestDeleteItem}
           onEdit={editItem}
+        />
+      )}
+
+      {completingItem && (
+        <CompleteItemDialog
+          item={completingItem}
+          onClose={closeCompleteDialog}
+          onConfirm={completeItem}
+          onRatingChange={setCompletionRating}
+          rating={completionRating}
+        />
+      )}
+
+      {deletingItem && (
+        <DeleteItemDialog
+          item={deletingItem}
+          onClose={closeDeleteDialog}
+          onConfirm={confirmDeleteItem}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { Edit3, Trash2 } from "lucide-react";
+import { Check, Edit3, Trash2 } from "lucide-react";
 import {
   getMovieTileMeta,
   getTvTileMeta,
@@ -28,11 +28,12 @@ function getFactLabel(item, movieTileMeta, tvTileMeta) {
   return movieTileMeta || tvTileMeta || "";
 }
 
-export function MediaItemCard({ item, onDelete, onEdit, onOpen }) {
+export function MediaItemCard({ item, onComplete, onDelete, onEdit, onOpen }) {
   const movieTileMeta = getMovieTileMeta(item);
   const tvTileMeta = getTvTileMeta(item);
   const creatorLabel = getCreatorLabel(item);
   const factLabel = getFactLabel(item, movieTileMeta, tvTileMeta);
+  const canComplete = item.status === "Want to Watch/Read";
 
   return (
     <article className="grid min-w-0 grid-cols-[76px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm transition hover:border-teal-600 hover:shadow-lift dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500 sm:block">
@@ -63,6 +64,17 @@ export function MediaItemCard({ item, onDelete, onEdit, onOpen }) {
           </button>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <div className="flex gap-1">
+              {canComplete && (
+                <button
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-teal-200 text-teal-700 transition hover:bg-teal-50 dark:border-teal-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                  onClick={() => onComplete(item)}
+                  type="button"
+                  aria-label={`Mark ${item.title} completed`}
+                  title={`Mark ${item.title} completed`}
+                >
+                  <Check size={14} />
+                </button>
+              )}
               <button
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
                 onClick={() => onEdit(item)}
@@ -73,7 +85,7 @@ export function MediaItemCard({ item, onDelete, onEdit, onOpen }) {
                 <Edit3 size={14} />
               </button>
               <button
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-300 text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:border-red-700 dark:hover:bg-red-950/50"
                 onClick={() => onDelete(item.id)}
                 type="button"
                 aria-label={`Delete ${item.title}`}
@@ -90,11 +102,12 @@ export function MediaItemCard({ item, onDelete, onEdit, onOpen }) {
   );
 }
 
-export function MediaPosterCard({ item, onDelete, onEdit, onOpen }) {
+export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) {
   const movieTileMeta = getMovieTileMeta(item);
   const tvTileMeta = getTvTileMeta(item);
   const creatorLabel = getCreatorLabel(item);
   const factLabel = getFactLabel(item, movieTileMeta, tvTileMeta);
+  const canComplete = item.status === "Want to Watch/Read";
 
   return (
     <article className="grid min-w-0 grid-rows-[auto_minmax(132px,auto)]">
@@ -124,16 +137,38 @@ export function MediaPosterCard({ item, onDelete, onEdit, onOpen }) {
         {creatorLabel && <p className="mt-1 h-4 truncate text-[11px] text-stone-600 dark:text-stone-400" title={creatorLabel}>{creatorLabel}</p>}
         <p className={`${creatorLabel ? "" : "mt-1"} h-4 truncate text-[11px] font-medium text-stone-500 dark:text-stone-400`} title={factLabel}>{factLabel}</p>
         <div className="mt-2 h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
-        <div className="mt-auto grid grid-cols-[1fr_32px] gap-2 pt-3">
+        <div className={`mt-auto grid gap-2 pt-3 ${canComplete ? "grid-cols-[1fr_32px_32px]" : "grid-cols-[1fr_32px]"}`}>
+          {canComplete ? (
+            <>
+              <button
+                className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-teal-200 text-xs font-medium text-teal-700 transition hover:bg-teal-50 dark:border-teal-900 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                onClick={() => onComplete(item)}
+                type="button"
+              >
+                <Check size={13} />
+                Done
+              </button>
+              <button
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
+                onClick={() => onEdit(item)}
+                type="button"
+                aria-label={`Edit ${item.title}`}
+                title={`Edit ${item.title}`}
+              >
+                <Edit3 size={14} />
+              </button>
+            </>
+          ) : (
+            <button
+              className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
+              onClick={() => onEdit(item)}
+              type="button"
+            >
+              Edit
+            </button>
+          )}
           <button
-            className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
-            onClick={() => onEdit(item)}
-            type="button"
-          >
-            Edit
-          </button>
-          <button
-            className="inline-flex h-8 items-center justify-center rounded-md border border-red-200 text-red-700 transition hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+            className="inline-flex h-8 items-center justify-center rounded-md border border-red-300 text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:border-red-700 dark:hover:bg-red-950/50"
             onClick={() => onDelete(item.id)}
             type="button"
             aria-label={`Delete ${item.title}`}

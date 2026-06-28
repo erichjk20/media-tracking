@@ -122,7 +122,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                     </div>
                     <span className="inline-flex h-8 items-center gap-1 rounded bg-teal-50 px-2 text-[11px] font-semibold text-teal-800 ring-1 ring-teal-100 dark:bg-teal-950/50 dark:text-teal-200 dark:ring-teal-900">
                       <Icon size={13} />
-                      {itemCategory?.label.replace("TV Shows", "TV") || "Media"}
+                      {itemCategory?.id === "tv" ? "TV/Anime" : itemCategory?.label || "Media"}
                     </span>
                   </button>
                 );

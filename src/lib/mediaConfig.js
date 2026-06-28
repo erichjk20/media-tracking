@@ -12,7 +12,7 @@ import {
 export const categories = [
   { id: "books", label: "Books", creatorLabel: "Author", action: "Read", icon: BookOpen },
   { id: "movies", label: "Movies", creatorLabel: "Director", action: "Watch", icon: Clapperboard },
-  { id: "tv", label: "TV Shows", creatorLabel: "Studio / Creator", action: "Watch", icon: Tv },
+  { id: "tv", label: "TV / Anime", creatorLabel: "Studio / Creator", action: "Watch", icon: Tv },
   { id: "manga", label: "Manga", creatorLabel: "Author / Artist", action: "Read", icon: PanelsTopLeft },
 ];
 

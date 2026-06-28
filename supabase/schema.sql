@@ -1,5 +1,43 @@
+create table if not exists public.user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  display_name text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.handle_new_user_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.user_profiles (id, email, display_name)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    nullif(coalesce(new.raw_user_meta_data->>'display_name', split_part(coalesce(new.email, ''), '@', 1)), '')
+  )
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    display_name = coalesce(public.user_profiles.display_name, excluded.display_name),
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_profile on auth.users;
+
+create trigger on_auth_user_created_profile
+after insert on auth.users
+for each row execute function public.handle_new_user_profile();
+
 create table if not exists public.library_items (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade default auth.uid(),
   category text not null check (category in ('books', 'movies', 'tv', 'manga')),
   subtype text check (
     subtype is null
@@ -31,6 +69,12 @@ add column if not exists duration_minutes integer;
 
 alter table public.library_items
 add column if not exists synopsis text;
+
+alter table public.library_items
+add column if not exists user_id uuid references auth.users(id) on delete cascade;
+
+alter table public.library_items
+alter column user_id set default auth.uid();
 
 alter table public.library_items
 drop constraint if exists library_items_subtype_check;
@@ -312,6 +356,9 @@ drop table if exists public.anime_details;
 create index if not exists library_items_category_status_idx
 on public.library_items (category, status);
 
+create index if not exists library_items_user_category_status_idx
+on public.library_items (user_id, category, status);
+
 create index if not exists library_items_added_at_idx
 on public.library_items (added_at desc);
 
@@ -327,7 +374,8 @@ on public.book_details (isbn);
 create index if not exists manga_details_author_idx
 on public.manga_details (lower(author));
 
-create or replace view public.movie_details_view as
+create or replace view public.movie_details_view
+with (security_invoker = true) as
 select
   library_item_id,
   movie_title,
@@ -339,7 +387,8 @@ select
   updated_at
 from public.movie_details;
 
-create or replace view public.book_details_view as
+create or replace view public.book_details_view
+with (security_invoker = true) as
 select
   library_item_id,
   book_title,
@@ -350,7 +399,8 @@ select
   updated_at
 from public.book_details;
 
-create or replace view public.manga_details_view as
+create or replace view public.manga_details_view
+with (security_invoker = true) as
 select
   library_item_id,
   manga_title,
@@ -362,7 +412,8 @@ select
   updated_at
 from public.manga_details;
 
-create or replace view public.tv_details_view as
+create or replace view public.tv_details_view
+with (security_invoker = true) as
 select
   library_item_id,
   tv_show_title,
@@ -374,19 +425,276 @@ select
   updated_at
 from public.tv_details;
 
-alter table public.library_items disable row level security;
-alter table public.movie_details disable row level security;
-alter table public.book_details disable row level security;
-alter table public.manga_details disable row level security;
-alter table public.tv_details disable row level security;
+do $$
+begin
+  if not exists (select 1 from public.library_items where user_id is null) then
+    alter table public.library_items alter column user_id set not null;
+  end if;
+end $$;
+
+alter table public.user_profiles enable row level security;
+alter table public.library_items enable row level security;
+alter table public.movie_details enable row level security;
+alter table public.book_details enable row level security;
+alter table public.manga_details enable row level security;
+alter table public.tv_details enable row level security;
+
+drop policy if exists "Users can view their own profile" on public.user_profiles;
+drop policy if exists "Users can insert their own profile" on public.user_profiles;
+drop policy if exists "Users can update their own profile" on public.user_profiles;
+
+create policy "Users can view their own profile"
+on public.user_profiles for select
+to authenticated
+using (id = auth.uid());
+
+create policy "Users can insert their own profile"
+on public.user_profiles for insert
+to authenticated
+with check (id = auth.uid());
+
+create policy "Users can update their own profile"
+on public.user_profiles for update
+to authenticated
+using (id = auth.uid())
+with check (id = auth.uid());
+
+drop policy if exists "Users can view their own library items" on public.library_items;
+drop policy if exists "Users can insert their own library items" on public.library_items;
+drop policy if exists "Users can update their own library items" on public.library_items;
+drop policy if exists "Users can delete their own library items" on public.library_items;
+
+create policy "Users can view their own library items"
+on public.library_items for select
+to authenticated
+using (user_id = auth.uid());
+
+create policy "Users can insert their own library items"
+on public.library_items for insert
+to authenticated
+with check (user_id = auth.uid());
+
+create policy "Users can update their own library items"
+on public.library_items for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+create policy "Users can delete their own library items"
+on public.library_items for delete
+to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "Users can view their own movie details" on public.movie_details;
+drop policy if exists "Users can insert their own movie details" on public.movie_details;
+drop policy if exists "Users can update their own movie details" on public.movie_details;
+drop policy if exists "Users can delete their own movie details" on public.movie_details;
+
+create policy "Users can view their own movie details"
+on public.movie_details for select
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = movie_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can insert their own movie details"
+on public.movie_details for insert
+to authenticated
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = movie_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can update their own movie details"
+on public.movie_details for update
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = movie_details.library_item_id
+    and library_items.user_id = auth.uid()
+))
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = movie_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can delete their own movie details"
+on public.movie_details for delete
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = movie_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+drop policy if exists "Users can view their own book details" on public.book_details;
+drop policy if exists "Users can insert their own book details" on public.book_details;
+drop policy if exists "Users can update their own book details" on public.book_details;
+drop policy if exists "Users can delete their own book details" on public.book_details;
+
+create policy "Users can view their own book details"
+on public.book_details for select
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = book_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can insert their own book details"
+on public.book_details for insert
+to authenticated
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = book_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can update their own book details"
+on public.book_details for update
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = book_details.library_item_id
+    and library_items.user_id = auth.uid()
+))
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = book_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can delete their own book details"
+on public.book_details for delete
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = book_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+drop policy if exists "Users can view their own manga details" on public.manga_details;
+drop policy if exists "Users can insert their own manga details" on public.manga_details;
+drop policy if exists "Users can update their own manga details" on public.manga_details;
+drop policy if exists "Users can delete their own manga details" on public.manga_details;
+
+create policy "Users can view their own manga details"
+on public.manga_details for select
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = manga_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can insert their own manga details"
+on public.manga_details for insert
+to authenticated
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = manga_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can update their own manga details"
+on public.manga_details for update
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = manga_details.library_item_id
+    and library_items.user_id = auth.uid()
+))
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = manga_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can delete their own manga details"
+on public.manga_details for delete
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = manga_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+drop policy if exists "Users can view their own tv details" on public.tv_details;
+drop policy if exists "Users can insert their own tv details" on public.tv_details;
+drop policy if exists "Users can update their own tv details" on public.tv_details;
+drop policy if exists "Users can delete their own tv details" on public.tv_details;
+
+create policy "Users can view their own tv details"
+on public.tv_details for select
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = tv_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can insert their own tv details"
+on public.tv_details for insert
+to authenticated
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = tv_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can update their own tv details"
+on public.tv_details for update
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = tv_details.library_item_id
+    and library_items.user_id = auth.uid()
+))
+with check (exists (
+  select 1 from public.library_items
+  where library_items.id = tv_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
+
+create policy "Users can delete their own tv details"
+on public.tv_details for delete
+to authenticated
+using (exists (
+  select 1 from public.library_items
+  where library_items.id = tv_details.library_item_id
+    and library_items.user_id = auth.uid()
+));
 
 grant usage on schema public to anon, authenticated;
-grant select, insert, update, delete on public.library_items to anon, authenticated;
-grant select, insert, update, delete on public.movie_details to anon, authenticated;
-grant select, insert, update, delete on public.book_details to anon, authenticated;
-grant select, insert, update, delete on public.manga_details to anon, authenticated;
-grant select, insert, update, delete on public.tv_details to anon, authenticated;
-grant select on public.movie_details_view to anon, authenticated;
-grant select on public.book_details_view to anon, authenticated;
-grant select on public.manga_details_view to anon, authenticated;
-grant select on public.tv_details_view to anon, authenticated;
+revoke select, insert, update, delete on public.user_profiles from anon;
+revoke select, insert, update, delete on public.library_items from anon;
+revoke select, insert, update, delete on public.movie_details from anon;
+revoke select, insert, update, delete on public.book_details from anon;
+revoke select, insert, update, delete on public.manga_details from anon;
+revoke select, insert, update, delete on public.tv_details from anon;
+revoke select on public.movie_details_view from anon;
+revoke select on public.book_details_view from anon;
+revoke select on public.manga_details_view from anon;
+revoke select on public.tv_details_view from anon;
+grant select, insert, update on public.user_profiles to authenticated;
+grant select, insert, update, delete on public.library_items to authenticated;
+grant select, insert, update, delete on public.movie_details to authenticated;
+grant select, insert, update, delete on public.book_details to authenticated;
+grant select, insert, update, delete on public.manga_details to authenticated;
+grant select, insert, update, delete on public.tv_details to authenticated;
+grant select on public.movie_details_view to authenticated;
+grant select on public.book_details_view to authenticated;
+grant select on public.manga_details_view to authenticated;
+grant select on public.tv_details_view to authenticated;
+
+-- Existing personal data migration:
+-- 1. Sign in once with your email so a Supabase auth.users row exists.
+-- 2. Replace the email below and run it once to claim the current unowned library rows.
+-- update public.library_items
+-- set user_id = (select id from auth.users where email = 'your-email@example.com' limit 1)
+-- where user_id is null;
+-- 3. Rerun this schema after the update; the safe block above will make user_id not null.

@@ -28,20 +28,23 @@ const dbStatusByAppStatus = {
 
 export { isSupabaseConfigured };
 
-export async function fetchMediaItems() {
+export async function fetchMediaItems(userId) {
   if (!supabase) return [];
+  if (!userId) throw new Error("Sign in before loading your library.");
 
   const { data, error } = await supabase
     .from(tableName)
     .select("*, movie_details(*), book_details(*), manga_details(*), tv_details(*)")
+    .eq("user_id", userId)
     .order("added_at", { ascending: true });
 
   if (error) throw error;
   return data.map(dbRowToMediaItem);
 }
 
-export async function saveMediaItem(item) {
+export async function saveMediaItem(item, userId) {
   if (!supabase) return item;
+  if (!userId) throw new Error("Sign in before saving to your library.");
 
   const itemId = isUuid(item.id) ? item.id : crypto.randomUUID();
   const itemToSave = {
@@ -50,7 +53,7 @@ export async function saveMediaItem(item) {
     category: item.category === "anime" ? "tv" : item.category,
     subtype: item.category === "anime" ? "anime" : item.subtype,
   };
-  const row = mediaItemToDbRow(itemToSave);
+  const row = mediaItemToDbRow(itemToSave, userId);
 
   let { data, error } = await supabase
     .from(tableName)
@@ -77,13 +80,15 @@ export async function saveMediaItem(item) {
   return dbRowToMediaItem({ ...data, ...details });
 }
 
-export async function removeMediaItem(id) {
+export async function removeMediaItem(id, userId) {
   if (!supabase) return;
+  if (!userId) throw new Error("Sign in before deleting from your library.");
 
   const { error } = await supabase
     .from(tableName)
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
 
   if (error) throw error;
 }
@@ -98,6 +103,7 @@ function dbRowToMediaItem(row) {
 
   return {
     id: row.id,
+    userId: row.user_id || "",
     category,
     subtype,
     status: appStatusByDbStatus[row.status] || row.status,
@@ -127,13 +133,14 @@ function dbRowToMediaItem(row) {
   };
 }
 
-function mediaItemToDbRow(item) {
+function mediaItemToDbRow(item, userId) {
   const isCompleted = item.status === "Completed";
   const category = item.category === "anime" ? "tv" : item.category;
   const subtype = item.category === "anime" ? "anime" : item.subtype || null;
 
   return {
     id: item.id,
+    user_id: userId,
     category,
     subtype,
     status: dbStatusByAppStatus[item.status] || item.status,

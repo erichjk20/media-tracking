@@ -33,11 +33,13 @@ Each media item contains:
 
 ## Current Implementation
 
-This is a client-only React app. It stores library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. If Supabase is not configured or is unavailable, it falls back to `localStorage` under the key `media-shelf-items`.
+This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email magic links identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`.
 
 The main app supports:
 
 - A homepage for choosing a media type, then quickly searching and logging new media
+- Email magic-link sign-in when Supabase is configured
+- Private per-user libraries backed by Supabase Auth and row-level security
 - Home/Library view switching
 - Category switching
 - Shelf switching between Completed and Want to Watch/Read
@@ -96,6 +98,7 @@ Tracked/source files:
     ├── App.jsx
     ├── components
     │   ├── AppHeader.jsx
+    │   ├── AuthView.jsx
     │   ├── BottomNav.jsx
     │   ├── BrandWordmark.jsx
     │   ├── CompleteItemDialog.jsx
@@ -131,12 +134,13 @@ Both are ignored by Git.
 
 `src/App.jsx`
 
-- Coordinates top-level app state, storage fallback, view switching, item CRUD behavior, filtering, and add/edit form handling.
-- Loads and saves media items through the Supabase/localStorage persistence layer.
+- Coordinates top-level app state, auth/session loading, storage mode, view switching, item CRUD behavior, filtering, and add/edit form handling.
+- Loads and saves signed-in media items through Supabase, or uses localStorage only when Supabase is not configured.
 
 `src/components/`
 
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
+- `AuthView.jsx` owns the email magic-link sign-in form.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view.
 
 `src/lib/mediaConfig.js`
@@ -154,10 +158,12 @@ Both are ignored by Git.
 `src/lib/supabase.js`
 
 - Creates the Supabase client when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present.
+- Provides session, auth subscription, magic-link, sign-out, and user profile helpers.
 
 `src/lib/mediaItemsStore.js`
 
 - Maps app media items to/from the Supabase `library_items` table.
+- Requires the signed-in user id when fetching, saving, or deleting Supabase-backed items.
 - Stores shared item fields, including `synopsis`, in `library_items`.
 - Saves category-specific details to `movie_details`, `book_details`, `manga_details`, and `tv_details`.
 - Provides fetch, upsert, and delete helpers.
@@ -165,7 +171,7 @@ Both are ignored by Git.
 
 `supabase/schema.sql`
 
-- Defines the `library_items` table, category detail tables, category/status constraints, rating rules, useful indexes, and personal-app anon CRUD grants.
+- Defines `user_profiles`, `library_items`, category detail tables, category/status constraints, rating rules, useful indexes, and row-level security policies.
 
 `src/index.css`
 
@@ -221,7 +227,9 @@ The production build and lint checks were last verified successfully after the R
 
 ## Supabase Persistence
 
-The app uses the `library_items` table and category detail tables defined in `supabase/schema.sql`.
+The app uses the `user_profiles`, `library_items`, and category detail tables defined in `supabase/schema.sql`.
+
+`user_profiles.id` links to Supabase Auth `auth.users.id`. `library_items.user_id` stores item ownership and references the same auth user id.
 
 `library_items.title` remains the main entry title, and `library_items.synopsis` stores the shared back-cover synopsis for all media categories. The detail tables also mirror the visible title for easier table-level inspection:
 
@@ -247,11 +255,11 @@ The React app maps those values to its display labels:
 - `Completed`
 - `Want to Watch/Read`
 
-The browser-facing Supabase anon key is not a private secret. The current schema disables row-level security for a simple personal/local setup. Before deploying this for multiple users or a public audience, add Supabase Auth, a `user_id` column, and row-level security policies.
+The browser-facing Supabase anon key is not a private secret. Private data is protected by Supabase Auth sessions and row-level security policies on `library_items`, detail tables, and `user_profiles`.
 
-The schema grants `select`, `insert`, `update`, and `delete` on `library_items` to `anon` and `authenticated` so the browser client can write during the personal-app phase. If Supabase reports a row-level security violation during setup, rerun the bottom of `supabase/schema.sql`.
+When Supabase is configured, signed-out users see the magic-link auth screen. Signed-in users only load rows where `library_items.user_id = auth.uid()`. If Supabase is not configured, the app uses localStorage for local development/demo use.
 
-When Supabase is first configured, the app loads from the database. If the database is empty and browser `localStorage` contains saved items, the app attempts to migrate those items to Supabase automatically.
+Existing personal rows must be claimed after your auth user exists. Sign in once with your email, run the one-time `update public.library_items set user_id = (...) where user_id is null;` SQL comment at the bottom of `supabase/schema.sql`, then rerun the schema so the safe block can make `library_items.user_id` required.
 
 ## OMDb Integration
 
@@ -371,6 +379,7 @@ The lookup:
 - Poster grid view keeps at least three columns on narrow screens.
 - Mobile category switching uses a fixed bottom navigation bar.
 - Desktop and tablet show a compact top header with search and a category grid below it.
+- Signed-in users can sign out from the header.
 - The previous "All completed" route/control has been removed for now.
 - The active shelf is controlled with a two-option segmented control.
 - The add/edit form opens as a modal sheet instead of living as a permanent sidebar.
@@ -396,4 +405,5 @@ At the time this context file was created, the app files are newly added and may
 - Add validation or image preview error handling for broken cover URLs.
 - Split `src/App.jsx` into smaller components if the app grows.
 - Add tests with Vitest and React Testing Library.
-- Replace `localStorage` with a backend or sync service if multi-device access becomes important.
+- Add email/password login as an optional Supabase Auth method if users need a more conventional sign-in path.
+- Add a future `media_titles` table if shared canonical media metadata, global stats, or recommendations become product priorities.

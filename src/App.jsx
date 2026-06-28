@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import AppHeader from "./components/AppHeader";
+import AuthView from "./components/AuthView";
 import BottomNav from "./components/BottomNav";
 import CompleteItemDialog from "./components/CompleteItemDialog";
 import DeleteItemDialog from "./components/DeleteItemDialog";
@@ -10,10 +11,16 @@ import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import {
   fetchMediaItems,
-  isSupabaseConfigured,
   removeMediaItem,
   saveMediaItem,
 } from "./lib/mediaItemsStore";
+import {
+  ensureUserProfile,
+  getCurrentSession,
+  isSupabaseConfigured,
+  signOut,
+  subscribeToAuthChanges,
+} from "./lib/supabase";
 import {
   bookSubtypeOptions,
   categories,
@@ -29,7 +36,6 @@ import {
   getBookLookupLanguage,
   getDefaultSubtype,
   getKeywordMatchScore,
-  getLocalStorageItems,
   getLookupMessage,
   getSearchTokens,
   getSelectableSubtype,
@@ -50,10 +56,13 @@ import {
 } from "./lib/mediaLookup";
 
 function App() {
-  const [items, setItems] = useState(getStoredItems);
+  const [session, setSession] = useState(null);
+  const [authStatus, setAuthStatus] = useState(isSupabaseConfigured ? "loading" : "local");
+  const [profile, setProfile] = useState(null);
+  const [items, setItems] = useState(() => (isSupabaseConfigured ? [] : getStoredItems()));
   const [storageMode, setStorageMode] = useState(isSupabaseConfigured ? "loading" : "local");
   const [storageMessage, setStorageMessage] = useState(
-    isSupabaseConfigured ? "Connecting to Supabase..." : "",
+    isSupabaseConfigured ? "Checking your session..." : "",
   );
   const [activeView, setActiveView] = useState("home");
   const [activeCategory, setActiveCategory] = useState("books");
@@ -80,6 +89,8 @@ function App() {
   const [pendingHomeLookup, setPendingHomeLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
   const [homeSearchResetToken, setHomeSearchResetToken] = useState(0);
+  const user = session?.user || null;
+  const shouldUseSupabase = Boolean(isSupabaseConfigured && user);
 
   const category = categories.find((entry) => entry.id === activeCategory);
   const canUseBookLookup = draft.category === "books";
@@ -191,36 +202,88 @@ function App() {
 
     let isCurrent = true;
 
-    async function loadDatabaseItems() {
+    async function loadSession() {
       try {
-        let databaseItems = await fetchMediaItems();
-        const localItems = getLocalStorageItems();
-
-        if (!databaseItems.length && localItems.length) {
-          databaseItems = await Promise.all(localItems.map((item) => saveMediaItem(item)));
-        }
-
+        const currentSession = await getCurrentSession();
         if (!isCurrent) return;
-        setItems(normalizeItems(databaseItems));
-        setStorageMode("supabase");
+        setSession(currentSession);
+        setAuthStatus("ready");
         setStorageMessage("");
       } catch (error) {
-        console.error("Supabase load failed", error);
+        console.error("Supabase session load failed", error);
         if (!isCurrent) return;
-        setStorageMode("local");
-        setStorageMessage(`Supabase is unavailable. Changes are being saved in this browser. ${error.message || ""}`.trim());
+        setAuthStatus("ready");
+        setStorageMessage(`Could not check your session. ${error.message || ""}`.trim());
       }
     }
 
-    loadDatabaseItems();
+    loadSession();
+    const unsubscribe = subscribeToAuthChanges((nextSession) => {
+      if (!isCurrent) return;
+      setSession(nextSession);
+      setAuthStatus("ready");
+    });
 
     return () => {
       isCurrent = false;
+      unsubscribe();
     };
   }, []);
 
   useEffect(() => {
-    if (storageMode === "loading" || storageMode === "supabase") return;
+    if (!isSupabaseConfigured) return;
+    if (authStatus === "loading") return;
+
+    if (!user) {
+      setItems([]);
+      setProfile(null);
+      setStorageMode("signed-out");
+      setStorageMessage("");
+      setSelectedItemId(null);
+      setCompletingItemId(null);
+      setDeletingItemId(null);
+      setIsEditorOpen(false);
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadUserLibrary() {
+      setItems([]);
+      setProfile(null);
+      setStorageMode("loading");
+      setStorageMessage("Loading your library...");
+
+      try {
+        const [profileData, databaseItems] = await Promise.all([
+          ensureUserProfile(user),
+          fetchMediaItems(user.id),
+        ]);
+
+        if (!isCurrent) return;
+        setProfile(profileData);
+        setItems(normalizeItems(databaseItems));
+        setStorageMode("supabase");
+        setStorageMessage("");
+      } catch (error) {
+        console.error("Supabase library load failed", error);
+        if (!isCurrent) return;
+        setItems([]);
+        setProfile(null);
+        setStorageMode("error");
+        setStorageMessage(`Could not load your private library. ${error.message || ""}`.trim());
+      }
+    }
+
+    loadUserLibrary();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authStatus, user]);
+
+  useEffect(() => {
+    if (isSupabaseConfigured || storageMode === "loading" || storageMode === "supabase") return;
     window.localStorage.setItem("media-shelf-items", JSON.stringify(items));
   }, [items, storageMode]);
 
@@ -287,7 +350,7 @@ function App() {
     };
 
     try {
-      const savedItem = storageMode === "supabase" ? await saveMediaItem(nextItem) : nextItem;
+      const savedItem = shouldUseSupabase ? await saveMediaItem(nextItem, user.id) : nextItem;
 
       setItems((current) =>
         editingId
@@ -301,16 +364,7 @@ function App() {
       setIsEditorOpen(false);
     } catch (error) {
       console.error("Supabase save failed", error);
-      setStorageMode("local");
-      setStorageMessage(`Could not save to Supabase. This change was saved in this browser instead. ${error.message || ""}`.trim());
-      setItems((current) =>
-        editingId ? current.map((item) => (item.id === editingId ? nextItem : item)) : [...current, nextItem],
-      );
-      resetForm();
-      if (isAddingNewItem) {
-        setHomeSearchResetToken((current) => current + 1);
-      }
-      setIsEditorOpen(false);
+      setStorageMessage(`Could not save to your private library. ${error.message || ""}`.trim());
     }
   }
 
@@ -365,15 +419,12 @@ function App() {
     };
 
     try {
-      const savedItem = storageMode === "supabase" ? await saveMediaItem(completedItem) : completedItem;
+      const savedItem = shouldUseSupabase ? await saveMediaItem(completedItem, user.id) : completedItem;
       setItems((current) => current.map((item) => (item.id === completingItem.id ? savedItem : item)));
       closeCompleteDialog();
     } catch (error) {
       console.error("Supabase completion save failed", error);
-      setStorageMode("local");
-      setStorageMessage(`Could not save to Supabase. This change was saved in this browser instead. ${error.message || ""}`.trim());
-      setItems((current) => current.map((item) => (item.id === completingItem.id ? completedItem : item)));
-      closeCompleteDialog();
+      setStorageMessage(`Could not save to your private library. ${error.message || ""}`.trim());
     }
   }
 
@@ -438,12 +489,20 @@ function App() {
 
   async function deleteItem(id) {
     try {
-      if (storageMode === "supabase") await removeMediaItem(id);
+      if (shouldUseSupabase) await removeMediaItem(id, user.id);
       setItems((current) => current.filter((item) => item.id !== id));
       if (selectedItemId === id) setSelectedItemId(null);
       if (editingId === id) resetForm();
     } catch {
       setStorageMessage("Could not delete from Supabase. Try again in a moment.");
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+    } catch (error) {
+      setStorageMessage(`Could not sign out. ${error.message || ""}`.trim());
     }
   }
 
@@ -673,15 +732,30 @@ function App() {
     setLookupMessage("Manga details added from Jikan. You can edit anything before saving.");
   }
 
+  if (isSupabaseConfigured && authStatus === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f4f6f5] px-4 text-stone-950 dark:bg-stone-950 dark:text-stone-100">
+        <p className="text-sm font-semibold text-stone-600 dark:text-stone-400">Loading shelvd...</p>
+      </main>
+    );
+  }
+
+  if (isSupabaseConfigured && !user) {
+    return <AuthView />;
+  }
+
   return (
     <main className="min-h-screen bg-[#f4f6f5] pb-28 dark:bg-stone-950 lg:pb-0">
       <AppHeader
         activeCategory={activeCategory}
         activeView={activeView}
         counts={counts}
+        profile={profile}
+        user={user}
         onGoHome={() => setActiveView("home")}
         onShowCategory={showCategory}
         onShowLibrary={showLibrary}
+        onSignOut={handleSignOut}
       />
 
       {storageMessage && (

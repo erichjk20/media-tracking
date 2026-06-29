@@ -1,21 +1,72 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, Mail } from "lucide-react";
 import BrandWordmark from "./BrandWordmark";
 import { sendMagicLink } from "../lib/supabase";
+
+const SIGN_IN_COOLDOWN_SECONDS = 60;
+const AUTH_COOLDOWN_STORAGE_KEY = "shelvd-auth-email-cooldown-until";
+
+function getStoredCooldownUntil() {
+  const storedCooldown = window.localStorage.getItem(AUTH_COOLDOWN_STORAGE_KEY);
+  const cooldownUntil = Number(storedCooldown);
+  return Number.isFinite(cooldownUntil) ? cooldownUntil : 0;
+}
+
+function storeCooldown(until) {
+  window.localStorage.setItem(AUTH_COOLDOWN_STORAGE_KEY, String(until));
+}
+
+function getAuthErrorMessage(error) {
+  const rawMessage = error?.message || "";
+  const normalizedMessage = rawMessage.toLowerCase();
+
+  if (normalizedMessage.includes("rate limit")) {
+    return "Too many sign-in emails were requested. Please wait a minute and try again.";
+  }
+
+  if (normalizedMessage.includes("email address not authorized")) {
+    return "This email is not authorized for the current Supabase test project.";
+  }
+
+  return rawMessage || "Could not send the sign-in link.";
+}
 
 function AuthView() {
   const [email, setEmail] = useState("");
   const [sentEmail, setSentEmail] = useState("");
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState(getStoredCooldownUntil);
+  const [now, setNow] = useState(Date.now);
+
+  const cooldownRemaining = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+  const isSubmitDisabled = status === "loading" || cooldownRemaining > 0;
+
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [cooldownRemaining]);
+
+  function startCooldown() {
+    const nextCooldownUntil = Date.now() + SIGN_IN_COOLDOWN_SECONDS * 1000;
+    setCooldownUntil(nextCooldownUntil);
+    setNow(Date.now());
+    storeCooldown(nextCooldownUntil);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
     const cleanedEmail = email.trim();
-    if (!cleanedEmail || status === "loading") return;
+    if (!cleanedEmail || isSubmitDisabled) return;
 
     setStatus("loading");
     setMessage("");
+    startCooldown();
 
     try {
       await sendMagicLink(cleanedEmail);
@@ -23,7 +74,7 @@ function AuthView() {
       setSentEmail(cleanedEmail);
     } catch (error) {
       setStatus("error");
-      setMessage(error.message || "Could not send the sign-in link.");
+      setMessage(getAuthErrorMessage(error));
     }
   }
 
@@ -91,10 +142,14 @@ function AuthView() {
 
             <button
               className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-stone-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 dark:focus:ring-teal-950 dark:disabled:bg-stone-700 dark:disabled:text-stone-400"
-              disabled={status === "loading"}
+              disabled={isSubmitDisabled}
               type="submit"
             >
-              {status === "loading" ? "Sending..." : "Continue with email"}
+              {status === "loading"
+                ? "Sending..."
+                : cooldownRemaining > 0
+                  ? `Try again in ${cooldownRemaining}s`
+                  : "Continue with email"}
               <ArrowRight size={17} />
             </button>
 

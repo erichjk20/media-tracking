@@ -2,14 +2,13 @@ import { Library } from "lucide-react";
 import {
   bookSubtypeOptions,
   movieSubtypeOptions,
-  statuses,
-  statusLabels,
   tvSubtypeOptions,
 } from "../lib/mediaConfig";
 import { MediaItemCard, MediaPosterCard } from "./MediaCards";
 import {
   ShelfSearch,
   SortSelect,
+  StatusSegmentedControl,
   SubtypeFilter,
   ViewToggle,
 } from "./ShelfControls";
@@ -101,23 +100,12 @@ function LibraryView({
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
-          <div className="grid h-9 w-40 shrink-0 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-48">
-            {statuses.map((status) => (
-              <button
-                key={status}
-                className={`h-8 rounded px-2 text-xs font-semibold transition sm:px-3 ${
-                  activeStatus === status ? "bg-teal-700 text-white dark:bg-teal-700/80 dark:text-white" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
-                }`}
-                onClick={() => onActiveStatusChange(status)}
-                type="button"
-              >
-                <span>{statusLabels[status]}</span>
-                <span className={`ml-1 ${activeStatus === status ? "text-teal-100 dark:text-teal-100" : "text-stone-400 dark:text-stone-500"}`}>
-                  {activeShelfCounts?.[status] || 0}
-                </span>
-              </button>
-            ))}
-          </div>
+          <StatusSegmentedControl
+            activeStatus={activeStatus}
+            counts={activeShelfCounts}
+            onChange={onActiveStatusChange}
+            variant="shelf"
+          />
 
           <ShelfSearch query={query} onChange={onQueryChange} />
           <SortSelect sortOrder={sortOrder} onChange={onSortOrderChange} />

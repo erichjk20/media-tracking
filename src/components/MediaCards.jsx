@@ -1,38 +1,14 @@
 import { Check, Edit3, Trash2 } from "lucide-react";
 import {
-  getMovieTileMeta,
-  getTvTileMeta,
+  getCardCreatorLabel,
+  getItemTileMeta,
 } from "../lib/mediaUtils";
+import MediaCover from "./MediaCover";
 import Rating from "./Rating";
 
-function getCreatorLabel(item) {
-  if (item.category === "books") return item.author || item.creator || "Unknown author";
-  return "";
-}
-
-function getMangaVolumeFact(item) {
-  const count = Number(item.volumeCount);
-  if (!count) return "Unknown volumes";
-  return `${count} ${count === 1 ? "volume" : "volumes"}`;
-}
-
-function getMangaChapterFact(item) {
-  const count = Number(item.chapterCount);
-  if (!count) return "Unknown chapters";
-  return `${count} ${count === 1 ? "chapter" : "chapters"}`;
-}
-
-function getFactLabel(item, movieTileMeta, tvTileMeta) {
-  if (item.category === "books") return item.pageCount ? `${item.pageCount} pages` : "Unknown pages";
-  if (item.category === "manga") return `${getMangaVolumeFact(item)} • ${getMangaChapterFact(item)}`;
-  return movieTileMeta || tvTileMeta || "";
-}
-
 export function MediaItemCard({ item, onComplete, onDelete, onEdit, onOpen }) {
-  const movieTileMeta = getMovieTileMeta(item);
-  const tvTileMeta = getTvTileMeta(item);
-  const creatorLabel = getCreatorLabel(item);
-  const factLabel = getFactLabel(item, movieTileMeta, tvTileMeta);
+  const creatorLabel = getCardCreatorLabel(item);
+  const factLabel = getItemTileMeta(item);
   const canComplete = item.status === "Want to Watch/Read";
 
   return (
@@ -43,13 +19,12 @@ export function MediaItemCard({ item, onComplete, onDelete, onEdit, onOpen }) {
         type="button"
         aria-label={`Open ${item.title}`}
       >
-        {item.imageUrl ? (
-          <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
-        ) : (
-          <div className="cover-fallback flex h-full w-full items-end p-2 text-xs font-semibold text-white sm:p-4 sm:text-lg">
-            {item.title}
-          </div>
-        )}
+        <MediaCover
+          className="flex h-full w-full items-end p-2 text-xs font-semibold text-white sm:p-4 sm:text-lg"
+          imageClassName="h-full w-full object-cover"
+          src={item.imageUrl}
+          title={item.title}
+        />
       </button>
       <div className="min-w-0 p-3 sm:p-4">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -103,10 +78,8 @@ export function MediaItemCard({ item, onComplete, onDelete, onEdit, onOpen }) {
 }
 
 export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) {
-  const movieTileMeta = getMovieTileMeta(item);
-  const tvTileMeta = getTvTileMeta(item);
-  const creatorLabel = getCreatorLabel(item);
-  const factLabel = getFactLabel(item, movieTileMeta, tvTileMeta);
+  const creatorLabel = getCardCreatorLabel(item);
+  const factLabel = getItemTileMeta(item);
   const canComplete = item.status === "Want to Watch/Read";
 
   return (
@@ -118,17 +91,12 @@ export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) 
         aria-label={`Open ${item.title}`}
       >
         <div className="aspect-[2/3] overflow-hidden bg-stone-200 dark:bg-stone-800">
-          {item.imageUrl ? (
-            <img
-              className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-              src={item.imageUrl}
-              alt={`${item.title} cover`}
-            />
-          ) : (
-            <div className="cover-fallback flex h-full w-full items-end p-2 text-xs font-semibold text-white">
-              {item.title}
-            </div>
-          )}
+          <MediaCover
+            className="flex h-full w-full items-end p-2 text-xs font-semibold text-white"
+            imageClassName="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            src={item.imageUrl}
+            title={item.title}
+          />
         </div>
       </button>
 

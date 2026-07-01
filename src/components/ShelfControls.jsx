@@ -1,6 +1,53 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, LayoutGrid, List as ListIcon, Search } from "lucide-react";
-import { sortOptions } from "../lib/mediaConfig";
+import { sortOptions, statuses, statusLabels } from "../lib/mediaConfig";
+
+export function StatusSegmentedControl({
+  activeStatus,
+  className = "",
+  counts,
+  onChange,
+  variant = "default",
+}) {
+  const containerClassName =
+    variant === "shelf"
+      ? "grid h-9 w-40 shrink-0 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-48"
+      : "grid grid-cols-2 rounded-md border border-stone-300 bg-stone-50 p-0.5 dark:border-stone-700 dark:bg-stone-950 md:w-32";
+  const activeClassName =
+    variant === "shelf"
+      ? "bg-teal-700 text-white dark:bg-teal-700/80 dark:text-white"
+      : "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950";
+  const inactiveClassName =
+    variant === "shelf"
+      ? "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
+      : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800";
+
+  return (
+    <div className={`${containerClassName} ${className}`.trim()}>
+      {statuses.map((status) => {
+        const isActive = activeStatus === status;
+
+        return (
+          <button
+            key={status}
+            className={`h-8 rounded px-2 text-xs font-semibold transition ${variant === "shelf" ? "sm:px-3" : ""} ${
+              isActive ? activeClassName : inactiveClassName
+            }`}
+            onClick={() => onChange(status)}
+            type="button"
+          >
+            <span>{statusLabels[status]}</span>
+            {counts && (
+              <span className={`ml-1 ${isActive ? "text-teal-100 dark:text-teal-100" : "text-stone-400 dark:text-stone-500"}`}>
+                {counts[status] || 0}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function ShelfSearch({ query, onChange }) {
   const [isExpanded, setIsExpanded] = useState(Boolean(query));

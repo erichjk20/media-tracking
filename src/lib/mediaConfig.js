@@ -12,7 +12,7 @@ import {
 export const categories = [
   { id: "books", label: "Books", creatorLabel: "Author", action: "Read", icon: BookOpen },
   { id: "movies", label: "Movies", creatorLabel: "Director", action: "Watch", icon: Clapperboard },
-  { id: "tv", label: "TV / Anime", creatorLabel: "Studio / Creator", action: "Watch", icon: Tv },
+  { id: "tv", label: "TV Shows", creatorLabel: "Studio / Creator", action: "Watch", icon: Tv },
   { id: "manga", label: "Manga", creatorLabel: "Author / Artist", action: "Read", icon: PanelsTopLeft },
 ];
 
@@ -34,14 +34,14 @@ export const openLibraryCanonicalBookLanguage = "en";
 export const movieSubtypeOptions = [
   { value: "all", label: "All" },
   { value: "movie", label: "General" },
-  { value: "anime-movie", label: "Anime" },
-  { value: "korean-movie", label: "Korean" },
+  { value: "anime-movie", label: "Anime", formLabel: "Anime movie" },
+  { value: "korean-movie", label: "Korean", formLabel: "Korean movie" },
 ];
 
 export const bookSubtypeOptions = [
   { value: "all", label: "All" },
   { value: "book", label: "General" },
-  { value: "korean-book", label: "Korean" },
+  { value: "korean-book", label: "Korean", formLabel: "Korean book" },
 ];
 
 export const tvSubtypeOptions = [
@@ -59,6 +59,10 @@ export const defaultItems = [
     status: "Completed",
     title: "Piranesi",
     creator: "Susanna Clarke",
+    author: "Susanna Clarke",
+    pageCount: 245,
+    publisher: "Bloomsbury Publishing",
+    isbn: "9781635575637",
     rating: 5,
     synopsis: "A man living in an endless house of halls and tides records its wonders while slowly uncovering the truth of who he is and how he arrived there.",
     notes: "",
@@ -73,7 +77,7 @@ export const defaultItems = [
     title: "Arrival",
     creator: "Denis Villeneuve",
     director: "Denis Villeneuve",
-    genre: "Drama, Sci-Fi",
+    genre: "Drama, Mystery, Sci-Fi",
     releaseYear: 2016,
     durationMinutes: 116,
     rating: 5,
@@ -88,6 +92,12 @@ export const defaultItems = [
     status: "Want to Watch/Read",
     title: "Severance",
     creator: "Dan Erickson",
+    genre: "Sci-Fi, Psychological Thriller",
+    releaseYear: 2022,
+    seasonCount: 2,
+    episodeCount: 19,
+    durationMinutesPerEpisode: 50,
+    studio: "Red Hour Productions, Fifth Season",
     rating: 0,
     synopsis: "Employees at Lumon Industries undergo a procedure that splits work memories from personal memories, exposing a strange corporate world beneath the office routine.",
     notes: "",
@@ -100,7 +110,13 @@ export const defaultItems = [
     subtype: "anime",
     status: "Completed",
     title: "Frieren: Beyond Journey's End",
-    creator: "Madhouse",
+    creator: "Kanehito Yamada, Tsukasa Abe",
+    genre: "Adventure, Drama, Fantasy",
+    releaseYear: 2023,
+    seasonCount: 2,
+    episodeCount: 38,
+    durationMinutesPerEpisode: 24,
+    studio: "Madhouse",
     rating: 5,
     synopsis: "An elf mage reflects on time, grief, and companionship as she retraces the journey she once shared with the heroes who defeated the Demon King.",
     notes: "",
@@ -113,6 +129,10 @@ export const defaultItems = [
     status: "Want to Watch/Read",
     title: "Witch Hat Atelier",
     creator: "Kamome Shirahama",
+    author: "Kamome Shirahama",
+    artist: "Kamome Shirahama",
+    volumeCount: 16,
+    chapterCount: 97,
     rating: 0,
     synopsis: "A young girl who dreams of magic discovers a hidden world of spells and apprenticeships after a forbidden act changes her life.",
     notes: "",

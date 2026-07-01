@@ -6,6 +6,7 @@ import {
   getLookupResultTitle,
   rankLookupResults,
 } from "../lib/mediaUtils";
+import MediaCover from "./MediaCover";
 
 function DetailsLookup({
   bookLanguage,
@@ -108,11 +109,12 @@ function DetailsLookup({
                   onClick={() => onApply(lookupResult)}
                   type="button"
                 >
-                  {imageUrl ? (
-                    <img className="h-14 w-10 rounded object-cover" src={imageUrl} alt={`${title} cover`} />
-                  ) : (
-                    <div className="cover-fallback h-14 w-10 rounded" />
-                  )}
+                  <MediaCover
+                    className="h-14 w-10 rounded"
+                    imageClassName="h-14 w-10 rounded object-cover"
+                    src={imageUrl}
+                    title={title}
+                  />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-stone-950 dark:text-stone-100">{title}</span>
                     <span className="mt-1 block truncate text-xs text-stone-600 dark:text-stone-400">{getLookupResultMeta(lookupResult)}</span>

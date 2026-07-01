@@ -18,46 +18,29 @@ import {
 } from "lucide-react";
 import { categories, statusLabels } from "../lib/mediaConfig";
 import {
-  getMovieTileMeta,
+  formatCount,
+  formatDuration,
+  getCreatorRole,
+  getPrimaryCreator,
   getSubtypeLabel,
-  getTvTileMeta,
 } from "../lib/mediaUtils";
+import MediaCover from "./MediaCover";
 import Rating from "./Rating";
 
-function formatDuration(value) {
-  const minutes = Number(value);
-  if (!minutes) return "";
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (!hours) return `${remainingMinutes} min`;
-  return remainingMinutes ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
-}
-
-function formatCount(value, singular, plural = `${singular}s`) {
-  const count = Number(value);
-  if (!count) return "";
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function getPrimaryCreator(item) {
-  if (item.category === "books") return item.author || item.creator || "";
-  if (item.category === "movies") return item.director || item.creator || "";
-  if (item.category === "tv") return item.creator || item.studio || "";
-  if (item.category === "manga") return item.author || item.creator || item.artist || "";
-  return item.creator || "";
-}
-
-function getCreatorLabel(item) {
-  if (item.category === "books") return "Author";
-  if (item.category === "movies") return "Director";
-  if (item.category === "tv") return "Creator";
-  if (item.category === "manga") return "Author";
-  return "Creator";
-}
-
 function getHeaderMeta(item) {
-  if (item.category === "movies") return getMovieTileMeta(item);
-  if (item.category === "tv") return getTvTileMeta(item);
+  if (item.category === "movies") {
+    return [
+      item.releaseYear,
+      formatDuration(item.durationMinutes),
+    ].filter(Boolean).join(" • ");
+  }
+  if (item.category === "tv") {
+    return [
+      item.releaseYear,
+      formatCount(item.seasonCount, "season"),
+      formatCount(item.episodeCount, "episode"),
+    ].filter(Boolean).join(" • ");
+  }
   if (item.category === "books" && item.pageCount) return `${item.pageCount} pages`;
   if (item.category === "manga") {
     return [
@@ -70,7 +53,7 @@ function getHeaderMeta(item) {
 
 function getDetailRows(item) {
   const rows = [
-    { label: getCreatorLabel(item), value: getPrimaryCreator(item), icon: UserRound },
+    { label: getCreatorRole(item), value: getPrimaryCreator(item), icon: UserRound },
   ];
 
   if (item.category === "books") {
@@ -129,13 +112,12 @@ function getLabeledDetailValue(notes, label) {
 function CoverArt({ item }) {
   return (
     <div className="media-detail-cover relative overflow-hidden rounded bg-stone-200 dark:bg-stone-800">
-      {item.imageUrl ? (
-        <img className="h-full w-full object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
-      ) : (
-        <div className="cover-fallback flex h-full w-full items-end p-5 text-2xl font-semibold leading-tight text-white">
-          {item.title}
-        </div>
-      )}
+      <MediaCover
+        className="flex h-full w-full items-end p-5 text-2xl font-semibold leading-tight text-white"
+        imageClassName="h-full w-full object-cover"
+        src={item.imageUrl}
+        title={item.title}
+      />
     </div>
   );
 }

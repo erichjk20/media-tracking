@@ -1,6 +1,7 @@
 import {
   bookSubtypeOptions,
   defaultItems,
+  emptyDraft,
   movieSubtypeOptions,
   openLibraryCanonicalBookLanguage,
   tvSubtypeOptions,
@@ -28,26 +29,27 @@ export function normalizeItems(items) {
   return items.map((item) => {
     const category = item.category === "anime" ? "tv" : item.category;
     const subtype = item.category === "anime" ? "anime" : item.subtype;
+    const defaultItem = defaultItems.find((previewItem) => previewItem.id === item.id) || {};
 
     return {
       ...item,
       category,
-      director: item.director || (category === "movies" ? item.creator || "" : ""),
-      genre: item.genre || "",
-      releaseYear: item.releaseYear || "",
-      durationMinutes: item.durationMinutes || "",
-      pageCount: item.pageCount || "",
-      publisher: item.publisher || "",
-      isbn: item.isbn || "",
-      author: item.author || (category === "manga" ? item.creator || "" : ""),
-      artist: item.artist || "",
-      volumeCount: item.volumeCount || "",
-      chapterCount: item.chapterCount || "",
-      seasonCount: item.seasonCount || "",
-      episodeCount: item.episodeCount || "",
-      durationMinutesPerEpisode: item.durationMinutesPerEpisode || "",
-      studio: item.studio || "",
-      synopsis: item.synopsis || "",
+      director: item.director || defaultItem.director || (category === "movies" ? item.creator || "" : ""),
+      genre: item.genre || defaultItem.genre || "",
+      releaseYear: item.releaseYear || defaultItem.releaseYear || "",
+      durationMinutes: item.durationMinutes || defaultItem.durationMinutes || "",
+      pageCount: item.pageCount || defaultItem.pageCount || "",
+      publisher: item.publisher || defaultItem.publisher || "",
+      isbn: item.isbn || defaultItem.isbn || "",
+      author: item.author || defaultItem.author || (category === "manga" ? item.creator || "" : ""),
+      artist: item.artist || defaultItem.artist || "",
+      volumeCount: item.volumeCount || defaultItem.volumeCount || "",
+      chapterCount: item.chapterCount || defaultItem.chapterCount || "",
+      seasonCount: item.seasonCount || defaultItem.seasonCount || "",
+      episodeCount: item.episodeCount || defaultItem.episodeCount || "",
+      durationMinutesPerEpisode: item.durationMinutesPerEpisode || defaultItem.durationMinutesPerEpisode || "",
+      studio: item.studio || defaultItem.studio || "",
+      synopsis: item.synopsis || defaultItem.synopsis || "",
       subtype: getDefaultSubtype(category, subtype),
     };
   });
@@ -62,6 +64,22 @@ export function getDefaultSubtype(category, subtype = "") {
 
 export function getSelectableSubtype(category, subtype = "") {
   return subtype && subtype !== "all" ? getDefaultSubtype(category, subtype) : getDefaultSubtype(category);
+}
+
+export function createMediaDraft({
+  category = emptyDraft.category,
+  status = emptyDraft.status,
+  subtype = "",
+  title = "",
+} = {}) {
+  return {
+    ...emptyDraft,
+    category,
+    subtype: getSelectableSubtype(category, subtype),
+    status,
+    title,
+    rating: status === "Completed" ? 3 : 0,
+  };
 }
 
 export function compareShelfItems(a, b, sortOrder) {
@@ -337,18 +355,6 @@ function getTvReleaseYear(item) {
   return item.releaseYear || getLabeledNoteValue(item.notes, "Year");
 }
 
-function formatSeasonCount(value) {
-  const count = Number(value);
-  if (!count) return "";
-  return `${count} ${count === 1 ? "season" : "seasons"}`;
-}
-
-function formatEpisodeCount(value) {
-  const count = Number(value);
-  if (!count) return "";
-  return `${count} eps`;
-}
-
 export function getLabeledNoteValue(notes, label) {
   const match = String(notes || "").match(new RegExp(`(?:^|\\n)${label}:\\s*(.+)`, "i"));
   return match?.[1]?.trim() || "";
@@ -358,6 +364,70 @@ export function getBookTileMeta(item) {
   if (item.category !== "books" || !item.pageCount) return "";
 
   return `${item.pageCount} pages`;
+}
+
+export function getMangaTileMeta(item) {
+  if (item.category !== "manga") return "";
+
+  return [
+    formatCount(item.volumeCount, "volume") || "Unknown volumes",
+    formatCount(item.chapterCount, "chapter") || "Unknown chapters",
+  ].join(" • ");
+}
+
+export function getItemTileMeta(item) {
+  if (item.category === "books") return getBookTileMeta(item) || "Unknown pages";
+  if (item.category === "manga") return getMangaTileMeta(item);
+  return getMovieTileMeta(item) || getTvTileMeta(item) || "";
+}
+
+export function getPrimaryCreator(item) {
+  if (item.category === "books") return item.author || item.creator || "";
+  if (item.category === "movies") return item.director || item.creator || "";
+  if (item.category === "tv") return item.creator || item.studio || "";
+  if (item.category === "manga") return item.author || item.creator || item.artist || "";
+  return item.creator || "";
+}
+
+export function getCreatorRole(item) {
+  if (item.category === "books") return "Author";
+  if (item.category === "movies") return "Director";
+  if (item.category === "tv") return "Creator";
+  if (item.category === "manga") return "Author";
+  return "Creator";
+}
+
+export function getCardCreatorLabel(item) {
+  if (item.category === "books" || item.category === "manga") {
+    return getPrimaryCreator(item) || "Unknown author";
+  }
+
+  return getPrimaryCreator(item);
+}
+
+export function formatCount(value, singular, plural = `${singular}s`) {
+  const count = Number(value);
+  if (!count) return "";
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function formatSeasonCount(value) {
+  return formatCount(value, "season");
+}
+
+function formatEpisodeCount(value) {
+  const count = Number(value);
+  if (!count) return "";
+  return `${count} eps`;
+}
+
+export function formatDuration(value) {
+  const minutes = Number(value);
+  if (!minutes) return "";
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (!hours) return `${remainingMinutes} min`;
+  return remainingMinutes ? `${hours} hr ${remainingMinutes} min` : `${hours} hr`;
 }
 
 function formatCompactDurationMinutes(value) {

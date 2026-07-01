@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Library, Search } from "lucide-react";
-import { categories, statuses, statusLabels } from "../lib/mediaConfig";
+import { categories, statusLabels } from "../lib/mediaConfig";
+import MediaCover from "./MediaCover";
+import { StatusSegmentedControl } from "./ShelfControls";
 
 function HomeView({ items, onOpenItem, onStartLookup }) {
   const [homeQuery, setHomeQuery] = useState("");
@@ -36,7 +38,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
             return (
               <button
                 key={entry.id}
-                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition ${
+                className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
                   isSelected
                     ? "border-stone-950 bg-stone-950 text-white shadow-sm dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
                     : "border-stone-300 bg-white text-stone-700 hover:border-teal-700 hover:text-teal-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-teal-500 dark:hover:text-teal-300"
@@ -47,6 +49,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                 title={entry.label}
               >
                 <Icon size={17} />
+                <span>{entry.label}</span>
               </button>
             );
           })}
@@ -69,20 +72,10 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
               />
             </label>
 
-            <div className="grid grid-cols-2 rounded-md border border-stone-300 bg-stone-50 p-0.5 dark:border-stone-700 dark:bg-stone-950 md:w-32">
-              {statuses.map((status) => (
-                <button
-                  key={status}
-                  className={`h-8 rounded px-2 text-xs font-semibold transition ${
-                    selectedStatus === status ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
-                  }`}
-                  onClick={() => setSelectedStatus(status)}
-                  type="button"
-                >
-                  {statusLabels[status]}
-                </button>
-              ))}
-            </div>
+            <StatusSegmentedControl
+              activeStatus={selectedStatus}
+              onChange={setSelectedStatus}
+            />
 
             <button
               className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-teal-600 dark:hover:bg-teal-500 dark:focus:ring-teal-950 dark:disabled:bg-stone-700"
@@ -110,11 +103,12 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                     type="button"
                     aria-label={`Open ${item.title}`}
                   >
-                    {item.imageUrl ? (
-                      <img className="h-16 w-11 rounded object-cover" src={item.imageUrl} alt={`${item.title} cover`} />
-                    ) : (
-                      <div className="cover-fallback h-16 w-11 rounded" />
-                    )}
+                    <MediaCover
+                      className="h-16 w-11 rounded"
+                      imageClassName="h-16 w-11 rounded object-cover"
+                      src={item.imageUrl}
+                      title={item.title}
+                    />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-stone-950 dark:text-stone-100">{item.title}</p>
                       <p className="mt-1 truncate text-xs text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>
@@ -122,7 +116,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                     </div>
                     <span className="inline-flex h-8 items-center gap-1 rounded bg-teal-50 px-2 text-[11px] font-semibold text-teal-800 ring-1 ring-teal-100 dark:bg-teal-950/50 dark:text-teal-200 dark:ring-teal-900">
                       <Icon size={13} />
-                      {itemCategory?.id === "tv" ? "TV/Anime" : itemCategory?.label || "Media"}
+                      {itemCategory?.label || "Media"}
                     </span>
                   </button>
                 );

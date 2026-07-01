@@ -10,10 +10,10 @@ The app tracks exactly four top-level media categories:
 
 - Books
 - Movies
-- TV / Anime
+- TV Shows
 - Manga
 
-Anime series are tracked inside the TV / Anime category with an Anime subtype. Anime movies stay inside Movies with an Anime Movie subtype.
+Anime series are tracked inside the TV Shows category with an Anime subtype. Anime movies stay inside Movies with an Anime Movie subtype.
 
 Each category has exactly two shelves:
 
@@ -50,12 +50,11 @@ The main app supports:
 - Homepage search prefill that opens the add sheet and runs the same unified lookup flow
 - Synopsis population from supported lookup providers
 - A physical media detail overlay that opens on the cover and flips to a same-size back cover with synopsis, facts, and notes
-- OMDb lookup behind the unified search for Movies and TV / Anime
-- TMDb lookup behind the unified search for Movies and TV / Anime
+- OMDb lookup behind the unified search for Movies and TV Shows
+- TMDb lookup behind the unified search for Movies and TV Shows
 - Open Library and Aladin lookup behind the unified search for Books
 - Jikan lookup behind the unified search for Manga
 - Per-category counts
-- A homepage library snapshot broken down by category and shelf
 - A recently added homepage section with media type tags
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
@@ -70,7 +69,7 @@ The main app supports:
 - Tailwind CSS 3
 - ESLint flat config for React, Hooks, and Vite React Refresh checks
 - lucide-react for icons
-- OMDb API for movie and TV / Anime lookup
+- OMDb API for movie and TV Shows lookup
 - Open Library API for book lookup
 - Aladin API for Korean book lookup
 - Jikan API for manga lookup
@@ -101,6 +100,7 @@ Tracked/source files:
     │   ├── AuthView.jsx
     │   ├── BottomNav.jsx
     │   ├── BrandWordmark.jsx
+    │   ├── ConfirmDialog.jsx
     │   ├── CompleteItemDialog.jsx
     │   ├── DeleteItemDialog.jsx
     │   ├── DetailsLookup.jsx
@@ -108,9 +108,13 @@ Tracked/source files:
     │   ├── HomeView.jsx
     │   ├── LibraryView.jsx
     │   ├── MediaCards.jsx
+    │   ├── MediaCover.jsx
     │   ├── MediaDetailOverlay.jsx
     │   ├── Rating.jsx
     │   └── ShelfControls.jsx
+    ├── hooks
+    │   ├── useMediaLookup.js
+    │   └── useShelfData.js
     ├── index.css
     ├── lib
     │   ├── mediaConfig.js
@@ -134,8 +138,16 @@ Both are ignored by Git.
 
 `src/App.jsx`
 
-- Coordinates top-level app state, auth/session loading, storage mode, view switching, item CRUD behavior, filtering, and add/edit form handling.
+- Coordinates top-level app state, auth/session loading, storage mode, view switching, item CRUD behavior, and add/edit form handling.
 - Loads and saves signed-in media items through Supabase, or uses localStorage only when Supabase is not configured.
+
+`src/hooks/useMediaLookup.js`
+
+- Owns unified add/edit lookup state, provider searching, lookup result application, and homepage lookup handoff.
+
+`src/hooks/useShelfData.js`
+
+- Derives visible shelf items, category counts, subtype counts, and active shelf counts from app state.
 
 `src/components/`
 
@@ -150,6 +162,7 @@ Both are ignored by Git.
 `src/lib/mediaLookup.js`
 
 - Owns external lookup provider selection, API requests, result normalization, and item patch creation for OMDb, TMDb, Open Library, Aladin, and Jikan.
+- Routes Movies and TV Shows, including Anime subtype entries, through TMDb.
 
 `src/lib/mediaUtils.js`
 
@@ -263,28 +276,29 @@ Existing personal rows must be claimed after your auth user exists. Sign in once
 
 ## OMDb Integration
 
-Movies and TV / Anime include OMDb results in the unified add/edit lookup.
+Movies and TV Shows include OMDb results in the unified add/edit lookup.
 
 The lookup:
 
 - Searches OMDb by title with `s`.
-- Restricts results to `type=movie` for Movies and `type=series` for TV / Anime.
-- Uses the Anime subtype under TV / Anime for anime series.
+- Restricts results to `type=movie` for Movies and `type=series` for TV Shows.
+- Uses the Anime subtype under TV Shows for anime series.
 - Fetches selected result details by IMDb id with `i`.
 - Fills title, creator/director, poster URL, and notes with relevant OMDb metadata.
 - Leaves the user's personal 1-5 star rating separate from OMDb's IMDb score.
 
-## TMDb Korean Lookup
+## TMDb Movie And TV Lookup
 
-Movies and TV / Anime include TMDb-powered Korean media results in the unified add/edit lookup.
+Movies and TV Shows use TMDb as the primary unified add/edit lookup provider. Anime series stay in TV Shows with the Anime subtype, but use TMDb lookup so seasons are grouped under one show-level library item instead of being logged as separate season entries.
 
 The lookup:
 
 - Accepts English or Korean search text.
 - Searches TMDb movie results for Movies.
-- Searches TMDb TV results for TV / Anime.
+- Searches TMDb TV results for TV Shows.
+- Uses TMDb TV results for Anime subtype entries.
 - Supports English or Korean result language display.
-- Fills title, creator/director, poster URL, and notes with TMDb metadata.
+- Fills title, creator/director, poster URL, synopsis, and available runtime/count metadata from TMDb.
 - Automatically marks Korean movie results as `korean-movie` when TMDb country data includes `KR`.
 - Automatically marks Korean TV results as `kdrama` when TMDb origin country data includes `KR`.
 
@@ -308,7 +322,7 @@ Movies support a lightweight `subtype` field:
 - `anime-movie`
 - `korean-movie`
 
-TV / Anime supports a lightweight `subtype` field:
+The TV Shows category supports a lightweight `subtype` field:
 
 - `tv`
 - `anime`
@@ -316,7 +330,7 @@ TV / Anime supports a lightweight `subtype` field:
 
 Existing saved book items without a subtype are normalized to `book` at load time. Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
 
-The Books shelf includes an `All / General / Korean` filter. The Movies shelf includes an `All / General / Anime / Korean` filter. The TV / Anime shelf includes an `All / General / Anime / Korean` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, and anime series and K-Dramas stay under TV / Anime.
+The Books shelf includes an `All / General / Korean` filter. The Movies shelf includes an `All / General / Anime / Korean` filter. The TV Shows shelf includes an `All / General / Anime / Korean` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, and anime series and K-Dramas stay under TV Shows.
 
 The local API key is read from:
 
@@ -366,7 +380,7 @@ The lookup:
 
 - Searches manga by title via `https://api.jikan.moe/v4/manga`.
 - Does not require a local API key.
-- Fills title, author/artist, cover image URL, and notes with volume/chapter counts from Jikan.
+- Fills title, author/artist, cover image URL, synopsis, and available volume/chapter fields from Jikan.
 - Uses safe-for-work search results.
 - Saves title and author/artist exactly as normalized from the API response.
 
@@ -389,7 +403,7 @@ The lookup:
 - Delete actions use a confirmation dialog before removing an item.
 - The display label adapts to category intent:
   - Books and Manga use "Want to Read"
-  - Movies and TV / Anime use "Want to Watch"
+  - Movies and TV Shows use "Want to Watch"
 - The stored status value remains the exact shared value: `Want to Watch/Read`.
 
 ## Current Git State Notes
@@ -403,7 +417,7 @@ At the time this context file was created, the app files are newly added and may
 - Add import/export JSON for backups.
 - Add sorting controls, such as rating, title, or recently added.
 - Add validation or image preview error handling for broken cover URLs.
-- Split `src/App.jsx` into smaller components if the app grows.
+- Keep extracting focused hooks/components from `src/App.jsx` as new workflows grow.
 - Add tests with Vitest and React Testing Library.
 - Add email/password login as an optional Supabase Auth method if users need a more conventional sign-in path.
 - Add a future `media_titles` table if shared canonical media metadata, global stats, or recommendations become product priorities.

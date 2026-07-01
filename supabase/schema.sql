@@ -1,3 +1,6 @@
+-- User Profiles
+-- Creates one profile row per Supabase Auth user and keeps the profile email in sync.
+
 create table if not exists public.user_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -34,6 +37,9 @@ drop trigger if exists on_auth_user_created_profile on auth.users;
 create trigger on_auth_user_created_profile
 after insert on auth.users
 for each row execute function public.handle_new_user_profile();
+
+-- Core Library Table
+-- Stores fields shared by every tracked media item.
 
 create table if not exists public.library_items (
   id uuid primary key default gen_random_uuid(),
@@ -92,6 +98,9 @@ drop constraint if exists library_items_duration_minutes_check;
 alter table public.library_items
 add constraint library_items_duration_minutes_check
 check (duration_minutes is null or duration_minutes > 0);
+
+-- Category Detail Tables
+-- Stores category-specific facts separately from the shared library item row.
 
 create table if not exists public.movie_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
@@ -165,6 +174,9 @@ add column if not exists tv_show_title text;
 
 alter table public.tv_details
 add column if not exists studio text;
+
+-- Existing Data Backfills
+-- Pulls structured detail fields out of legacy notes and shared columns.
 
 insert into public.movie_details (
   library_item_id,
@@ -273,6 +285,9 @@ set
   duration_minutes_per_episode = excluded.duration_minutes_per_episode,
   updated_at = now();
 
+-- Legacy Anime Migration
+-- Moves old top-level anime rows into TV Shows with the anime subtype.
+
 do $$
 begin
   if to_regclass('public.anime_details') is not null then
@@ -353,6 +368,9 @@ check (category in ('books', 'movies', 'tv', 'manga'));
 
 drop table if exists public.anime_details;
 
+-- Indexes
+-- Speeds up common shelf filters, title search, and detail lookups.
+
 create index if not exists library_items_category_status_idx
 on public.library_items (category, status);
 
@@ -373,6 +391,9 @@ on public.book_details (isbn);
 
 create index if not exists manga_details_author_idx
 on public.manga_details (lower(author));
+
+-- Read-Only Detail Views
+-- Makes category detail tables easier to inspect in Supabase.
 
 create or replace view public.movie_details_view
 with (security_invoker = true) as
@@ -425,6 +446,9 @@ select
   updated_at
 from public.tv_details;
 
+-- Ownership Constraint Finalization
+-- Makes user_id required once legacy unowned rows have been claimed.
+
 do $$
 begin
   if not exists (select 1 from public.library_items where user_id is null) then
@@ -432,12 +456,18 @@ begin
   end if;
 end $$;
 
+-- Row Level Security
+-- Enables RLS on all user-owned tables before policies are defined.
+
 alter table public.user_profiles enable row level security;
 alter table public.library_items enable row level security;
 alter table public.movie_details enable row level security;
 alter table public.book_details enable row level security;
 alter table public.manga_details enable row level security;
 alter table public.tv_details enable row level security;
+
+-- Profile Policies
+-- Users can only read and write their own profile row.
 
 drop policy if exists "Users can view their own profile" on public.user_profiles;
 drop policy if exists "Users can insert their own profile" on public.user_profiles;
@@ -458,6 +488,9 @@ on public.user_profiles for update
 to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
+
+-- Library Item Policies
+-- Users can only access library rows owned by their auth user id.
 
 drop policy if exists "Users can view their own library items" on public.library_items;
 drop policy if exists "Users can insert their own library items" on public.library_items;
@@ -484,6 +517,9 @@ create policy "Users can delete their own library items"
 on public.library_items for delete
 to authenticated
 using (user_id = auth.uid());
+
+-- Movie Detail Policies
+-- Detail rows inherit ownership from their parent library item.
 
 drop policy if exists "Users can view their own movie details" on public.movie_details;
 drop policy if exists "Users can insert their own movie details" on public.movie_details;
@@ -531,6 +567,9 @@ using (exists (
     and library_items.user_id = auth.uid()
 ));
 
+-- Book Detail Policies
+-- Detail rows inherit ownership from their parent library item.
+
 drop policy if exists "Users can view their own book details" on public.book_details;
 drop policy if exists "Users can insert their own book details" on public.book_details;
 drop policy if exists "Users can update their own book details" on public.book_details;
@@ -576,6 +615,9 @@ using (exists (
   where library_items.id = book_details.library_item_id
     and library_items.user_id = auth.uid()
 ));
+
+-- Manga Detail Policies
+-- Detail rows inherit ownership from their parent library item.
 
 drop policy if exists "Users can view their own manga details" on public.manga_details;
 drop policy if exists "Users can insert their own manga details" on public.manga_details;
@@ -623,6 +665,9 @@ using (exists (
     and library_items.user_id = auth.uid()
 ));
 
+-- TV Detail Policies
+-- Detail rows inherit ownership from their parent library item.
+
 drop policy if exists "Users can view their own tv details" on public.tv_details;
 drop policy if exists "Users can insert their own tv details" on public.tv_details;
 drop policy if exists "Users can update their own tv details" on public.tv_details;
@@ -669,6 +714,9 @@ using (exists (
     and library_items.user_id = auth.uid()
 ));
 
+-- Grants
+-- Blocks anonymous table access and grants authenticated users access through RLS.
+
 grant usage on schema public to anon, authenticated;
 revoke select, insert, update, delete on public.user_profiles from anon;
 revoke select, insert, update, delete on public.library_items from anon;
@@ -691,6 +739,7 @@ grant select on public.book_details_view to authenticated;
 grant select on public.manga_details_view to authenticated;
 grant select on public.tv_details_view to authenticated;
 
+-- Manual Legacy Data Claim
 -- Existing personal data migration:
 -- 1. Sign in once with your email so a Supabase auth.users row exists.
 -- 2. Replace the email below and run it once to claim the current unowned library rows.

@@ -13,8 +13,6 @@ function EditorSheet({
   activeStatus,
   bookLanguage,
   canUseBookLookup,
-  canUseMangaLookup,
-  canUseOmdb,
   canUseTmdb,
   category,
   draft,
@@ -36,7 +34,8 @@ function EditorSheet({
   setActiveStatus,
   tmdbLanguage,
 }) {
-  const canLookupDetails = canUseBookLookup || canUseMangaLookup || canUseOmdb || canUseTmdb;
+  const canLookupDetails = lookupProviders.length > 0;
+  const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
 
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 dark:bg-black/70 sm:items-center sm:justify-center">
@@ -61,7 +60,7 @@ function EditorSheet({
           {canLookupDetails && (
             <DetailsLookup
               bookLanguage={bookLanguage}
-              categoryLabel={category.label}
+              categoryLabel={lookupCategoryLabel}
               canUseBookLookup={canUseBookLookup}
               canUseTmdb={canUseTmdb}
               lookupProviders={lookupProviders}
@@ -144,11 +143,7 @@ function EditorSheet({
                   .filter((option) => option.value !== "all")
                   .map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.value === "anime-movie"
-                        ? "Anime movie"
-                        : option.value === "korean-movie"
-                          ? "Korean movie"
-                          : "General"}
+                      {option.formLabel || option.label}
                     </option>
                   ))}
               </select>
@@ -166,7 +161,7 @@ function EditorSheet({
                   .filter((option) => option.value !== "all")
                   .map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.value === "korean-book" ? "Korean book" : "General"}
+                      {option.formLabel || option.label}
                     </option>
                   ))}
               </select>
@@ -184,7 +179,7 @@ function EditorSheet({
                   .filter((option) => option.value !== "all")
                   .map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.value === "anime" ? "Anime" : option.value === "kdrama" ? "Korean" : "General"}
+                      {option.formLabel || option.label}
                     </option>
                   ))}
               </select>

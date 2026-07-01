@@ -10,7 +10,7 @@ function BrandWordmark({ animateBook = false, onClick }) {
         <span>she</span>
         <span
           aria-hidden="true"
-          className={`mx-0.5 inline-block origin-bottom rounded-[0.14em] bg-teal-700 px-[0.08em] text-[#fafbf8] shadow-sm dark:bg-teal-500 dark:text-stone-950 ${
+          className={`mx-0.5 inline-block origin-center rounded-[0.12em] bg-teal-700 px-[0.045em] font-medium text-[#fafbf8] shadow-sm dark:bg-teal-500 dark:text-stone-950 ${
             animateBook ? "brand-book-tilt" : "-rotate-6"
           }`}
         >

@@ -41,7 +41,7 @@ function BottomNav({ activeCategory, onAddItem, onShowCategory }) {
               type="button"
             >
               <Icon size={18} />
-              <span className="max-w-full truncate">{entry.id === "tv" ? "TV/Anime" : entry.label}</span>
+              <span className="max-w-full truncate">{entry.label}</span>
             </button>
           );
         })}

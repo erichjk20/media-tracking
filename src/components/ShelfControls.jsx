@@ -11,16 +11,16 @@ export function StatusSegmentedControl({
 }) {
   const containerClassName =
     variant === "shelf"
-      ? "grid h-9 w-40 shrink-0 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900 sm:w-48"
-      : "grid grid-cols-2 rounded-md border border-stone-300 bg-stone-50 p-0.5 dark:border-stone-700 dark:bg-stone-950 md:w-32";
+      ? "grid h-9 w-40 shrink-0 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-white/10 dark:bg-[#181715] sm:w-48"
+      : "grid h-9 grid-cols-2 rounded-md border border-stone-300 bg-stone-50 p-0.5 dark:border-white/10 dark:bg-[#12110f] md:w-32";
   const activeClassName =
     variant === "shelf"
-      ? "bg-teal-700 text-white dark:bg-teal-700/80 dark:text-white"
-      : "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950";
+      ? "bg-shelf-accent-deep text-white"
+      : "bg-stone-950 text-white dark:bg-[#d7cec0] dark:text-[#141210]";
   const inactiveClassName =
     variant === "shelf"
-      ? "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
-      : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800";
+      ? "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-white/5"
+      : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-white/5";
 
   return (
     <div className={`${containerClassName} ${className}`.trim()}>
@@ -30,15 +30,15 @@ export function StatusSegmentedControl({
         return (
           <button
             key={status}
-            className={`h-8 rounded px-2 text-xs font-semibold transition ${variant === "shelf" ? "sm:px-3" : ""} ${
+            className={`inline-flex h-full min-w-0 items-center justify-center rounded px-2 text-xs font-semibold transition ${variant === "shelf" ? "sm:px-3" : ""} ${
               isActive ? activeClassName : inactiveClassName
             }`}
             onClick={() => onChange(status)}
             type="button"
           >
-            <span>{statusLabels[status]}</span>
+            <span className="truncate">{statusLabels[status]}</span>
             {counts && (
-              <span className={`ml-1 ${isActive ? "text-teal-100 dark:text-teal-100" : "text-stone-400 dark:text-stone-500"}`}>
+              <span className={`ml-1 ${isActive ? "text-shelf-accent-soft" : "text-stone-400 dark:text-stone-500"}`}>
                 {counts[status] || 0}
               </span>
             )}
@@ -61,7 +61,7 @@ export function ShelfSearch({ query, onChange }) {
   return (
     <div className={`min-w-0 ${showInput ? "basis-full" : "shrink-0"} sm:min-w-64 sm:flex-1 sm:basis-auto sm:shrink`}>
       <button
-        className={`h-9 w-9 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus:border-teal-600 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:focus:border-teal-500 dark:focus:ring-teal-950 sm:hidden ${
+        className={`h-9 w-9 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus:border-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#181715] dark:text-stone-300 dark:hover:bg-white/5 sm:hidden ${
           showInput ? "hidden" : "inline-flex"
         }`}
         onClick={() => setIsExpanded(true)}
@@ -76,7 +76,7 @@ export function ShelfSearch({ query, onChange }) {
         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={16} />
         <input
           ref={inputRef}
-          className="h-9 w-full rounded-md border border-stone-300 bg-white/85 pl-9 pr-3 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900/80 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-teal-500 dark:focus:bg-stone-900 dark:focus:ring-teal-950 sm:text-xs"
+          className="h-9 w-full rounded-md border border-stone-300 bg-white/90 pl-9 pr-3 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-shelf-accent focus:bg-white focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#181715]/80 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:bg-[#181715] sm:text-xs"
           value={query}
           onBlur={() => {
             if (!query) setIsExpanded(false);
@@ -95,7 +95,7 @@ export function SortSelect({ sortOrder, onChange }) {
 
   return (
     <label
-      className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:focus-within:border-teal-500 dark:focus-within:ring-teal-950"
+      className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:bg-stone-100 focus-within:border-shelf-accent focus-within:ring-4 focus-within:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#181715] dark:text-stone-300 dark:hover:bg-white/5"
       title={`Sort: ${activeOption.label}`}
     >
       <span className="sr-only">Sort shelf</span>
@@ -123,15 +123,15 @@ export function ViewToggle({ shelfView, onChange }) {
   ];
 
   return (
-    <div className="grid w-20 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-stone-700 dark:bg-stone-900">
+    <div className="grid h-9 w-20 grid-cols-2 rounded-md border border-stone-300 bg-white p-0.5 dark:border-white/10 dark:bg-[#181715]">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = shelfView === option.value;
         return (
           <button
             key={option.value}
-            className={`inline-flex h-8 items-center justify-center rounded transition ${
-              isActive ? "bg-teal-700 text-white dark:bg-teal-600" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
+            className={`inline-flex h-full items-center justify-center rounded transition ${
+              isActive ? "bg-shelf-accent-deep text-white" : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-white/5"
             }`}
             onClick={() => onChange(option.value)}
             type="button"
@@ -152,7 +152,7 @@ export function SubtypeFilter({ activeSubtype, counts, onChange, options }) {
 
   return (
     <label
-      className="relative inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-stone-300/80 bg-white/70 px-2.5 pr-7 text-xs font-medium text-stone-600 transition hover:border-stone-400 hover:bg-white focus-within:border-teal-600 focus-within:ring-4 focus-within:ring-teal-100 dark:border-stone-700/80 dark:bg-stone-900/70 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:bg-stone-900 dark:focus-within:border-teal-500 dark:focus-within:ring-teal-950"
+      className="relative inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-stone-300/80 bg-white/70 px-2.5 pr-7 text-xs font-medium text-stone-600 transition hover:border-stone-400 hover:bg-white focus-within:border-shelf-accent focus-within:ring-4 focus-within:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#181715]/70 dark:text-stone-300 dark:hover:border-white/20 dark:hover:bg-[#181715]"
       title={`Type: ${activeLabel}`}
     >
       <span className="sr-only">Filter subtype</span>

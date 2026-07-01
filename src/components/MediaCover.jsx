@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 function MediaCover({
   alt,
   className = "",
@@ -6,12 +8,19 @@ function MediaCover({
   src,
   title,
 }) {
-  if (src) {
+  const [hasImageError, setHasImageError] = useState(false);
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [src]);
+
+  if (src && !hasImageError) {
     return (
       <img
         className={imageClassName || className}
         src={src}
         alt={alt || `${title} cover`}
+        onError={() => setHasImageError(true)}
       />
     );
   }

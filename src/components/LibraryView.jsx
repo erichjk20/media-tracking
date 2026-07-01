@@ -80,16 +80,16 @@ function LibraryView({
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
       <div className="min-w-0">
-        <div className="border-b border-stone-300 pb-3 dark:border-stone-800">
+        <div className="border-b border-stone-300 pb-3 dark:border-white/10">
           <div>
-            <h2 className="text-[1.65rem] font-semibold leading-tight text-stone-950 dark:text-stone-100 sm:text-3xl">{category.label}</h2>
+            <h2 className="text-[1.65rem] font-semibold leading-tight text-stone-950 dark:text-[#eee9df] sm:text-3xl">{category.label}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-600 dark:text-stone-400">
               <span>
                 {completedCount} completed, {plannedCount} planned
               </span>
               {subtypeFilter && (
                 <>
-                  <span className="text-stone-300 dark:text-stone-700" aria-hidden="true">
+                  <span className="text-stone-300 dark:text-white/15" aria-hidden="true">
                     /
                   </span>
                   {subtypeFilter}
@@ -127,9 +127,9 @@ function LibraryView({
             </div>
           )
         ) : (
-          <div className="mt-5 flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-6 text-center dark:border-stone-700 dark:bg-stone-900">
+          <div className="mt-5 flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-6 text-center dark:border-white/10 dark:bg-[#181715]/70">
             <Library className="text-stone-400 dark:text-stone-500" size={36} />
-            <h3 className="mt-4 text-lg font-semibold text-stone-950 dark:text-stone-100">Nothing here yet</h3>
+            <h3 className="mt-4 text-lg font-semibold text-stone-950 dark:text-[#eee9df]">Nothing here yet</h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-stone-600 dark:text-stone-400">
               Add a title to this shelf or switch categories to browse another part of your library.
             </p>

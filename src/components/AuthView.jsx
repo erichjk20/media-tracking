@@ -86,30 +86,30 @@ function AuthView() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f4] px-5 py-8 text-stone-950 dark:bg-stone-950 dark:text-stone-100 sm:px-6">
+    <main className="min-h-screen bg-transparent px-5 py-8 text-stone-100 sm:px-6">
       <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-sm flex-col justify-center">
         <div className="mb-6 px-1">
           <BrandWordmark animateBook />
         </div>
 
         {status === "sent" ? (
-          <div className="border-t border-stone-300/80 pt-6 dark:border-stone-800">
+          <div className="border-t border-stone-300/80 pt-6 dark:border-white/10">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-teal-50 text-teal-700 ring-1 ring-teal-100 dark:bg-teal-950/40 dark:text-teal-300 dark:ring-teal-900">
+              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-shelf-accent-deep/15 text-shelf-accent-soft ring-1 ring-shelf-accent/20">
                 <CheckCircle2 size={20} />
               </span>
               <h1 className="text-2xl font-semibold leading-tight">Check your email</h1>
             </div>
 
             <p className="mt-4 text-sm leading-6 text-stone-600 dark:text-stone-400">
-              We sent a secure sign-in link to <span className="font-semibold text-stone-900 dark:text-stone-100">{sentEmail}</span>.
+              We sent a secure sign-in link to <span className="font-semibold text-stone-900 dark:text-[#eee9df]">{sentEmail}</span>.
             </p>
             <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-400">
               Open the link on this device to continue to your library.
             </p>
 
             <button
-              className="mt-5 text-sm font-semibold text-teal-800 transition hover:text-teal-900 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:text-teal-300 dark:hover:text-teal-200 dark:focus:ring-teal-950"
+              className="mt-5 text-sm font-semibold text-shelf-accent-soft transition hover:text-shelf-accent-bright focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35"
               onClick={handleUseDifferentEmail}
               type="button"
             >
@@ -117,7 +117,7 @@ function AuthView() {
             </button>
           </div>
         ) : (
-          <form className="border-t border-stone-300/80 pt-6 dark:border-stone-800" onSubmit={handleSubmit}>
+          <form className="border-t border-stone-300/80 pt-6 dark:border-white/10" onSubmit={handleSubmit}>
             <h1 className="text-2xl font-semibold leading-tight">Sign in to shelvd</h1>
             <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-400">
               No password needed. We'll email you a secure link.
@@ -128,7 +128,7 @@ function AuthView() {
               <span className="relative mt-2 block">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" size={18} />
                 <input
-                  className="input h-12 rounded-lg bg-white/85 pl-10 shadow-sm dark:bg-stone-900/80"
+                  className="input h-12 rounded-lg bg-white/90 pl-10 shadow-sm dark:bg-[#181715]/80"
                   autoComplete="email"
                   inputMode="email"
                   onChange={(event) => setEmail(event.target.value)}
@@ -141,7 +141,7 @@ function AuthView() {
             </label>
 
             <button
-              className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-stone-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 dark:focus:ring-teal-950 dark:disabled:bg-stone-700 dark:disabled:text-stone-400"
+              className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#d7cec0] px-4 text-sm font-semibold text-[#141210] shadow-sm transition hover:bg-[#e6ded1] focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-stone-500"
               disabled={isSubmitDisabled}
               type="submit"
             >
@@ -154,7 +154,7 @@ function AuthView() {
             </button>
 
             {message && (
-              <p className="mt-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+              <p className="mt-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-900 dark:border-red-500/25 dark:bg-red-950/30 dark:text-red-200">
                 {message}
               </p>
             )}

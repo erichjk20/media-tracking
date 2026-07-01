@@ -27,8 +27,8 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
     <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="min-w-0">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-teal-700 dark:text-teal-400">Log something new</p>
-          <h2 className="mt-2 text-3xl font-semibold leading-tight text-stone-950 dark:text-stone-100 sm:text-5xl">Choose a media type.</h2>
+          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-shelf-accent-bright/80">Log something new</p>
+          <h2 className="mt-2 text-3xl font-semibold leading-tight text-stone-950 dark:text-[#eee9df] sm:text-5xl">Choose a media type.</h2>
         </div>
 
         <div className="mt-5 flex justify-center gap-2 pb-1">
@@ -40,8 +40,8 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                 key={entry.id}
                 className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
                   isSelected
-                    ? "border-stone-950 bg-stone-950 text-white shadow-sm dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
-                    : "border-stone-300 bg-white text-stone-700 hover:border-teal-700 hover:text-teal-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-teal-500 dark:hover:text-teal-300"
+                    ? "border-shelf-accent-bright/40 bg-shelf-accent-deep text-white shadow-sm"
+                    : "border-white/10 bg-[#181715] text-stone-200 hover:border-shelf-accent/50 hover:text-shelf-accent-soft"
                 }`}
                 onClick={() => setSelectedCategory(entry.id)}
                 type="button"
@@ -57,14 +57,14 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
 
         <form className="mx-auto mt-5 max-w-4xl" onSubmit={handleSubmit}>
           <div
-            className={`grid gap-2 rounded-md border bg-white p-1.5 shadow-sm dark:bg-stone-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center ${
-              selectedCategory ? "border-stone-300 dark:border-stone-700" : "border-dashed border-stone-300 dark:border-stone-700"
+            className={`grid gap-2 rounded-md border bg-white p-1.5 shadow-sm dark:bg-[#181715] md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center ${
+              selectedCategory ? "border-stone-300 dark:border-white/10" : "border-dashed border-stone-300 dark:border-white/10"
             }`}
           >
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" size={18} />
               <input
-                className="h-12 w-full rounded border-0 bg-white pl-10 pr-3 text-sm font-medium text-stone-950 outline-none placeholder:text-stone-400 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-50 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:ring-teal-950 dark:disabled:bg-stone-800"
+                className="h-12 w-full rounded border-0 bg-white pl-10 pr-3 text-sm font-medium text-stone-950 outline-none placeholder:text-stone-400 focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-50 dark:bg-[#181715] dark:text-stone-100 dark:placeholder:text-stone-500 dark:disabled:bg-[#24221f]"
                 disabled={!selectedCategory}
                 value={homeQuery}
                 onChange={(event) => setHomeQuery(event.target.value)}
@@ -78,7 +78,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
             />
 
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-teal-600 dark:hover:bg-teal-500 dark:focus:ring-teal-950 dark:disabled:bg-stone-700"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-white/10"
               disabled={!selectedCategory}
               type="submit"
             >
@@ -89,7 +89,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
         </form>
 
         {recentItems.length > 0 && (
-          <div className="mx-auto mt-10 max-w-5xl border-t border-stone-300 pt-6 dark:border-stone-800">
+          <div className="mx-auto mt-10 max-w-5xl border-t border-stone-300 pt-6 dark:border-white/10">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-500 dark:text-stone-400">Recently added</h3>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {recentItems.map((item) => {
@@ -98,7 +98,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                 return (
                   <button
                     key={item.id}
-                    className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 text-left shadow-sm transition hover:border-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500 dark:focus:ring-teal-950"
+                    className="grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] gap-3 rounded-lg border border-stone-300 bg-white p-3 text-left shadow-sm transition hover:border-shelf-accent/50 focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#181715]"
                     onClick={() => onOpenItem(item)}
                     type="button"
                     aria-label={`Open ${item.title}`}
@@ -114,7 +114,7 @@ function HomeView({ items, onOpenItem, onStartLookup }) {
                       <p className="mt-1 truncate text-xs text-stone-600 dark:text-stone-400">{item.creator || "Unknown creator"}</p>
                       <p className="mt-1 text-xs font-medium text-stone-500 dark:text-stone-500">{statusLabels[item.status] || item.status}</p>
                     </div>
-                    <span className="inline-flex h-8 items-center gap-1 rounded bg-teal-50 px-2 text-[11px] font-semibold text-teal-800 ring-1 ring-teal-100 dark:bg-teal-950/50 dark:text-teal-200 dark:ring-teal-900">
+                    <span className="inline-flex h-8 items-center gap-1 rounded bg-shelf-accent-deep/15 px-2 text-[11px] font-semibold text-shelf-accent-soft ring-1 ring-shelf-accent/20">
                       <Icon size={13} />
                       {itemCategory?.label || "Media"}
                     </span>

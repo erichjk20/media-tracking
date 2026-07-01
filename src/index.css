@@ -4,34 +4,31 @@
 
 @layer components {
   .input {
-    @apply h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-teal-500 dark:focus:ring-teal-950;
+    @apply h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-shelf-accent focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#12110f] dark:text-stone-100 dark:placeholder:text-stone-500;
   }
 }
 
 :root {
-  color: #1f2937;
-  background: #f4f6f5;
+  color: #e8e3da;
+  background: #0f0e0d;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #e7e5e4;
-    background: #0c0a09;
-  }
-
-  select {
-    color-scheme: dark;
-  }
+select {
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(42, 157, 145, 0.06), transparent 30rem),
+    linear-gradient(180deg, #11100e 0%, #0f0e0d 42%, #0b0a09 100%);
 }
 
 button,
@@ -42,9 +39,12 @@ select {
 }
 
 .cover-fallback {
+  overflow: hidden;
+  color: #f8fafc;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
   background:
-    linear-gradient(135deg, rgba(15, 118, 110, 0.9), rgba(180, 83, 9, 0.76)),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.5), transparent 34%);
+    linear-gradient(135deg, rgba(32, 125, 116, 0.86), rgba(130, 64, 22, 0.66)),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.38), transparent 34%);
 }
 
 .brand-book-tilt {

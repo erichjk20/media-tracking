@@ -193,6 +193,11 @@ Both are ignored by Git.
 - Sets global page background/text rendering.
 - Defines `.cover-fallback` styling.
 
+## Design Priorities
+
+- Prioritize phone layouts first when changing UI; desktop refinements should not compromise the mobile view.
+- Treat the app as dark-first/dark-only for now. Avoid light base surfaces that rely on `dark:` overrides for primary shells like headers, page backgrounds, nav, cards, and modals.
+
 `package.json`
 
 - Contains Vite and verification scripts:

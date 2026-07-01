@@ -407,8 +407,8 @@ function App() {
 
   if (isSupabaseConfigured && authStatus === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f6f5] px-4 text-stone-950 dark:bg-stone-950 dark:text-stone-100">
-        <p className="text-sm font-semibold text-stone-600 dark:text-stone-400">Loading shelvd...</p>
+      <main className="flex min-h-screen items-center justify-center bg-[#0f0e0d] px-4 text-stone-100">
+        <p className="text-sm font-semibold text-stone-400">Loading shelvd...</p>
       </main>
     );
   }
@@ -418,7 +418,7 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f6f5] pb-28 dark:bg-stone-950 lg:pb-0">
+    <main className="min-h-screen bg-transparent pb-28 lg:pb-0">
       <AppHeader
         activeCategory={activeCategory}
         activeView={activeView}
@@ -433,7 +433,7 @@ function App() {
 
       {storageMessage && (
         <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-200">
             {storageMessage}
           </p>
         </div>
@@ -478,7 +478,7 @@ function App() {
 
       {activeView === "library" && (
         <button
-          className="fixed bottom-6 right-6 z-30 hidden h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-white shadow-lift transition hover:bg-teal-800 lg:inline-flex"
+          className="fixed bottom-6 right-6 z-30 hidden h-14 w-14 items-center justify-center rounded-full bg-shelf-accent-deep text-white shadow-lift transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 lg:inline-flex"
           onClick={startNewItem}
           type="button"
           aria-label="Add item"

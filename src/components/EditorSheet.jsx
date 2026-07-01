@@ -38,15 +38,15 @@ function EditorSheet({
   const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 dark:bg-black/70 sm:items-center sm:justify-center">
-      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-300 bg-white p-4 shadow-lift dark:border-stone-700 dark:bg-stone-900 sm:max-w-xl sm:rounded-xl sm:p-5">
-        <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900 sm:-mx-5 sm:-mt-5 sm:px-5">
+    <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 dark:bg-black/75 sm:items-center sm:justify-center">
+      <section className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-stone-300 bg-white p-4 shadow-lift dark:border-white/10 dark:bg-[#181715] sm:max-w-xl sm:rounded-xl sm:p-5">
+        <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#181715] sm:-mx-5 sm:-mt-5 sm:px-5">
           <div>
-            <h2 className="text-lg font-semibold text-stone-950 dark:text-stone-100">{editingId ? "Edit item" : "Add item"}</h2>
+            <h2 className="text-lg font-semibold text-stone-950 dark:text-[#eee9df]">{editingId ? "Edit item" : "Add item"}</h2>
             <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{category.label} / {activeStatus}</p>
           </div>
           <button
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
             onClick={onClose}
             type="button"
             aria-label="Close editor"
@@ -221,7 +221,7 @@ function EditorSheet({
           </Field>
 
           <button
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800 focus:outline-none focus:ring-4 focus:ring-teal-100 dark:bg-teal-600 dark:hover:bg-teal-500 dark:focus:ring-teal-950"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35"
             type="submit"
           >
             {editingId ? <Save size={17} /> : <Plus size={17} />}

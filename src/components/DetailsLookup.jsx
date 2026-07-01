@@ -28,11 +28,11 @@ function DetailsLookup({
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
 
   return (
-    <div className="rounded-lg border border-teal-200 bg-teal-50/70 p-3 dark:border-teal-900 dark:bg-teal-950/25">
+    <div className="rounded-lg border border-shelf-accent/20 bg-shelf-accent-deep/10 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">Find details</span>
         {lookupProviders.map((provider) => (
-          <span key={provider.id} className="rounded bg-white px-2 py-1 text-xs font-semibold text-teal-800 ring-1 ring-teal-100 dark:bg-stone-900 dark:text-teal-200 dark:ring-teal-900">
+          <span key={provider.id} className="rounded bg-[#181715] px-2 py-1 text-xs font-semibold text-shelf-accent-soft ring-1 ring-shelf-accent/20">
             {provider.label}
           </span>
         ))}
@@ -55,7 +55,7 @@ function DetailsLookup({
           />
         </label>
         <button
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white transition hover:bg-shelf-accent disabled:cursor-not-allowed disabled:bg-white/10"
           disabled={status === "loading"}
           onClick={onSearch}
           type="button"
@@ -92,7 +92,7 @@ function DetailsLookup({
       )}
 
       {message && (
-        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700 dark:text-red-300" : "text-teal-800 dark:text-teal-200"}`}>
+        <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700 dark:text-red-300" : "text-shelf-accent-soft"}`}>
           {message}
         </p>
       )}
@@ -105,7 +105,7 @@ function DetailsLookup({
             return (
               <li key={lookupResult.id}>
                 <button
-                  className="grid w-full grid-cols-[42px_minmax(0,1fr)_auto] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-teal-500 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-teal-500"
+                  className="grid w-full grid-cols-[42px_minmax(0,1fr)_auto] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
                   onClick={() => onApply(lookupResult)}
                   type="button"
                 >
@@ -116,10 +116,10 @@ function DetailsLookup({
                     title={title}
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-stone-950 dark:text-stone-100">{title}</span>
+                    <span className="block truncate text-sm font-semibold text-stone-950 dark:text-[#eee9df]">{title}</span>
                     <span className="mt-1 block truncate text-xs text-stone-600 dark:text-stone-400">{getLookupResultMeta(lookupResult)}</span>
                   </span>
-                  <span className="self-start rounded bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                  <span className="self-start rounded bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-600 dark:bg-white/5 dark:text-stone-300">
                     {lookupResult.sourceLabel}
                   </span>
                 </button>

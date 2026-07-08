@@ -37,7 +37,7 @@ This is a client-only React app. It stores signed-in private library data in Sup
 
 The main app supports:
 
-- A homepage for choosing a media type, then quickly searching and logging new media
+- A command-style homepage for choosing media type and shelf, then quickly searching and logging new media
 - Email magic-link sign-in when Supabase is configured
 - Private per-user libraries backed by Supabase Auth and row-level security
 - Home/Library view switching
@@ -55,7 +55,7 @@ The main app supports:
 - Open Library and Aladin lookup behind the unified search for Books
 - Jikan lookup behind the unified search for Manga
 - Per-category counts
-- A recently added homepage section with media type tags
+- A Profile view with library stats and recently added items
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
 - Star rating input for Completed items only
@@ -105,6 +105,7 @@ Tracked/source files:
     │   ├── DeleteItemDialog.jsx
     │   ├── DetailsLookup.jsx
     │   ├── EditorSheet.jsx
+    │   ├── HomeCommand.jsx
     │   ├── HomeView.jsx
     │   ├── LibraryView.jsx
     │   ├── MediaCards.jsx
@@ -113,6 +114,7 @@ Tracked/source files:
     │   ├── Rating.jsx
     │   └── ShelfControls.jsx
     ├── hooks
+    │   ├── useLibraryMetrics.js
     │   ├── useMediaLookup.js
     │   └── useShelfData.js
     ├── index.css
@@ -153,6 +155,8 @@ Both are ignored by Git.
 
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
 - `AuthView.jsx` owns the email magic-link sign-in form.
+- `HomeView.jsx` owns homepage command state and lookup handoff.
+- `HomeCommand.jsx` owns the centered quick-log command controls.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view.
 
 `src/lib/mediaConfig.js`

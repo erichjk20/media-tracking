@@ -114,6 +114,10 @@ function App() {
   );
 
   useEffect(() => {
+    setActiveView("home");
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!isSupabaseConfigured) return;
 
     let isCurrent = true;
@@ -473,8 +477,6 @@ function App() {
       {activeView === "home" ? (
         <HomeView
           key={homeSearchResetToken}
-          items={items}
-          onOpenItem={openItemDetails}
           onStartLookup={startHomeLookup}
         />
       ) : activeView === "profile" ? (

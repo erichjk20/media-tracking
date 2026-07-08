@@ -2,6 +2,10 @@
 
 Track your media without the noise.
 
+## App Flow
+
+Signed-in users land on a centered quick-log homepage. Choose a media type, pick Done or Want, search a title, and the add sheet opens with lookup results for that category. Library browsing, stats, and recently added items live outside the homepage so the first screen stays focused on logging.
+
 ## Supabase Setup
 
 1. Create a Supabase project.

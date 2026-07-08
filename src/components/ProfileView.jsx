@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  BookOpenCheck,
-  Clock3,
   Library,
   Save,
-  Star,
   UserRound,
 } from "lucide-react";
 import { statusLabels } from "../lib/mediaConfig";
@@ -12,23 +9,6 @@ import MediaCover from "./MediaCover";
 
 function formatAverageRating(value) {
   return value ? value.toFixed(1) : "0.0";
-}
-
-function ProfileMetric({ icon: Icon, label, value, detail }) {
-  return (
-    <article className="rounded-lg border border-white/10 bg-[#181715] p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">{label}</p>
-          <p className="mt-2 text-2xl font-semibold text-[#eee9df]">{value}</p>
-        </div>
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep/15 text-shelf-accent-soft ring-1 ring-shelf-accent/20">
-          <Icon size={19} />
-        </span>
-      </div>
-      {detail && <p className="mt-2 text-sm text-stone-400">{detail}</p>}
-    </article>
-  );
 }
 
 function ProfileView({
@@ -44,6 +24,11 @@ function ProfileView({
   const [saveMessage, setSaveMessage] = useState("");
   const accountLabel = user?.email || "Local library";
   const shownName = profile?.display_name || "Your profile";
+  const savedDisplayName = profile?.display_name || "";
+  const hasDisplayNameChanges = displayName.trim() !== savedDisplayName.trim();
+  const completedPercent = metrics.totalCount
+    ? Math.round((metrics.completedCount / metrics.totalCount) * 100)
+    : 0;
 
   useEffect(() => {
     setDisplayName(profile?.display_name || "");
@@ -64,7 +49,7 @@ function ProfileView({
     try {
       await onSaveDisplayName(cleanedName);
       setSaveStatus("saved");
-      setSaveMessage("Saved.");
+      setSaveMessage("");
     } catch (error) {
       setSaveStatus("error");
       setSaveMessage(error.message || "Could not save your profile.");
@@ -73,11 +58,11 @@ function ProfileView({
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-      <div className="grid gap-5 lg:grid-cols-[minmax(260px,0.35fr)_minmax(0,1fr)]">
-        <aside className="rounded-lg border border-white/10 bg-[#181715] p-4 shadow-sm">
+      <div className="grid gap-5">
+        <aside className="border-b border-white/10 pb-5">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white">
-              <UserRound size={23} />
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white">
+              <UserRound size={21} />
             </span>
             <div className="min-w-0">
               <h2 className="truncate text-xl font-semibold text-[#eee9df]">{shownName}</h2>
@@ -86,25 +71,36 @@ function ProfileView({
           </div>
 
           <form className="mt-5" onSubmit={handleSubmit}>
-            <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500" htmlFor="profile-display-name">
-              Display name
-            </label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto]">
-              <input
-                id="profile-display-name"
-                className="input"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Name your shelf"
-              />
-              <button
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-wait disabled:bg-shelf-accent-deep/60"
-                disabled={saveStatus === "saving"}
-                type="submit"
-              >
-                <Save size={16} />
-                {saveStatus === "saving" ? "Saving" : "Save"}
-              </button>
+            <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500" htmlFor="profile-display-name">
+                Display name
+              </label>
+              <div className="relative min-w-0">
+                <input
+                  id="profile-display-name"
+                  className={`input ${hasDisplayNameChanges ? "pr-12" : ""}`}
+                  value={displayName}
+                  onChange={(event) => {
+                    setDisplayName(event.target.value);
+                    if (saveStatus !== "idle") {
+                      setSaveStatus("idle");
+                      setSaveMessage("");
+                    }
+                  }}
+                  placeholder="Name your shelf"
+                />
+                {hasDisplayNameChanges && (
+                  <button
+                    className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-shelf-accent-soft transition hover:bg-shelf-accent-deep/15 focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-wait disabled:text-stone-500"
+                    disabled={saveStatus === "saving"}
+                    type="submit"
+                    aria-label="Save display name"
+                    title="Save display name"
+                  >
+                    <Save size={16} />
+                  </button>
+                )}
+              </div>
             </div>
             {saveMessage && (
               <p className={`mt-2 text-sm ${saveStatus === "error" ? "text-red-300" : "text-shelf-accent-soft"}`}>
@@ -115,39 +111,40 @@ function ProfileView({
         </aside>
 
         <div className="min-w-0">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <ProfileMetric
-              icon={Library}
-              label="Library"
-              value={metrics.totalCount}
-              detail={`${metrics.completedCount} completed, ${metrics.plannedCount} planned`}
-            />
-            <ProfileMetric
-              icon={BookOpenCheck}
-              label="Completed"
-              value={metrics.completedCount}
-              detail={metrics.totalCount ? `${Math.round((metrics.completedCount / metrics.totalCount) * 100)}% of library` : "No completed titles yet"}
-            />
-            <ProfileMetric
-              icon={Clock3}
-              label="Planned"
-              value={metrics.plannedCount}
-              detail="Want to Watch/Read"
-            />
-            <ProfileMetric
-              icon={Star}
-              label="Avg rating"
-              value={formatAverageRating(metrics.averageRating)}
-              detail={`${metrics.ratedCount} rated completed ${metrics.ratedCount === 1 ? "item" : "items"}`}
-            />
-          </div>
-
-          <div className="mt-5 grid gap-5">
-            <section className="border-y border-white/10 py-4">
+          <div className="grid gap-5">
+            <section className="border-y border-white/10 py-5">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold text-[#eee9df]">Media totals</h3>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+              <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0 sm:max-w-lg sm:flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Library</p>
+                  <div className="mt-1 flex items-end gap-3">
+                    <span className="text-6xl font-semibold leading-none text-[#eee9df]">{metrics.totalCount}</span>
+                    <span className="pb-1 text-sm font-semibold text-stone-500">
+                      {metrics.totalCount === 1 ? "item" : "items"}
+                    </span>
+                  </div>
+                  <div className="mt-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold">
+                      <span className="text-stone-300">
+                        {metrics.completedCount} completed <span className="text-stone-600">/</span> {metrics.plannedCount} planned
+                      </span>
+                      <span className="text-stone-600">/</span>
+                      <span className="text-stone-400">{formatAverageRating(metrics.averageRating)} avg rating</span>
+                      <span className="ml-auto shrink-0 text-shelf-accent-soft">{completedPercent}%</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full rounded-full bg-shelf-accent-bright"
+                        style={{ width: `${completedPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
                 {metrics.categoryBreakdown.map((entry) => (
                   <button
                     key={entry.id}

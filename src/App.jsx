@@ -9,6 +9,7 @@ import EditorSheet from "./components/EditorSheet";
 import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
+import ProfileView from "./components/ProfileView";
 import {
   fetchMediaItems,
   removeMediaItem,
@@ -20,20 +21,24 @@ import {
   isSupabaseConfigured,
   signOut,
   subscribeToAuthChanges,
+  updateUserProfileDisplayName,
 } from "./lib/supabase";
 import {
   createMediaDraft,
   getDefaultSubtype,
+  getStoredProfile,
   getStoredItems,
   normalizeItems,
+  saveStoredProfile,
 } from "./lib/mediaUtils";
+import { useLibraryMetrics } from "./hooks/useLibraryMetrics";
 import { useMediaLookup } from "./hooks/useMediaLookup";
 import { useShelfData } from "./hooks/useShelfData";
 
 function App() {
   const [session, setSession] = useState(null);
   const [authStatus, setAuthStatus] = useState(isSupabaseConfigured ? "loading" : "local");
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(() => (isSupabaseConfigured ? null : getStoredProfile()));
   const [items, setItems] = useState(() => (isSupabaseConfigured ? [] : getStoredItems()));
   const [storageMode, setStorageMode] = useState(isSupabaseConfigured ? "loading" : "local");
   const [storageMessage, setStorageMessage] = useState(
@@ -58,6 +63,7 @@ function App() {
   const [homeSearchResetToken, setHomeSearchResetToken] = useState(0);
   const user = session?.user || null;
   const shouldUseSupabase = Boolean(isSupabaseConfigured && user);
+  const libraryMetrics = useLibraryMetrics(items);
   const {
     activeShelfCounts,
     bookSubtypeCounts,
@@ -384,6 +390,26 @@ function App() {
     }
   }
 
+  async function handleSaveDisplayName(displayName) {
+    const cleanedName = displayName.trim();
+    if (!cleanedName) throw new Error("Add a display name first.");
+
+    if (shouldUseSupabase) {
+      const nextProfile = await updateUserProfileDisplayName(user.id, cleanedName);
+      setProfile(nextProfile);
+      return nextProfile;
+    }
+
+    const nextProfile = {
+      ...(profile || { id: "local", email: "" }),
+      display_name: cleanedName,
+      updated_at: new Date().toISOString(),
+    };
+    saveStoredProfile(nextProfile);
+    setProfile(nextProfile);
+    return nextProfile;
+  }
+
   function updateDraft(field, value) {
     setDraft((current) => ({
       ...current,
@@ -398,6 +424,10 @@ function App() {
   function showLibrary() {
     setShelfView("grid");
     setActiveView("library");
+  }
+
+  function showProfile() {
+    setActiveView("profile");
   }
 
   function showCategory(categoryId) {
@@ -428,6 +458,7 @@ function App() {
         onGoHome={() => setActiveView("home")}
         onShowCategory={showCategory}
         onShowLibrary={showLibrary}
+        onShowProfile={showProfile}
         onSignOut={handleSignOut}
       />
 
@@ -445,6 +476,15 @@ function App() {
           items={items}
           onOpenItem={openItemDetails}
           onStartLookup={startHomeLookup}
+        />
+      ) : activeView === "profile" ? (
+        <ProfileView
+          metrics={libraryMetrics}
+          onOpenItem={openItemDetails}
+          onSaveDisplayName={handleSaveDisplayName}
+          onShowCategory={showCategory}
+          profile={profile}
+          user={user}
         />
       ) : (
         <LibraryView

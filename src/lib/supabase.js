@@ -74,3 +74,21 @@ export async function ensureUserProfile(user) {
   if (error) throw error;
   return data;
 }
+
+export async function updateUserProfileDisplayName(userId, displayName) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  if (!userId) throw new Error("Sign in before updating your profile.");
+
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .update({
+      display_name: displayName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}

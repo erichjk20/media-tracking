@@ -7,6 +7,30 @@ import {
   tvSubtypeOptions,
 } from "./mediaConfig";
 
+const localProfileStorageKey = "media-shelf-profile";
+
+export function getStoredProfile() {
+  try {
+    const stored = window.localStorage.getItem(localProfileStorageKey);
+    const profile = stored ? JSON.parse(stored) : {};
+    return {
+      id: "local",
+      email: "",
+      display_name: profile.display_name || "",
+    };
+  } catch {
+    return {
+      id: "local",
+      email: "",
+      display_name: "",
+    };
+  }
+}
+
+export function saveStoredProfile(profile) {
+  window.localStorage.setItem(localProfileStorageKey, JSON.stringify(profile));
+}
+
 export function getStoredItems() {
   try {
     const stored = window.localStorage.getItem("media-shelf-items");

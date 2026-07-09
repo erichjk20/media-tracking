@@ -5,7 +5,6 @@ import HomeCommand from "./HomeCommand";
 function HomeView({ onStartLookup }) {
   const [homeQuery, setHomeQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(categories[0]?.id || "");
-  const [selectedStatus, setSelectedStatus] = useState("Completed");
   const selectedCategoryDetails = categories.find((entry) => entry.id === selectedCategory);
   const selectedCategoryLabel = selectedCategoryDetails?.label.toLowerCase() || "media";
 
@@ -17,7 +16,7 @@ function HomeView({ onStartLookup }) {
     onStartLookup({
       categoryId: selectedCategory,
       query: cleanedQuery,
-      status: selectedStatus,
+      status: "Completed",
     });
   }
 
@@ -28,10 +27,8 @@ function HomeView({ onStartLookup }) {
           homeQuery={homeQuery}
           selectedCategory={selectedCategory}
           selectedCategoryLabel={selectedCategoryLabel}
-          selectedStatus={selectedStatus}
           onCategoryChange={setSelectedCategory}
           onQueryChange={setHomeQuery}
-          onStatusChange={setSelectedStatus}
           onSubmit={handleSubmit}
         />
       </div>

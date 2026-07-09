@@ -37,7 +37,7 @@ This is a client-only React app. It stores signed-in private library data in Sup
 
 The main app supports:
 
-- A command-style homepage for choosing media type and shelf, then quickly searching and logging new media
+- A command-style homepage for choosing media type, then quickly searching and logging new media through the add sheet
 - Email magic-link sign-in when Supabase is configured
 - Private per-user libraries backed by Supabase Auth and row-level security
 - Home/Library view switching

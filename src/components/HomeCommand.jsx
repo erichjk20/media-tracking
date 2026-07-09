@@ -1,16 +1,13 @@
 import { Search } from "lucide-react";
 import { categories } from "../lib/mediaConfig";
-import { StatusSegmentedControl } from "./ShelfControls";
 
 function HomeCommand({
   homeQuery,
   onCategoryChange,
   onQueryChange,
-  onStatusChange,
   onSubmit,
   selectedCategory,
   selectedCategoryLabel,
-  selectedStatus,
 }) {
   return (
     <>
@@ -20,20 +17,14 @@ function HomeCommand({
         </h2>
       </div>
 
-      <MediaTypeSelector
-        selectedCategory={selectedCategory}
-        onChange={onCategoryChange}
-      />
+      <div className="mx-auto mt-7 flex w-full max-w-[42rem] flex-col items-center">
+        <MediaTypeSelector
+          selectedCategory={selectedCategory}
+          onChange={onCategoryChange}
+        />
+      </div>
 
-      <form className="mx-auto mt-4 w-full max-w-[42rem]" onSubmit={onSubmit}>
-        <div className="mb-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <StatusSegmentedControl
-            activeStatus={selectedStatus}
-            className="w-full max-w-[16rem] sm:w-48"
-            onChange={onStatusChange}
-          />
-        </div>
-
+      <form className="mx-auto mt-5 w-full max-w-[42rem]" onSubmit={onSubmit}>
         <CommandSearch
           query={homeQuery}
           selectedCategoryLabel={selectedCategoryLabel}
@@ -46,7 +37,7 @@ function HomeCommand({
 
 function MediaTypeSelector({ selectedCategory, onChange }) {
   return (
-    <div className="mx-auto mt-7 grid w-full max-w-[42rem] grid-cols-4 gap-1 rounded-full border border-white/10 bg-[#181715]/70 p-1 shadow-[0_14px_45px_rgba(0,0,0,0.2)]">
+    <div className="grid w-full grid-cols-4 gap-1 rounded-full border border-white/10 bg-[#181715]/70 p-1 shadow-[0_14px_45px_rgba(0,0,0,0.2)]">
       {categories.map((entry) => {
         const Icon = entry.icon;
         const isSelected = entry.id === selectedCategory;

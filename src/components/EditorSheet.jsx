@@ -36,6 +36,7 @@ function EditorSheet({
 }) {
   const canLookupDetails = lookupProviders.length > 0;
   const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
+  const lookupPrompt = editingId ? `Search ${lookupCategoryLabel.toLowerCase()} title` : "Find a title to add";
   const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
   const getShelfLabel = (status) => (status === "Completed" ? "Completed" : statusLabels[status] || status);
 
@@ -69,10 +70,12 @@ function EditorSheet({
               onApply={onApplyLookupResult}
               onBookLanguageChange={onBookLanguageChange}
               onQueryChange={onLookupQueryChange}
+              prompt={lookupPrompt}
               onSearch={onSearchDetails}
               query={lookupQuery}
               results={lookupResults}
               status={lookupStatus}
+              title={editingId ? "Find details" : "Find title to add"}
             />
           )}
 

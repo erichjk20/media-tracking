@@ -17,16 +17,18 @@ function DetailsLookup({
   onBookLanguageChange,
   onQueryChange,
   onSearch,
+  prompt,
   query,
   results,
   status,
+  title = "Find details",
 }) {
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
 
   return (
     <div className="rounded-lg border border-shelf-accent/20 bg-shelf-accent-deep/10 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">Find details</span>
+        <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">{title}</span>
       </div>
 
       <div className="mt-3 flex gap-2">
@@ -42,7 +44,7 @@ function DetailsLookup({
                 onSearch(event);
               }
             }}
-            placeholder={`Search ${categoryLabel.toLowerCase()} title`}
+            placeholder={prompt || `Search ${categoryLabel.toLowerCase()} title`}
           />
         </label>
         <button

@@ -5,6 +5,7 @@ import BottomNav from "./components/BottomNav";
 import CompleteItemDialog from "./components/CompleteItemDialog";
 import DeleteItemDialog from "./components/DeleteItemDialog";
 import EditorSheet from "./components/EditorSheet";
+import FloatingAddButton from "./components/FloatingAddButton";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import ProfileView from "./components/ProfileView";
@@ -87,7 +88,6 @@ function App() {
     lookupQuery,
     lookupResults,
     lookupStatus,
-    queueLookup,
     resetLookupState,
     searchDetails,
     setBookLanguage,
@@ -306,27 +306,17 @@ function App() {
     }
   }
 
-  function startShelfLookup({ categoryId, query: shelfQuery, status, subtype = "" }) {
-    const cleanedQuery = shelfQuery.trim();
-    const selectedSubtype = getDefaultSubtype(categoryId, subtype);
+  function startAddItem() {
+    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
-    setActiveCategory(categoryId);
-    setActiveStatus(status);
     setDraft(createMediaDraft({
-      category: categoryId,
-      subtype: selectedSubtype,
-      status,
-      title: cleanedQuery,
+      category: activeCategory,
+      subtype,
+      status: activeStatus,
     }));
     setEditingId(null);
     resetLookupState();
     setIsEditorOpen(true);
-    queueLookup({
-      categoryId,
-      query: cleanedQuery,
-      status,
-      subtype: selectedSubtype,
-    });
   }
 
   function closeEditor() {
@@ -467,7 +457,6 @@ function App() {
           onDeleteItem={requestDeleteItem}
           onEditItem={editItem}
           onOpenItem={openItemDetails}
-          onStartLookup={startShelfLookup}
           onQueryChange={setQuery}
           onShelfViewChange={setShelfView}
           onSortOrderChange={setSortOrder}
@@ -477,6 +466,10 @@ function App() {
           tvSubtypeCounts={tvSubtypeCounts}
           visibleItems={visibleItems}
         />
+      )}
+
+      {activeView === "library" && !isEditorOpen && !selectedItem && (
+        <FloatingAddButton categoryLabel={category.label.toLowerCase()} onClick={startAddItem} />
       )}
 
       {selectedItem && (

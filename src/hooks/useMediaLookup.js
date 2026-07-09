@@ -135,11 +135,11 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       if (lookupResult.source === "omdb") {
         const patch = withoutPersonalNotes(await getOmdbItemPatch(lookupResult.result, draft.category, draft.subtype));
         applyPatch(setDraft, patch);
-        setLookupMessage("Details added from OMDb. You can edit anything before saving.");
+        setLookupMessage("Details added. You can edit anything before saving.");
       } else if (lookupResult.source === "tmdb") {
         const patch = withoutPersonalNotes(await getTmdbItemPatch(lookupResult.result, draft));
         applyPatch(setDraft, patch);
-        setLookupMessage(patch.subtype === "korean-movie" || patch.subtype === "kdrama" ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
+        setLookupMessage(patch.subtype === "korean-movie" || patch.subtype === "kdrama" ? "Korean media details added." : "Details added. You can adjust the type before saving.");
       } else if (lookupResult.source === "open-library") {
         const patch = withoutPersonalNotes(getOpenLibraryItemPatch(lookupResult.result, draft));
         applyPatch(setDraft, patch);
@@ -147,15 +147,15 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       } else if (lookupResult.source === "aladin") {
         const patch = withoutPersonalNotes(getAladinItemPatch(lookupResult.result));
         applyPatch(setDraft, patch);
-        setLookupMessage("Korean book details added from Aladin.");
+        setLookupMessage("Korean book details added.");
       } else if (lookupResult.source === "jikan-anime") {
         const patch = withoutPersonalNotes(getAnimeItemPatch(lookupResult.result));
         applyPatch(setDraft, patch);
-        setLookupMessage("Anime details added from Jikan. You can edit anything before saving.");
+        setLookupMessage("Anime details added. You can edit anything before saving.");
       } else {
         const patch = withoutPersonalNotes(getMangaItemPatch(lookupResult.result));
         applyPatch(setDraft, patch);
-        setLookupMessage("Manga details added from Jikan. You can edit anything before saving.");
+        setLookupMessage("Manga details added. You can edit anything before saving.");
       }
 
       setLookupQuery("");

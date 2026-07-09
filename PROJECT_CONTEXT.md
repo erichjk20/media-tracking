@@ -29,7 +29,7 @@ Each media item contains:
 - Rating, from 1 to 5 stars, only for Completed items
 - Synopsis
 - Personal Notes
-- Image URL for cover art
+- Cover art, usually sourced from lookup results with an optional URL override
 
 ## Current Implementation
 
@@ -49,6 +49,8 @@ The main app supports:
 - A unified add/edit lookup search that queries the relevant APIs for the selected category
 - Homepage search prefill that opens the add sheet and runs the same unified lookup flow
 - Synopsis population from supported lookup providers
+- A user-facing add/edit sheet with a primary Completed/Want segmented shelf control
+- Cover preview in the add/edit sheet, with add/change/remove controls and image URL entry hidden until needed
 - A physical media detail overlay that opens on the cover and flips to a same-size back cover with synopsis, facts, and notes
 - OMDb lookup behind the unified search for Movies and TV Shows
 - TMDb lookup behind the unified search for Movies and TV Shows
@@ -157,6 +159,8 @@ Both are ignored by Git.
 - `AuthView.jsx` owns the email magic-link sign-in form.
 - `HomeView.jsx` owns homepage command state and lookup handoff.
 - `HomeCommand.jsx` owns the centered quick-log command controls.
+- `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
+- `DetailsLookup.jsx` owns user-facing lookup search and result selection without exposing provider/debug details.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view.
 
 `src/lib/mediaConfig.js`

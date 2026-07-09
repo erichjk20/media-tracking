@@ -1,12 +1,15 @@
-import { Plus, Save, X } from "lucide-react";
+import { Check, ImagePlus, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { useState } from "react";
 import {
   bookSubtypeOptions,
   categories,
   movieSubtypeOptions,
+  statusLabels,
   statuses,
   tvSubtypeOptions,
 } from "../lib/mediaConfig";
 import DetailsLookup from "./DetailsLookup";
+import MediaCover from "./MediaCover";
 import Rating from "./Rating";
 
 function EditorSheet({
@@ -33,6 +36,8 @@ function EditorSheet({
 }) {
   const canLookupDetails = lookupProviders.length > 0;
   const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
+  const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
+  const getShelfLabel = (status) => (status === "Completed" ? "Completed" : statusLabels[status] || status);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 dark:bg-black/75 sm:items-center sm:justify-center">
@@ -40,7 +45,7 @@ function EditorSheet({
         <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#181715] sm:-mx-5 sm:-mt-5 sm:px-5">
           <div>
             <h2 className="text-lg font-semibold text-stone-950 dark:text-[#eee9df]">{editingId ? "Edit item" : "Add item"}</h2>
-            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{category.label} / {activeStatus}</p>
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{category.label} / {getShelfLabel(activeStatus)}</p>
           </div>
           <button
             className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
@@ -71,6 +76,32 @@ function EditorSheet({
             />
           )}
 
+          <FieldGroup label="Shelf">
+            <div className="grid grid-cols-2 gap-2 rounded-md border border-stone-300 bg-stone-100 p-1 dark:border-white/10 dark:bg-[#12110f]">
+              {statuses.map((status) => {
+                const isActive = draft.status === status;
+                return (
+                  <button
+                    key={status}
+                    className={`inline-flex h-10 items-center justify-center rounded px-3 text-sm font-semibold transition ${
+                      isActive
+                        ? "bg-white text-stone-950 shadow-sm dark:bg-[#24211e] dark:text-[#eee9df]"
+                        : "text-stone-600 hover:bg-white/70 dark:text-stone-400 dark:hover:bg-white/5"
+                    }`}
+                    onClick={() => {
+                      onUpdateDraft("status", status);
+                      setActiveStatus(status);
+                    }}
+                    type="button"
+                    aria-pressed={isActive}
+                  >
+                    {getShelfLabel(status)}
+                  </button>
+                );
+              })}
+            </div>
+          </FieldGroup>
+
           <Field label="Title">
             <input
               className="input"
@@ -90,7 +121,7 @@ function EditorSheet({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Category">
               <select
                 className="input"
@@ -103,23 +134,6 @@ function EditorSheet({
                 {categories.map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {entry.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Shelf">
-              <select
-                className="input"
-                value={draft.status}
-                onChange={(event) => {
-                  onUpdateDraft("status", event.target.value);
-                  setActiveStatus(event.target.value);
-                }}
-              >
-                {statuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
                   </option>
                 ))}
               </select>
@@ -181,20 +195,18 @@ function EditorSheet({
           )}
 
           {draft.status === "Completed" && (
-            <Field label="Rating">
+            <FieldGroup label="Rating">
               <Rating value={Number(draft.rating)} onChange={(rating) => onUpdateDraft("rating", rating)} />
-            </Field>
+            </FieldGroup>
           )}
 
-          <Field label="Image URL">
-            <input
-              className="input"
-              value={draft.imageUrl}
-              onChange={(event) => onUpdateDraft("imageUrl", event.target.value)}
-              placeholder="https://..."
-              type="url"
-            />
-          </Field>
+          <CoverField
+            imageUrl={draft.imageUrl}
+            isImageEditorOpen={isImageEditorOpen}
+            onImageEditorOpenChange={setIsImageEditorOpen}
+            onUpdateImageUrl={(value) => onUpdateDraft("imageUrl", value)}
+            title={draft.title}
+          />
 
           <Field label="Synopsis">
             <textarea
@@ -233,6 +245,101 @@ function Field({ label, children }) {
       <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">{label}</span>
       {children}
     </label>
+  );
+}
+
+function FieldGroup({ label, children }) {
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function CoverField({
+  imageUrl,
+  isImageEditorOpen,
+  onImageEditorOpenChange,
+  onUpdateImageUrl,
+  title,
+}) {
+  const coverTitle = title || "Cover";
+
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">Cover</span>
+      <div className="flex gap-3 rounded-md border border-stone-300 bg-stone-50 p-3 dark:border-white/10 dark:bg-[#12110f]">
+        {imageUrl ? (
+          <MediaCover
+            className="h-32 w-24 shrink-0 rounded-md text-xs"
+            fallbackClassName="flex items-center justify-center p-2 text-center font-semibold"
+            imageClassName="h-32 w-24 shrink-0 rounded-md object-cover"
+            src={imageUrl}
+            title={coverTitle}
+          />
+        ) : (
+          <div className="cover-fallback flex h-32 w-24 shrink-0 items-center justify-center rounded-md p-2 text-center text-xs font-semibold">
+            {coverTitle}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          {imageUrl ? (
+            <p className="text-sm font-medium text-stone-800 dark:text-stone-100">Cover added</p>
+          ) : (
+            <p className="text-sm font-medium text-stone-800 dark:text-stone-100">No cover yet</p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-white dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/5"
+              onClick={() => onImageEditorOpenChange(true)}
+              type="button"
+            >
+              {imageUrl ? <Pencil size={15} /> : <ImagePlus size={15} />}
+              {imageUrl ? "Change" : "Add cover"}
+            </button>
+            {imageUrl && (
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-stone-300 px-3 text-sm font-semibold text-stone-700 transition hover:bg-white dark:border-white/10 dark:text-stone-200 dark:hover:bg-white/5"
+                onClick={() => {
+                  onUpdateImageUrl("");
+                  onImageEditorOpenChange(false);
+                }}
+                type="button"
+              >
+                <Trash2 size={15} />
+                Remove
+              </button>
+            )}
+          </div>
+
+          {isImageEditorOpen && (
+            <div className="mt-3 flex gap-2">
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">Cover image URL</span>
+                <input
+                  className="input"
+                  value={imageUrl}
+                  onChange={(event) => onUpdateImageUrl(event.target.value)}
+                  placeholder="Paste image URL"
+                  type="url"
+                />
+              </label>
+              <button
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white transition hover:bg-shelf-accent"
+                onClick={() => onImageEditorOpenChange(false)}
+                type="button"
+                aria-label="Done editing cover"
+                title="Done editing cover"
+              >
+                <Check size={17} />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

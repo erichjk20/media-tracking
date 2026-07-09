@@ -12,7 +12,6 @@ function DetailsLookup({
   bookLanguage,
   categoryLabel,
   canUseBookLookup,
-  lookupProviders,
   message,
   onApply,
   onBookLanguageChange,
@@ -28,11 +27,6 @@ function DetailsLookup({
     <div className="rounded-lg border border-shelf-accent/20 bg-shelf-accent-deep/10 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-stone-800 dark:text-stone-100">Find details</span>
-        {lookupProviders.map((provider) => (
-          <span key={provider.id} className="rounded bg-[#181715] px-2 py-1 text-xs font-semibold text-shelf-accent-soft ring-1 ring-shelf-accent/20">
-            {provider.label}
-          </span>
-        ))}
       </div>
 
       <div className="mt-3 flex gap-2">
@@ -90,7 +84,7 @@ function DetailsLookup({
             return (
               <li key={lookupResult.id}>
                 <button
-                  className="grid w-full grid-cols-[42px_minmax(0,1fr)_auto] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
+                  className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
                   onClick={() => onApply(lookupResult)}
                   type="button"
                 >
@@ -103,9 +97,6 @@ function DetailsLookup({
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-stone-950 dark:text-[#eee9df]">{title}</span>
                     <span className="mt-1 block truncate text-xs text-stone-600 dark:text-stone-400">{getLookupResultMeta(lookupResult)}</span>
-                  </span>
-                  <span className="self-start rounded bg-stone-100 px-2 py-1 text-[11px] font-semibold text-stone-600 dark:bg-white/5 dark:text-stone-300">
-                    {lookupResult.sourceLabel}
                   </span>
                 </button>
               </li>

@@ -12,18 +12,15 @@ function DetailsLookup({
   bookLanguage,
   categoryLabel,
   canUseBookLookup,
-  canUseTmdb,
   lookupProviders,
   message,
   onApply,
   onBookLanguageChange,
   onQueryChange,
   onSearch,
-  onTmdbLanguageChange,
   query,
   results,
   status,
-  tmdbLanguage,
 }) {
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
 
@@ -66,28 +63,16 @@ function DetailsLookup({
         </button>
       </div>
 
-      {(canUseBookLookup || canUseTmdb) && (
+      {canUseBookLookup && (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {canUseBookLookup && (
-            <label>
-              <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">Book language</span>
-              <select className="input" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
-                <option value="en">English</option>
-                <option value="all">Any language</option>
-                <option value="ko">Korean</option>
-              </select>
-            </label>
-          )}
-
-          {canUseTmdb && (
-            <label>
-              <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">TMDb language</span>
-              <select className="input" value={tmdbLanguage} onChange={(event) => onTmdbLanguageChange(event.target.value)}>
-                <option value="en-US">English</option>
-                <option value="ko-KR">Korean</option>
-              </select>
-            </label>
-          )}
+          <label>
+            <span className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300">Book language</span>
+            <select className="input" value={bookLanguage} onChange={(event) => onBookLanguageChange(event.target.value)}>
+              <option value="en">English</option>
+              <option value="all">Any language</option>
+              <option value="ko">Korean</option>
+            </select>
+          </label>
         </div>
       )}
 

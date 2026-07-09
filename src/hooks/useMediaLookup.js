@@ -55,7 +55,6 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   const [lookupResults, setLookupResults] = useState([]);
   const [lookupStatus, setLookupStatus] = useState("idle");
   const [lookupMessage, setLookupMessage] = useState("");
-  const [tmdbLanguage, setTmdbLanguage] = useState("en-US");
   const [bookLanguage, setBookLanguage] = useState(openLibraryCanonicalBookLanguage);
   const [pendingLookup, setPendingLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
@@ -65,7 +64,6 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     [draft.category, draft.subtype],
   );
   const canUseBookLookup = draft.category === "books";
-  const canUseTmdb = lookupProviders.some((provider) => provider.id === "tmdb");
 
   const resetLookupState = useCallback(() => {
     setLookupQuery("");
@@ -95,7 +93,6 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
           category: draft.category,
           language: draft.category === "books" ? getBookLookupLanguage(draft.subtype, bookLanguage) : bookLanguage,
           subtype: draft.subtype,
-          tmdbLanguage,
         });
       });
 
@@ -128,7 +125,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setLookupResults(results);
     setLookupStatus("success");
     setLookupMessage(messages.length ? messages.join(" ") : "");
-  }, [bookLanguage, draft.category, draft.subtype, lookupQuery, tmdbLanguage]);
+  }, [bookLanguage, draft.category, draft.subtype, lookupQuery]);
 
   const applyLookupResult = useCallback(async (lookupResult) => {
     setLookupStatus("loading");
@@ -140,7 +137,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
         applyPatch(setDraft, patch);
         setLookupMessage("Details added from OMDb. You can edit anything before saving.");
       } else if (lookupResult.source === "tmdb") {
-        const patch = withoutPersonalNotes(await getTmdbItemPatch(lookupResult.result, draft, { tmdbLanguage }));
+        const patch = withoutPersonalNotes(await getTmdbItemPatch(lookupResult.result, draft));
         applyPatch(setDraft, patch);
         setLookupMessage(patch.subtype === "korean-movie" || patch.subtype === "kdrama" ? "Korean media details added from TMDb." : "TMDb details added. You can adjust the subtype before saving.");
       } else if (lookupResult.source === "open-library") {
@@ -168,7 +165,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       setLookupStatus("error");
       setLookupMessage(error.message || "Could not apply that result.");
     }
-  }, [draft, setDraft, tmdbLanguage]);
+  }, [draft, setDraft]);
 
   const queueLookup = useCallback((lookup) => {
     setPendingLookup(lookup);
@@ -197,7 +194,6 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   return {
     bookLanguage,
     canUseBookLookup,
-    canUseTmdb,
     lookupMessage,
     lookupProviders,
     lookupQuery,
@@ -208,8 +204,6 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     searchDetails,
     setBookLanguage,
     setLookupQuery,
-    setTmdbLanguage,
     applyLookupResult,
-    tmdbLanguage,
   };
 }

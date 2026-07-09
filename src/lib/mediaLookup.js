@@ -94,7 +94,7 @@ async function fetchOmdbResults(searchText, category) {
 }
 
 async function fetchTmdbResults(searchText, context = {}) {
-  const { category, subtype, tmdbLanguage = tmdbCanonicalMediaLanguage } = context;
+  const { category, subtype } = context;
   const mediaType = category === "movies" ? "movie" : category === "tv" ? "tv" : "";
 
   if (!tmdbAccessToken && !tmdbApiKey) {
@@ -105,7 +105,7 @@ async function fetchTmdbResults(searchText, context = {}) {
     return { results: [], message: "" };
   }
 
-  const languages = getTmdbSearchLanguages(mediaType, subtype, tmdbLanguage);
+  const languages = getTmdbSearchLanguages(mediaType, subtype);
   const settledSearches = await Promise.allSettled(
     languages.map((language) => fetchTmdbSearchResults(searchText, mediaType, subtype, language)),
   );
@@ -282,11 +282,10 @@ export async function getOmdbItemPatch(result, category, subtype = "") {
   };
 }
 
-export async function getTmdbItemPatch(result, currentItem, options = {}) {
-  const { tmdbLanguage = tmdbCanonicalMediaLanguage } = options;
+export async function getTmdbItemPatch(result, currentItem) {
   const url = new URL(`https://api.themoviedb.org/3/${result.mediaType}/${result.id}`);
   applyTmdbAuth(url);
-  url.searchParams.set("language", result.mediaType === "movie" || result.mediaType === "tv" ? tmdbCanonicalMediaLanguage : tmdbLanguage);
+  url.searchParams.set("language", tmdbCanonicalMediaLanguage);
   url.searchParams.set("append_to_response", "credits");
 
   const response = await fetch(url, getTmdbRequestOptions());
@@ -399,15 +398,11 @@ function getTmdbRequestOptions() {
   };
 }
 
-function getTmdbSearchLanguages(mediaType, subtype, selectedLanguage) {
-  const languages = [selectedLanguage || tmdbCanonicalMediaLanguage];
-
-  if ((mediaType === "movie" && subtype === "korean-movie") || (mediaType === "tv" && subtype === "kdrama")) {
-    languages.push(selectedLanguage === "ko-KR" ? tmdbCanonicalMediaLanguage : "ko-KR");
-  }
+function getTmdbSearchLanguages(mediaType, subtype) {
+  const languages = [tmdbCanonicalMediaLanguage, "ko-KR"];
 
   if (mediaType === "tv" && subtype === "anime") {
-    languages.push(selectedLanguage === "ja-JP" ? tmdbCanonicalMediaLanguage : "ja-JP");
+    languages.push("ja-JP");
   }
 
   return [...new Set(languages)];

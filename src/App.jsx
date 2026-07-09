@@ -86,7 +86,6 @@ function App() {
     applyLookupResult,
     bookLanguage,
     canUseBookLookup,
-    canUseTmdb,
     lookupMessage,
     lookupProviders,
     lookupQuery,
@@ -97,8 +96,6 @@ function App() {
     searchDetails,
     setBookLanguage,
     setLookupQuery,
-    setTmdbLanguage,
-    tmdbLanguage,
   } = useMediaLookup({ draft, isEditorOpen, setDraft });
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) || null,
@@ -563,7 +560,6 @@ function App() {
           activeStatus={activeStatus}
           bookLanguage={bookLanguage}
           canUseBookLookup={canUseBookLookup}
-          canUseTmdb={canUseTmdb}
           category={category}
           draft={draft}
           editingId={editingId}
@@ -574,7 +570,6 @@ function App() {
           onUpdateDraft={updateDraft}
           onBookLanguageChange={setBookLanguage}
           onSearchDetails={searchDetails}
-          onTmdbLanguageChange={setTmdbLanguage}
           lookupMessage={lookupMessage}
           lookupProviders={lookupProviders}
           lookupQuery={lookupQuery}
@@ -582,7 +577,6 @@ function App() {
           lookupStatus={lookupStatus}
           setActiveCategory={setActiveCategory}
           setActiveStatus={setActiveStatus}
-          tmdbLanguage={tmdbLanguage}
         />
       )}
 

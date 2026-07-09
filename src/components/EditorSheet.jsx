@@ -13,7 +13,6 @@ function EditorSheet({
   activeStatus,
   bookLanguage,
   canUseBookLookup,
-  canUseTmdb,
   category,
   draft,
   editingId,
@@ -28,11 +27,9 @@ function EditorSheet({
   onLookupQueryChange,
   onSearchDetails,
   onSubmit,
-  onTmdbLanguageChange,
   onUpdateDraft,
   setActiveCategory,
   setActiveStatus,
-  tmdbLanguage,
 }) {
   const canLookupDetails = lookupProviders.length > 0;
   const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
@@ -62,18 +59,15 @@ function EditorSheet({
               bookLanguage={bookLanguage}
               categoryLabel={lookupCategoryLabel}
               canUseBookLookup={canUseBookLookup}
-              canUseTmdb={canUseTmdb}
               lookupProviders={lookupProviders}
               message={lookupMessage}
               onApply={onApplyLookupResult}
               onBookLanguageChange={onBookLanguageChange}
               onQueryChange={onLookupQueryChange}
               onSearch={onSearchDetails}
-              onTmdbLanguageChange={onTmdbLanguageChange}
               query={lookupQuery}
               results={lookupResults}
               status={lookupStatus}
-              tmdbLanguage={tmdbLanguage}
             />
           )}
 

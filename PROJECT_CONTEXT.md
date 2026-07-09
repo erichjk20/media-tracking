@@ -303,10 +303,10 @@ Movies and TV Shows use TMDb as the primary unified add/edit lookup provider. An
 The lookup:
 
 - Accepts English or Korean search text.
-- Searches TMDb movie results for Movies.
-- Searches TMDb TV results for TV Shows.
-- Uses TMDb TV results for Anime subtype entries.
-- Supports English or Korean result language display.
+- Searches TMDb movie results for Movies using English and Korean result languages behind the scenes.
+- Searches TMDb TV results for TV Shows using English and Korean result languages behind the scenes.
+- Uses TMDb TV results for Anime subtype entries, also adding Japanese result-language search behind the scenes.
+- Always fetches selected TMDb details in English (`en-US`) so saved media metadata stays consistent.
 - Fills title, creator/director, poster URL, synopsis, and available runtime/count metadata from TMDb.
 - Automatically marks Korean movie results as `korean-movie` when TMDb country data includes `KR`.
 - Automatically marks Korean TV results as `kdrama` when TMDb origin country data includes `KR`.

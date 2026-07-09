@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
 import AppHeader from "./components/AppHeader";
 import AuthView from "./components/AuthView";
 import BottomNav from "./components/BottomNav";
 import CompleteItemDialog from "./components/CompleteItemDialog";
 import DeleteItemDialog from "./components/DeleteItemDialog";
 import EditorSheet from "./components/EditorSheet";
-import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import ProfileView from "./components/ProfileView";
@@ -44,7 +42,7 @@ function App() {
   const [storageMessage, setStorageMessage] = useState(
     isSupabaseConfigured ? "Checking your session..." : "",
   );
-  const [activeView, setActiveView] = useState("home");
+  const [activeView, setActiveView] = useState("library");
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
   const [activeBookSubtype, setActiveBookSubtype] = useState("all");
@@ -60,7 +58,6 @@ function App() {
   const [completingItemId, setCompletingItemId] = useState(null);
   const [completionRating, setCompletionRating] = useState(3);
   const [deletingItemId, setDeletingItemId] = useState(null);
-  const [homeSearchResetToken, setHomeSearchResetToken] = useState(0);
   const user = session?.user || null;
   const shouldUseSupabase = Boolean(isSupabaseConfigured && user);
   const libraryMetrics = useLibraryMetrics(items);
@@ -68,7 +65,6 @@ function App() {
     activeShelfCounts,
     bookSubtypeCounts,
     category,
-    counts,
     movieSubtypeCounts,
     tvSubtypeCounts,
     visibleItems,
@@ -111,7 +107,7 @@ function App() {
   );
 
   useEffect(() => {
-    setActiveView("home");
+    setActiveView("library");
   }, [user?.id]);
 
   useEffect(() => {
@@ -208,8 +204,6 @@ function App() {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
     if (!cleanedTitle) return;
-    const isAddingNewItem = !editingId;
-
     const nextItem = {
       ...draft,
       id: editingId || crypto.randomUUID(),
@@ -247,9 +241,6 @@ function App() {
           : [...current, savedItem],
       );
       resetForm();
-      if (isAddingNewItem) {
-        setHomeSearchResetToken((current) => current + 1);
-      }
       setIsEditorOpen(false);
     } catch (error) {
       console.error("Supabase save failed", error);
@@ -315,21 +306,8 @@ function App() {
     }
   }
 
-  function startNewItem() {
-    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
-
-    setDraft(createMediaDraft({
-      category: activeCategory,
-      subtype,
-      status: activeStatus,
-    }));
-    setEditingId(null);
-    resetLookupState();
-    setIsEditorOpen(true);
-  }
-
-  function startHomeLookup({ categoryId, query: homeQuery, status, subtype = "" }) {
-    const cleanedQuery = homeQuery.trim();
+  function startShelfLookup({ categoryId, query: shelfQuery, status, subtype = "" }) {
+    const cleanedQuery = shelfQuery.trim();
     const selectedSubtype = getDefaultSubtype(categoryId, subtype);
 
     setActiveCategory(categoryId);
@@ -449,19 +427,8 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-transparent pb-28 lg:pb-0">
-      <AppHeader
-        activeCategory={activeCategory}
-        activeView={activeView}
-        counts={counts}
-        profile={profile}
-        user={user}
-        onGoHome={() => setActiveView("home")}
-        onShowCategory={showCategory}
-        onShowLibrary={showLibrary}
-        onShowProfile={showProfile}
-        onSignOut={handleSignOut}
-      />
+    <main className="min-h-screen bg-transparent pb-28">
+      <AppHeader />
 
       {storageMessage && (
         <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -471,16 +438,12 @@ function App() {
         </div>
       )}
 
-      {activeView === "home" ? (
-        <HomeView
-          key={homeSearchResetToken}
-          onStartLookup={startHomeLookup}
-        />
-      ) : activeView === "profile" ? (
+      {activeView === "profile" ? (
         <ProfileView
           metrics={libraryMetrics}
           onOpenItem={openItemDetails}
           onSaveDisplayName={handleSaveDisplayName}
+          onSignOut={handleSignOut}
           onShowCategory={showCategory}
           profile={profile}
           user={user}
@@ -504,6 +467,7 @@ function App() {
           onDeleteItem={requestDeleteItem}
           onEditItem={editItem}
           onOpenItem={openItemDetails}
+          onStartLookup={startShelfLookup}
           onQueryChange={setQuery}
           onShelfViewChange={setShelfView}
           onSortOrderChange={setSortOrder}
@@ -513,18 +477,6 @@ function App() {
           tvSubtypeCounts={tvSubtypeCounts}
           visibleItems={visibleItems}
         />
-      )}
-
-      {activeView === "library" && (
-        <button
-          className="fixed bottom-6 right-6 z-30 hidden h-14 w-14 items-center justify-center rounded-full bg-shelf-accent-deep text-white shadow-lift transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 lg:inline-flex"
-          onClick={startNewItem}
-          type="button"
-          aria-label="Add item"
-          title="Add item"
-        >
-          <Plus size={24} />
-        </button>
       )}
 
       {selectedItem && (
@@ -580,13 +532,12 @@ function App() {
         />
       )}
 
-      {activeView === "library" && (
-        <BottomNav
-          activeCategory={activeCategory}
-          onAddItem={startNewItem}
-          onShowCategory={showCategory}
-        />
-      )}
+      <BottomNav
+        activeCategory={activeCategory}
+        activeView={activeView}
+        onShowCategory={showCategory}
+        onShowProfile={showProfile}
+      />
     </main>
   );
 

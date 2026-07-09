@@ -1,4 +1,5 @@
-import { Library } from "lucide-react";
+import { useState } from "react";
+import { Library, Search } from "lucide-react";
 import {
   bookSubtypeOptions,
   movieSubtypeOptions,
@@ -31,6 +32,7 @@ function LibraryView({
   onDeleteItem,
   onEditItem,
   onOpenItem,
+  onStartLookup,
   onShelfViewChange,
   onSortOrderChange,
   onQueryChange,
@@ -40,8 +42,10 @@ function LibraryView({
   tvSubtypeCounts,
   visibleItems,
 }) {
+  const [logQuery, setLogQuery] = useState("");
   const completedCount = activeShelfCounts?.Completed || 0;
   const plannedCount = activeShelfCounts?.["Want to Watch/Read"] || 0;
+  const categoryLabel = category.label.toLowerCase();
   let subtypeFilter = null;
 
   if (activeCategory === "books") {
@@ -77,6 +81,19 @@ function LibraryView({
     );
   }
 
+  function handleLogSearchSubmit(event) {
+    event.preventDefault();
+    const cleanedQuery = logQuery.trim();
+    if (!cleanedQuery) return;
+
+    onStartLookup({
+      categoryId: activeCategory,
+      query: cleanedQuery,
+      status: activeStatus,
+    });
+    setLogQuery("");
+  }
+
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
       <div className="min-w-0">
@@ -98,6 +115,28 @@ function LibraryView({
             </div>
           </div>
         </div>
+
+        <form className="mt-4" onSubmit={handleLogSearchSubmit}>
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500" size={20} />
+            <input
+              className="h-14 w-full rounded-full border border-stone-300 bg-white pl-12 pr-16 text-base font-medium text-stone-950 shadow-[0_14px_45px_rgba(0,0,0,0.14)] outline-none transition placeholder:text-stone-400 focus:border-shelf-accent focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#181715] dark:text-stone-100 dark:placeholder:text-stone-500 sm:h-16 sm:pl-14 sm:pr-36"
+              value={logQuery}
+              onChange={(event) => setLogQuery(event.target.value)}
+              placeholder={`Search ${categoryLabel} to log`}
+            />
+            <button
+              className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-shelf-accent-deep text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 dark:disabled:bg-white/10 dark:disabled:text-stone-500 sm:right-3 sm:w-auto sm:px-5"
+              disabled={!logQuery.trim()}
+              type="submit"
+              aria-label={`Search ${categoryLabel}`}
+              title={`Search ${categoryLabel}`}
+            >
+              <Search size={17} />
+              <span className="hidden text-sm font-semibold sm:ml-2 sm:inline">Search</span>
+            </button>
+          </label>
+        </form>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
           <StatusSegmentedControl
@@ -131,7 +170,7 @@ function LibraryView({
             <Library className="text-stone-400 dark:text-stone-500" size={36} />
             <h3 className="mt-4 text-lg font-semibold text-stone-950 dark:text-[#eee9df]">Nothing here yet</h3>
             <p className="mt-2 max-w-sm text-sm leading-6 text-stone-600 dark:text-stone-400">
-              Add a title to this shelf or switch categories to browse another part of your library.
+              Search {categoryLabel} above to save your first title here.
             </p>
           </div>
         )}

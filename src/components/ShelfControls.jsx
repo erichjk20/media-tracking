@@ -82,7 +82,7 @@ export function ShelfSearch({ query, onChange }) {
             if (!query) setIsExpanded(false);
           }}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="Search shelf"
+          placeholder="Filter saved titles"
         />
       </label>
     </div>

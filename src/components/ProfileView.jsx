@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Library,
+  LogOut,
   Save,
   UserRound,
 } from "lucide-react";
@@ -15,6 +16,7 @@ function ProfileView({
   metrics,
   onOpenItem,
   onSaveDisplayName,
+  onSignOut,
   onShowCategory,
   profile,
   user,
@@ -60,14 +62,26 @@ function ProfileView({
     <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
       <div className="grid gap-5">
         <aside className="border-b border-white/10 pb-5">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white">
-              <UserRound size={21} />
-            </span>
-            <div className="min-w-0">
-              <h2 className="truncate text-xl font-semibold text-[#eee9df]">{shownName}</h2>
-              <p className="mt-1 truncate text-sm text-stone-400">{accountLabel}</p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white">
+                <UserRound size={21} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-semibold text-[#eee9df]">{shownName}</h2>
+                <p className="mt-1 truncate text-sm text-stone-400">{accountLabel}</p>
+              </div>
             </div>
+            {user && (
+              <button
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-white/10 bg-[#151412] px-3 text-sm font-semibold text-stone-200 transition hover:border-red-400/40 hover:bg-red-950/25 hover:text-red-200 focus:outline-none focus:ring-4 focus:ring-red-950/40"
+                onClick={onSignOut}
+                type="button"
+              >
+                <LogOut size={16} />
+                Sign out
+              </button>
+            )}
           </div>
 
           <form className="mt-5" onSubmit={handleSubmit}>

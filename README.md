@@ -19,6 +19,7 @@ Lookup results populate the form and cover art automatically. The add sheet show
 ```text
 VITE_SUPABASE_URL=your-supabase-project-url
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+ALADIN_TTB_KEY=your-aladin-ttb-key
 ```
 
 When Supabase is configured, users sign in with an email magic link and their private library rows are scoped by Supabase Auth + row-level security.
@@ -26,6 +27,38 @@ When Supabase is configured, users sign in with an email magic link and their pr
 If you already have personal rows in `library_items`, sign in once with your email and run the one-time backfill SQL at the bottom of `supabase/schema.sql` so those rows belong to your auth user. Rerun the schema after backfilling to make `library_items.user_id` required.
 
 If the Supabase variables are missing, the app runs as a local development/demo tracker using browser `localStorage`.
+
+## Free Production Deployment
+
+The app is configured for Netlify Free hosting with Supabase Free for auth and data.
+
+1. Push this repo to GitHub.
+2. In Netlify, create a new site from the GitHub repo.
+3. Use these build settings:
+
+```text
+Build command: npm run build
+Publish directory: dist
+```
+
+4. Add these Netlify environment variables:
+
+```text
+VITE_SUPABASE_URL=your-supabase-project-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_OMDB_API_KEY=your-omdb-api-key
+VITE_TMDB_ACCESS_TOKEN=your-tmdb-v4-read-access-token
+VITE_TMDB_API_KEY=your-tmdb-v3-api-key
+ALADIN_TTB_KEY=your-aladin-ttb-key
+```
+
+`ALADIN_TTB_KEY` is used by the Netlify Function at `/api/aladin/books`, so the Korean book lookup key is not exposed in the browser bundle.
+
+5. In Supabase Auth settings, add your Netlify production URL to the allowed redirect URLs.
+6. If the Supabase schema has not been created yet, run `supabase/schema.sql` in the Supabase SQL editor.
+7. Deploy from Netlify.
+
+Netlify reads `netlify.toml`, builds the Vite app into `dist`, serves it as a single-page app, and routes `/api/aladin/books` to the production function.
 
 ## Free Local Auth Testing
 

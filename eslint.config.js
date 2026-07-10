@@ -29,9 +29,18 @@ export default [
     },
   },
   {
-    files: ["eslint.config.js", "postcss.config.js", "tailwind.config.js", "vite.config.js"],
+    files: [
+      "eslint.config.js",
+      "postcss.config.js",
+      "tailwind.config.js",
+      "vite.config.js",
+      "netlify/functions/*.js",
+    ],
     languageOptions: {
-      globals: globals.node,
+      globals: {
+        ...globals.node,
+        fetch: "readonly",
+      },
     },
   },
 ];

@@ -5,7 +5,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
-    plugins: [react(), aladinApiPlugin(env.VITE_ALADIN_TTB_KEY)],
+    plugins: [react(), aladinApiPlugin(env.ALADIN_TTB_KEY || env.VITE_ALADIN_TTB_KEY)],
   };
 });
 
@@ -17,7 +17,7 @@ function aladinApiPlugin(aladinTtbKey) {
     }
 
     if (!aladinTtbKey) {
-      sendJson(response, 400, { message: "Add VITE_ALADIN_TTB_KEY to .env.local to use Korean book lookup." });
+      sendJson(response, 400, { message: "Add ALADIN_TTB_KEY to .env.local to use Korean book lookup." });
       return;
     }
 

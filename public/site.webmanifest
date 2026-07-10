@@ -1,0 +1,24 @@
+{
+  "name": "shelvd",
+  "short_name": "shelvd",
+  "description": "Track your media without the noise.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#181715",
+  "theme_color": "#181715",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -168,6 +168,7 @@ export const emptyDraft = {
   notes: "",
   imageUrl: "",
   addedAt: "",
+  statusChangedAt: "",
 };
 
 export const sortOptions = [

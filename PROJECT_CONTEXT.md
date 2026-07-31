@@ -58,6 +58,7 @@ The main app supports:
 - Jikan lookup behind the unified search for Manga
 - Per-category counts
 - A Profile view with library stats and recently added items
+- Per-shelf recently added sorting based on when an item entered its current Done/Want shelf
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
 - Star rating input for Completed items only

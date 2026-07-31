@@ -61,12 +61,13 @@ export async function saveMediaItem(item, userId) {
     .select()
     .single();
 
-  if (error && isMissingColumnError(error, "synopsis")) {
-    const rowWithoutSynopsis = { ...row };
-    delete rowWithoutSynopsis.synopsis;
+  if (error && (isMissingColumnError(error, "synopsis") || isMissingColumnError(error, "status_changed_at"))) {
+    const rowWithCompatibleColumns = { ...row };
+    if (isMissingColumnError(error, "synopsis")) delete rowWithCompatibleColumns.synopsis;
+    if (isMissingColumnError(error, "status_changed_at")) delete rowWithCompatibleColumns.status_changed_at;
     const retry = await supabase
       .from(tableName)
-      .upsert(rowWithoutSynopsis)
+      .upsert(rowWithCompatibleColumns)
       .select()
       .single();
     data = retry.data;
@@ -129,6 +130,7 @@ function dbRowToMediaItem(row) {
     notes: row.notes || "",
     imageUrl: row.image_url || "",
     addedAt: row.added_at || "",
+    statusChangedAt: row.status_changed_at || row.added_at || "",
     updatedAt: row.updated_at || "",
   };
 }
@@ -151,6 +153,7 @@ function mediaItemToDbRow(item, userId) {
     notes: item.notes || null,
     image_url: item.imageUrl || null,
     added_at: item.addedAt || new Date().toISOString(),
+    status_changed_at: item.statusChangedAt || item.addedAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 }
@@ -274,10 +277,11 @@ function firstRelatedRow(value) {
 }
 
 function isMissingColumnError(error, columnName) {
+  const message = String(error?.message || "");
   return (
-    error?.code === "PGRST204"
-    || String(error?.message || "").includes(`'${columnName}' column`)
-    || String(error?.message || "").includes(`column "${columnName}"`)
+    message.includes(`'${columnName}' column`)
+    || message.includes(`column "${columnName}"`)
+    || (error?.code === "PGRST204" && message.includes(columnName))
   );
 }
 

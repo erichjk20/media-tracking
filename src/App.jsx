@@ -204,10 +204,18 @@ function App() {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
     if (!cleanedTitle) return;
+    const now = new Date().toISOString();
+    const originalItem = editingId ? items.find((item) => item.id === editingId) : null;
+    const addedAt = editingId ? draft.addedAt || originalItem?.addedAt || now : now;
+    const statusChangedAt =
+      !editingId || draft.status !== originalItem?.status
+        ? now
+        : draft.statusChangedAt || originalItem?.statusChangedAt || addedAt;
     const nextItem = {
       ...draft,
       id: editingId || crypto.randomUUID(),
-      addedAt: editingId ? draft.addedAt || "" : new Date().toISOString(),
+      addedAt,
+      statusChangedAt,
       title: cleanedTitle,
       creator: draft.creator.trim(),
       director: draft.director.trim(),
@@ -293,6 +301,7 @@ function App() {
     const completedItem = {
       ...completingItem,
       status: "Completed",
+      statusChangedAt: new Date().toISOString(),
       rating: Number(completionRating) || 3,
     };
 

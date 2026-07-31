@@ -50,6 +50,7 @@ create table if not exists public.library_items (
     or subtype in ('book', 'korean-book', 'movie', 'anime-movie', 'korean-movie', 'tv', 'anime', 'kdrama')
   ),
   status text not null check (status in ('completed', 'want')),
+  status_changed_at timestamptz not null default now(),
   title text not null,
   creator text,
   director text,
@@ -75,6 +76,19 @@ add column if not exists duration_minutes integer;
 
 alter table public.library_items
 add column if not exists synopsis text;
+
+alter table public.library_items
+add column if not exists status_changed_at timestamptz;
+
+update public.library_items
+set status_changed_at = coalesce(status_changed_at, added_at, now())
+where status_changed_at is null;
+
+alter table public.library_items
+alter column status_changed_at set default now();
+
+alter table public.library_items
+alter column status_changed_at set not null;
 
 alter table public.library_items
 add column if not exists user_id uuid references auth.users(id) on delete cascade;
@@ -379,6 +393,9 @@ on public.library_items (user_id, category, status);
 
 create index if not exists library_items_added_at_idx
 on public.library_items (added_at desc);
+
+create index if not exists library_items_status_changed_at_idx
+on public.library_items (status_changed_at desc);
 
 create index if not exists library_items_title_idx
 on public.library_items (lower(title));

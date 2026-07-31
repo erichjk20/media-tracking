@@ -75,6 +75,7 @@ export function normalizeItems(items) {
       studio: item.studio || defaultItem.studio || "",
       synopsis: item.synopsis || defaultItem.synopsis || "",
       subtype: getDefaultSubtype(category, subtype),
+      statusChangedAt: item.statusChangedAt || defaultItem.statusChangedAt || item.addedAt || defaultItem.addedAt || "",
     };
   });
 }
@@ -113,11 +114,11 @@ export function compareShelfItems(a, b, sortOrder) {
     return (
       Number(b.item.rating || 0) - Number(a.item.rating || 0)
       || compareTitles(a.item, b.item)
-      || getAddedSortValue(b.item, b.index) - getAddedSortValue(a.item, a.index)
+      || getShelfSortValue(b.item, b.index) - getShelfSortValue(a.item, a.index)
     );
   }
 
-  return getAddedSortValue(b.item, b.index) - getAddedSortValue(a.item, a.index) || compareTitles(a.item, b.item);
+  return getShelfSortValue(b.item, b.index) - getShelfSortValue(a.item, a.index) || compareTitles(a.item, b.item);
 }
 
 function compareTitles(a, b) {
@@ -127,8 +128,8 @@ function compareTitles(a, b) {
   });
 }
 
-function getAddedSortValue(item, index) {
-  const timestamp = Date.parse(item.addedAt || "");
+function getShelfSortValue(item, index) {
+  const timestamp = Date.parse(item.statusChangedAt || item.addedAt || "");
   return Number.isNaN(timestamp) ? index : timestamp;
 }
 

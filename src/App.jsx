@@ -17,6 +17,7 @@ import {
 import {
   ensureUserProfile,
   getCurrentSession,
+  hasPasswordRecoveryRedirect,
   isSupabaseConfigured,
   signOut,
   subscribeToAuthChanges,
@@ -36,6 +37,7 @@ import { useShelfData } from "./hooks/useShelfData";
 
 function App() {
   const [session, setSession] = useState(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(hasPasswordRecoveryRedirect);
   const [authStatus, setAuthStatus] = useState(isSupabaseConfigured ? "loading" : "local");
   const [profile, setProfile] = useState(() => (isSupabaseConfigured ? null : getStoredProfile()));
   const [items, setItems] = useState(() => (isSupabaseConfigured ? [] : getStoredItems()));
@@ -130,12 +132,14 @@ function App() {
       }
     }
 
-    loadSession();
-    const unsubscribe = subscribeToAuthChanges((nextSession) => {
+    const unsubscribe = subscribeToAuthChanges((nextSession, event) => {
       if (!isCurrent) return;
       setSession(nextSession);
       setAuthStatus("ready");
+      if (event === "PASSWORD_RECOVERY") setIsPasswordRecovery(true);
+      if (event === "SIGNED_OUT") setIsPasswordRecovery(false);
     });
+    loadSession();
 
     return () => {
       isCurrent = false;
@@ -360,6 +364,10 @@ function App() {
     }
   }
 
+  function handlePasswordUpdated() {
+    setIsPasswordRecovery(false);
+  }
+
   async function handleSignOut() {
     try {
       await signOut();
@@ -421,8 +429,13 @@ function App() {
     );
   }
 
-  if (isSupabaseConfigured && !user) {
-    return <AuthView />;
+  if (isSupabaseConfigured && (isPasswordRecovery || !user)) {
+    return (
+      <AuthView
+        isPasswordRecovery={isPasswordRecovery}
+        onPasswordUpdated={handlePasswordUpdated}
+      />
+    );
   }
 
   return (

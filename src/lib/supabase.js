@@ -2,8 +2,27 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const PASSWORD_RESET_PENDING_KEY = "shelvd-password-reset-pending";
+const authUrlAtLoad =
+  typeof window === "undefined"
+    ? ""
+    : `${window.location.search}${window.location.hash}`;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const hasPasswordRecoveryRedirect =
+  authUrlAtLoad.includes("auth_action=password-reset")
+  || authUrlAtLoad.includes("type=recovery")
+  || (
+    authUrlAtLoad.includes("code=")
+    && typeof window !== "undefined"
+    && window.localStorage.getItem(PASSWORD_RESET_PENDING_KEY) === "true"
+  );
+
+function getAuthRedirectUrl(action) {
+  const url = new URL(window.location.origin);
+  url.searchParams.set("auth_action", action);
+  return url.toString();
+}
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
@@ -20,24 +39,60 @@ export async function getCurrentSession() {
 export function subscribeToAuthChanges(callback) {
   if (!supabase) return () => {};
 
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session);
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    callback(session, event);
   });
 
   return () => data.subscription.unsubscribe();
 }
 
-export async function sendMagicLink(email) {
+export async function signInWithPassword(email, password) {
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
+    password,
+  });
+
+  if (error) throw error;
+}
+
+export async function signUpWithPassword(email, password) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
     options: {
       emailRedirectTo: window.location.origin,
     },
   });
 
   if (error) throw error;
+  return data;
+}
+
+export async function sendPasswordReset(email) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  window.localStorage.setItem(PASSWORD_RESET_PENDING_KEY, "true");
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getAuthRedirectUrl("password-reset"),
+  });
+
+  if (error) {
+    window.localStorage.removeItem(PASSWORD_RESET_PENDING_KEY);
+    throw error;
+  }
+}
+
+export async function updatePassword(password) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+  window.localStorage.removeItem(PASSWORD_RESET_PENDING_KEY);
 }
 
 export async function signOut() {

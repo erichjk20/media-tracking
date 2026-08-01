@@ -13,7 +13,7 @@ Lookup results populate the form and cover art automatically. The add sheet show
 1. Create a Supabase project.
 2. Open the Supabase SQL editor.
 3. Run `supabase/schema.sql`.
-4. In Supabase Auth, make sure Email provider magic links are enabled and add your local/production site URL to the allowed redirect URLs.
+4. In Supabase Auth, make sure the Email provider is enabled with password sign-in and user signups, and add your local/production site URL to the allowed redirect URLs.
 5. Copy your project URL and anon key into `.env.local`:
 
 ```text
@@ -22,7 +22,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ALADIN_TTB_KEY=your-aladin-ttb-key
 ```
 
-When Supabase is configured, users sign in with an email magic link and their private library rows are scoped by Supabase Auth + row-level security.
+When Supabase is configured, users can create an account or sign in with email and password, and their private library rows are scoped by Supabase Auth + row-level security.
 
 If you already have personal rows in `library_items`, sign in once with your email and run the one-time backfill SQL at the bottom of `supabase/schema.sql` so those rows belong to your auth user. Rerun the schema after backfilling to make `library_items.user_id` required.
 
@@ -62,7 +62,7 @@ Netlify reads `netlify.toml`, builds the Vite app into `dist`, serves it as a si
 
 ## Free Local Auth Testing
 
-Use local Supabase when you need to test magic-link sign-in repeatedly without spending money or hitting hosted email limits.
+Use local Supabase when you need to test email/password sign-in and password reset flows without spending money or hitting hosted email limits.
 
 1. Install Docker Desktop, OrbStack, or another Docker-compatible runtime.
 2. Initialize Supabase locally if this repo does not already have `supabase/config.toml`:
@@ -93,7 +93,9 @@ VITE_SUPABASE_ANON_KEY=your-local-anon-key
 ```
 
 6. Open local Supabase Studio at `http://localhost:54323`, paste `supabase/schema.sql` into the SQL editor, and run it.
-7. Start the app with `npm run dev`, sign in, then open the local email inbox at `http://localhost:54324` to grab the magic link.
+7. Start the app with `npm run dev`.
+8. Create a test user in local Supabase Studio under Authentication.
+9. Sign in with that user's email and password. For password resets, open the local email inbox at `http://localhost:54324` to grab the reset link.
 
 ## Development Checks
 

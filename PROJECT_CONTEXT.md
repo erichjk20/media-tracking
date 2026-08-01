@@ -33,12 +33,12 @@ Each media item contains:
 
 ## Current Implementation
 
-This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email magic links identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`.
+This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email/password signup and login identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`.
 
 The main app supports:
 
 - A command-style homepage for choosing media type, then quickly searching and logging new media through the add sheet
-- Email magic-link sign-in when Supabase is configured
+- Email/password signup and sign-in when Supabase is configured
 - Private per-user libraries backed by Supabase Auth and row-level security
 - Home/Library view switching
 - Category switching
@@ -157,7 +157,7 @@ Both are ignored by Git.
 `src/components/`
 
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
-- `AuthView.jsx` owns the email magic-link sign-in form.
+- `AuthView.jsx` owns email/password signup, login, and password reset flows.
 - `HomeView.jsx` owns homepage command state and lookup handoff.
 - `HomeCommand.jsx` owns the centered quick-log command controls.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
@@ -180,7 +180,7 @@ Both are ignored by Git.
 `src/lib/supabase.js`
 
 - Creates the Supabase client when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present.
-- Provides session, auth subscription, magic-link, sign-out, and user profile helpers.
+- Provides session, auth subscription, email/password signup and login, password reset, sign-out, and user profile helpers.
 
 `src/lib/mediaItemsStore.js`
 
@@ -284,7 +284,7 @@ The React app maps those values to its display labels:
 
 The browser-facing Supabase anon key is not a private secret. Private data is protected by Supabase Auth sessions and row-level security policies on `library_items`, detail tables, and `user_profiles`.
 
-When Supabase is configured, signed-out users see the magic-link auth screen. Signed-in users only load rows where `library_items.user_id = auth.uid()`. If Supabase is not configured, the app uses localStorage for local development/demo use.
+When Supabase is configured, signed-out users see the email/password auth screen with signup, login, and password reset flows. Signed-in users only load rows where `library_items.user_id = auth.uid()`. If Supabase is not configured, the app uses localStorage for local development/demo use.
 
 Existing personal rows must be claimed after your auth user exists. Sign in once with your email, run the one-time `update public.library_items set user_id = (...) where user_id is null;` SQL comment at the bottom of `supabase/schema.sql`, then rerun the schema so the safe block can make `library_items.user_id` required.
 

@@ -4,6 +4,7 @@ import {
   dedupeLookupResults,
   getBookLookupLanguage,
   getLookupMessage,
+  normalizeLookupQuery,
   rankLookupResults,
 } from "../lib/mediaUtils";
 import {
@@ -74,7 +75,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
 
   const searchDetails = useCallback(async (event) => {
     event?.preventDefault();
-    const cleanedQuery = lookupQuery.trim();
+    const cleanedQuery = normalizeLookupQuery(lookupQuery);
     const providers = getLookupProviders(draft.category, draft.subtype);
 
     if (!cleanedQuery || !providers.length) {

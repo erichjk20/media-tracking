@@ -4,7 +4,22 @@
 
 @layer components {
   .input {
-    @apply h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-shelf-accent focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#12110f] dark:text-stone-100 dark:placeholder:text-stone-500;
+    @apply h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-base text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-shelf-accent focus:ring-4 focus:ring-shelf-accent-deep/35 dark:border-white/10 dark:bg-[#12110f] dark:text-stone-100 dark:placeholder:text-stone-500 sm:text-sm;
+  }
+
+  .app-screen {
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  .auth-frame {
+    min-height: calc(100vh - 4rem);
+    min-height: calc(100svh - 4rem);
+  }
+
+  .editor-sheet-frame {
+    max-height: 92vh;
+    max-height: 92svh;
   }
 }
 
@@ -26,9 +41,11 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100svh;
   background:
     radial-gradient(circle at top left, rgba(42, 157, 145, 0.06), transparent 30rem),
     linear-gradient(180deg, #11100e 0%, #0f0e0d 42%, #0b0a09 100%);
+  overflow-x: hidden;
 }
 
 button,
@@ -36,6 +53,20 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+@media (max-width: 639px) {
+  input[class],
+  textarea[class],
+  select[class] {
+    font-size: 16px !important;
+  }
 }
 
 .cover-fallback {

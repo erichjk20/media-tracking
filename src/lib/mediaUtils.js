@@ -228,8 +228,21 @@ function getLookupResultYear(lookupResult) {
   return String(result.published || "").slice(0, 4);
 }
 
-export function normalizeSearchText(value) {
+export function normalizeSearchPunctuation(value) {
   return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u02BC\uFF07]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\uFF02]/g, "\"")
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/\u00A0/g, " ");
+}
+
+export function normalizeLookupQuery(value) {
+  return normalizeSearchPunctuation(value).replace(/\s+/g, " ").trim();
+}
+
+export function normalizeSearchText(value) {
+  return normalizeSearchPunctuation(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();

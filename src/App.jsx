@@ -423,7 +423,7 @@ function App() {
 
   if (isSupabaseConfigured && authStatus === "loading") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0f0e0d] px-4 text-stone-100">
+      <main className="app-screen flex items-center justify-center bg-[#0f0e0d] px-4 text-stone-100">
         <p className="text-sm font-semibold text-stone-400">Loading shelvd...</p>
       </main>
     );
@@ -439,7 +439,7 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-transparent pb-28">
+    <main className="app-screen bg-transparent pb-28">
       <AppHeader />
 
       {storageMessage && (

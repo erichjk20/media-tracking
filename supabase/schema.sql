@@ -173,9 +173,12 @@ add column if not exists manga_title text;
 create table if not exists public.tv_details (
   library_item_id uuid primary key references public.library_items(id) on delete cascade,
   tv_show_title text,
+  genre text,
+  release_year integer check (release_year is null or release_year between 1800 and 2100),
   studio text,
   season_count integer check (season_count is null or season_count >= 0),
   episode_count integer check (episode_count is null or episode_count >= 0),
+  season_breakdown jsonb default '[]'::jsonb,
   duration_minutes_per_episode integer check (
     duration_minutes_per_episode is null or duration_minutes_per_episode > 0
   ),
@@ -187,7 +190,23 @@ alter table public.tv_details
 add column if not exists tv_show_title text;
 
 alter table public.tv_details
+add column if not exists genre text;
+
+alter table public.tv_details
+add column if not exists release_year integer;
+
+alter table public.tv_details
+drop constraint if exists tv_details_release_year_check;
+
+alter table public.tv_details
+add constraint tv_details_release_year_check
+check (release_year is null or release_year between 1800 and 2100);
+
+alter table public.tv_details
 add column if not exists studio text;
+
+alter table public.tv_details
+add column if not exists season_breakdown jsonb default '[]'::jsonb;
 
 -- Existing Data Backfills
 -- Pulls structured detail fields out of legacy notes and shared columns.
@@ -276,26 +295,35 @@ set
 insert into public.tv_details (
   library_item_id,
   tv_show_title,
+  genre,
+  release_year,
   studio,
   season_count,
   episode_count,
+  season_breakdown,
   duration_minutes_per_episode
 )
 select
   id,
   title,
+  nullif(substring(notes from '(?im)^Genre:\s*(.+)$'), ''),
+  nullif(substring(notes from '(?im)^Year:\s*([0-9]{4})'), '')::integer,
   nullif(substring(notes from '(?im)^Studio:\s*(.+)$'), ''),
   nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
   nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
+  '[]'::jsonb,
   nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
 from public.library_items
 where category = 'tv'
 on conflict (library_item_id) do update
 set
   tv_show_title = excluded.tv_show_title,
+  genre = coalesce(excluded.genre, public.tv_details.genre),
+  release_year = coalesce(excluded.release_year, public.tv_details.release_year),
   studio = coalesce(excluded.studio, public.tv_details.studio),
   season_count = excluded.season_count,
   episode_count = excluded.episode_count,
+  season_breakdown = coalesce(excluded.season_breakdown, public.tv_details.season_breakdown),
   duration_minutes_per_episode = excluded.duration_minutes_per_episode,
   updated_at = now();
 
@@ -309,17 +337,23 @@ begin
       insert into public.tv_details (
         library_item_id,
         tv_show_title,
+        genre,
+        release_year,
         studio,
         season_count,
         episode_count,
+        season_breakdown,
         duration_minutes_per_episode
       )
       select
         library_items.id,
         library_items.title,
+        nullif(substring(library_items.notes from '(?im)^Genre:\s*(.+)$'), ''),
+        nullif(substring(library_items.notes from '(?im)^Year:\s*([0-9]{4})'), '')::integer,
         coalesce(anime_details.studio, nullif(substring(library_items.notes from '(?im)^Studio:\s*(.+)$'), '')),
         coalesce(anime_details.season_count, nullif(substring(library_items.notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer),
         coalesce(anime_details.episode_count, nullif(substring(library_items.notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer),
+        '[]'::jsonb,
         coalesce(
           anime_details.duration_minutes_per_episode,
           nullif(substring(library_items.notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
@@ -331,9 +365,12 @@ begin
       on conflict (library_item_id) do update
       set
         tv_show_title = excluded.tv_show_title,
+        genre = coalesce(excluded.genre, public.tv_details.genre),
+        release_year = coalesce(excluded.release_year, public.tv_details.release_year),
         studio = coalesce(excluded.studio, public.tv_details.studio),
         season_count = excluded.season_count,
         episode_count = excluded.episode_count,
+        season_breakdown = coalesce(excluded.season_breakdown, public.tv_details.season_breakdown),
         duration_minutes_per_episode = excluded.duration_minutes_per_episode,
         updated_at = now()
     $migration$;
@@ -341,26 +378,35 @@ begin
     insert into public.tv_details (
       library_item_id,
       tv_show_title,
+      genre,
+      release_year,
       studio,
       season_count,
       episode_count,
+      season_breakdown,
       duration_minutes_per_episode
     )
     select
       id,
       title,
+      nullif(substring(notes from '(?im)^Genre:\s*(.+)$'), ''),
+      nullif(substring(notes from '(?im)^Year:\s*([0-9]{4})'), '')::integer,
       nullif(substring(notes from '(?im)^Studio:\s*(.+)$'), ''),
       nullif(substring(notes from '(?im)^Seasons:\s*([0-9]+)'), '')::integer,
       nullif(substring(notes from '(?im)^Episodes:\s*([0-9]+)'), '')::integer,
+      '[]'::jsonb,
       nullif(substring(notes from '(?im)^Duration per episode:\s*([0-9]+)'), '')::integer
     from public.library_items
     where category = 'anime'
     on conflict (library_item_id) do update
     set
       tv_show_title = excluded.tv_show_title,
+      genre = coalesce(excluded.genre, public.tv_details.genre),
+      release_year = coalesce(excluded.release_year, public.tv_details.release_year),
       studio = coalesce(excluded.studio, public.tv_details.studio),
       season_count = excluded.season_count,
       episode_count = excluded.episode_count,
+      season_breakdown = coalesce(excluded.season_breakdown, public.tv_details.season_breakdown),
       duration_minutes_per_episode = excluded.duration_minutes_per_episode,
       updated_at = now();
   end if;
@@ -455,9 +501,12 @@ with (security_invoker = true) as
 select
   library_item_id,
   tv_show_title,
+  genre,
+  release_year,
   studio,
   season_count,
   episode_count,
+  season_breakdown,
   duration_minutes_per_episode,
   created_at,
   updated_at

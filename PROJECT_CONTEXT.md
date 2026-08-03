@@ -162,7 +162,7 @@ Both are ignored by Git.
 - `HomeCommand.jsx` owns the centered quick-log command controls.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
 - `DetailsLookup.jsx` owns user-facing lookup search and result selection without exposing provider/debug details.
-- `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view.
+- `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view and released-season breakdown display for TV Shows.
 
 `src/lib/mediaConfig.js`
 
@@ -172,10 +172,12 @@ Both are ignored by Git.
 
 - Owns external lookup provider selection, API requests, result normalization, and item patch creation for OMDb, TMDb, Open Library, Aladin, and Jikan.
 - Routes Movies and TV Shows, including Anime subtype entries, through TMDb.
+- Counts TV seasons from released, non-special TMDb seasons instead of raw `number_of_seasons`, so renewed/upcoming seasons do not inflate saved season totals.
 
 `src/lib/mediaUtils.js`
 
 - Contains storage normalization, search ranking/deduping, parsing, tile metadata, subtype labels, and shared formatting helpers.
+- Normalizes optional TV season breakdown metadata from app-style and database-style keys.
 
 `src/lib/supabase.js`
 
@@ -188,6 +190,7 @@ Both are ignored by Git.
 - Requires the signed-in user id when fetching, saving, or deleting Supabase-backed items.
 - Stores shared item fields, including `synopsis`, in `library_items`.
 - Saves category-specific details to `movie_details`, `book_details`, `manga_details`, and `tv_details`.
+- Persists TV released-season breakdown metadata in `tv_details.season_breakdown` when that column exists, while retaining missing-column fallback behavior for older Supabase schemas.
 - Provides fetch, upsert, and delete helpers.
 - Converts legacy non-UUID local item IDs to UUIDs before writing to Supabase.
 
@@ -265,6 +268,8 @@ The app uses the `user_profiles`, `library_items`, and category detail tables de
 - `manga_details.manga_title`
 - `tv_details.tv_show_title`
 
+TV-specific metadata is stored on `tv_details`, including show title, genre, release year, studio, released season count, episode count, per-episode duration, and optional `season_breakdown` JSON. The season breakdown is currently a released-season-only list used by the detail overlay; upcoming/renewed seasons are intentionally excluded from the visible breakdown.
+
 For easier manual querying in Supabase, the schema also defines read-only views with title columns immediately after `library_item_id`:
 
 - `movie_details_view`
@@ -313,6 +318,9 @@ The lookup:
 - Uses TMDb TV results for Anime subtype entries, also adding Japanese result-language search behind the scenes.
 - Always fetches selected TMDb details in English (`en-US`) so saved media metadata stays consistent.
 - Fills title, creator/director, poster URL, synopsis, and available runtime/count metadata from TMDb.
+- For TV Shows, counts seasons from `detail.seasons` by excluding specials (`season_number === 0`) and excluding seasons without an `air_date` on or before today.
+- For TV Shows, saves `seasonBreakdown` as released seasons only; renewed/upcoming seasons can exist in TMDb metadata but should not appear in the detail overlay or inflate the show-level count.
+- For TV Shows, derives episode count from released season buckets when possible, falling back to TMDb's detail-level episode total only when released season bucket totals are unavailable.
 - Automatically marks Korean movie results as `korean-movie` when TMDb country data includes `KR`.
 - Automatically marks Korean TV results as `kdrama` when TMDb origin country data includes `KR`.
 

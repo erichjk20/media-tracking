@@ -44,6 +44,7 @@ function applyPatch(setDraft, patch) {
     chapterCount: patch.chapterCount || current.chapterCount,
     seasonCount: patch.seasonCount || current.seasonCount,
     episodeCount: patch.episodeCount || current.episodeCount,
+    seasonBreakdown: patch.seasonBreakdown || current.seasonBreakdown,
     durationMinutesPerEpisode: patch.durationMinutesPerEpisode || current.durationMinutesPerEpisode,
     studio: patch.studio || current.studio,
     imageUrl: patch.imageUrl || current.imageUrl,

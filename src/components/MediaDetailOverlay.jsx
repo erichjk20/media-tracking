@@ -104,6 +104,11 @@ function getSynopsisText(item) {
   );
 }
 
+function getSeasonBreakdown(item) {
+  if (item.category !== "tv" || !Array.isArray(item.seasonBreakdown)) return [];
+  return item.seasonBreakdown.filter((season) => season.status !== "upcoming" && (season.seasonNumber || season.name));
+}
+
 function getLabeledDetailValue(notes, label) {
   const match = String(notes || "").match(new RegExp(`(?:^|\\n)${label}:\\s*([\\s\\S]+?)(?=\\n[A-Z][A-Za-z ]{1,24}:\\s*|$)`, "i"));
   return match?.[1]?.trim() || "";
@@ -134,7 +139,37 @@ function DetailRow({ icon: Icon, label, value }) {
   );
 }
 
-function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, subtypeLabel, synopsis }) {
+function SeasonBreakdown({ seasons }) {
+  if (!seasons.length) return null;
+
+  return (
+    <div className="mt-4 border-t border-stone-300/80 pt-3 dark:border-white/10">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-500 dark:text-stone-400">
+        <Layers3 size={13} />
+        Seasons
+      </div>
+      <div className="mt-2 divide-y divide-stone-200 dark:divide-white/10">
+        {seasons.map((season) => (
+          <div key={`${season.seasonNumber}-${season.name}`} className="py-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-stone-900 dark:text-[#eee9df]">
+                {season.name || `Season ${season.seasonNumber}`}
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-stone-500 dark:text-stone-400">
+                {[
+                  formatCount(season.episodeCount, "episode"),
+                  season.airDate,
+                ].filter(Boolean).join(" • ")}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, seasons, subtypeLabel, synopsis }) {
   return (
     <div className="media-detail-back h-full w-full overflow-hidden bg-[#fbfaf7] p-5 text-stone-950 dark:bg-[#181715] dark:text-stone-100 sm:p-6">
       <div className="flex h-full min-h-0 flex-col">
@@ -179,6 +214,8 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
             {synopsis || "No synopsis saved yet."}
           </p>
 
+          <SeasonBreakdown seasons={seasons} />
+
           {notes && (
             <div className="mt-4 border-t border-stone-300/80 pt-3 dark:border-white/10">
               <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-stone-500 dark:text-stone-400">
@@ -202,6 +239,7 @@ function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
   const headerMeta = getHeaderMeta(item);
   const detailRows = getDetailRows(item);
   const synopsis = getSynopsisText(item);
+  const seasons = getSeasonBreakdown(item);
   const notes = item.notes?.trim();
   const canComplete = item.status === "Want to Watch/Read";
 
@@ -285,6 +323,7 @@ function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
                       headerMeta={headerMeta}
                       item={item}
                       notes={notes}
+                      seasons={seasons}
                       subtypeLabel={subtypeLabel}
                       synopsis={synopsis}
                     />

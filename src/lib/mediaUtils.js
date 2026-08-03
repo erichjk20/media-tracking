@@ -71,6 +71,7 @@ export function normalizeItems(items) {
       chapterCount: item.chapterCount || defaultItem.chapterCount || "",
       seasonCount: item.seasonCount || defaultItem.seasonCount || "",
       episodeCount: item.episodeCount || defaultItem.episodeCount || "",
+      seasonBreakdown: normalizeSeasonBreakdown(item.seasonBreakdown || defaultItem.seasonBreakdown),
       durationMinutesPerEpisode: item.durationMinutesPerEpisode || defaultItem.durationMinutesPerEpisode || "",
       studio: item.studio || defaultItem.studio || "",
       synopsis: item.synopsis || defaultItem.synopsis || "",
@@ -78,6 +79,20 @@ export function normalizeItems(items) {
       statusChangedAt: item.statusChangedAt || defaultItem.statusChangedAt || item.addedAt || defaultItem.addedAt || "",
     };
   });
+}
+
+export function normalizeSeasonBreakdown(seasons) {
+  if (!Array.isArray(seasons)) return [];
+
+  return seasons
+    .map((season) => ({
+      seasonNumber: Number(season.seasonNumber || season.season_number) || "",
+      name: String(season.name || "").trim(),
+      episodeCount: Number(season.episodeCount || season.episode_count) || "",
+      airDate: String(season.airDate || season.air_date || "").trim(),
+      status: season.status === "released" ? "released" : "upcoming",
+    }))
+    .filter((season) => season.seasonNumber || season.name);
 }
 
 export function getDefaultSubtype(category, subtype = "") {

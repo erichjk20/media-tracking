@@ -345,8 +345,14 @@ export async function getTmdbItemPatch(result, currentItem) {
       : cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
   const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvDirector(detail) || getTmdbTvCreator(detail);
   const genres = detail.genres?.map((genre) => genre.name).join(", ") || "";
-  const releaseYear = parseReleaseYear(result.mediaType === "movie" ? detail.release_date || result.releaseDate : "");
+  const releaseYear = parseReleaseYear(
+    result.mediaType === "movie"
+      ? detail.release_date || result.releaseDate
+      : detail.first_air_date || result.releaseDate,
+  );
   const durationMinutes = result.mediaType === "movie" ? detail.runtime || "" : "";
+  const releasedTvSeasons = result.mediaType === "tv" ? getReleasedTmdbSeasons(detail.seasons) : [];
+  const seasonBreakdown = result.mediaType === "tv" ? getTmdbSeasonBreakdown(detail.seasons) : [];
 
   return {
     category: result.mediaType === "movie" ? "movies" : "tv",
@@ -361,15 +367,49 @@ export async function getTmdbItemPatch(result, currentItem) {
     title,
     creator,
     director: result.mediaType === "movie" ? creator : "",
-    genre: result.mediaType === "movie" ? genres : "",
-    releaseYear: result.mediaType === "movie" ? releaseYear : "",
+    genre: genres,
+    releaseYear,
     durationMinutes: result.mediaType === "movie" ? durationMinutes : "",
-    seasonCount: result.mediaType === "tv" ? detail.number_of_seasons || "" : "",
-    episodeCount: result.mediaType === "tv" ? detail.number_of_episodes || "" : "",
+    seasonCount: result.mediaType === "tv" ? releasedTvSeasons.length || "" : "",
+    episodeCount: result.mediaType === "tv" ? getTmdbReleasedEpisodeCount(releasedTvSeasons, detail.number_of_episodes) : "",
+    seasonBreakdown,
     durationMinutesPerEpisode: result.mediaType === "tv" ? getFirstRuntime(detail.episode_run_time) : "",
     imageUrl: getTmdbImageUrl(detail.poster_path || result.posterPath),
     synopsis: cleanTmdbValue(detail.overview || result.overview),
   };
+}
+
+function getReleasedTmdbSeasons(seasons = []) {
+  const today = getLocalDateString(new Date());
+
+  return seasons
+    .filter((season) => {
+      if (Number(season.season_number) === 0) return false;
+      if (!season.air_date) return false;
+      return season.air_date <= today;
+    })
+    .sort((a, b) => Number(a.season_number || 0) - Number(b.season_number || 0));
+}
+
+function getTmdbSeasonBreakdown(seasons = []) {
+  return getReleasedTmdbSeasons(seasons)
+    .map((season) => ({
+      seasonNumber: Number(season.season_number) || "",
+      name: cleanTmdbValue(season.name) || `Season ${season.season_number}`,
+      episodeCount: Number(season.episode_count) || "",
+      airDate: cleanTmdbValue(season.air_date),
+      status: "released",
+    }));
+}
+
+function getTmdbReleasedEpisodeCount(releasedSeasons, fallbackEpisodeCount) {
+  const releasedEpisodeCount = releasedSeasons.reduce((total, season) => total + (Number(season.episode_count) || 0), 0);
+  return releasedEpisodeCount || fallbackEpisodeCount || "";
+}
+
+function getLocalDateString(date) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
 }
 
 export function getOpenLibraryItemPatch(result, currentItem) {
@@ -405,6 +445,8 @@ export function getAnimeItemPatch(result) {
     title: result.title,
     creator: result.creators,
     imageUrl: result.imageUrl,
+    genre: result.genres,
+    releaseYear: parseReleaseYear(result.year || result.aired),
     seasonCount: result.seasonCount,
     episodeCount: result.episodes,
     durationMinutesPerEpisode: parseOmdbRuntime(result.duration),

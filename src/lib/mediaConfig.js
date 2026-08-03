@@ -96,6 +96,10 @@ export const defaultItems = [
     releaseYear: 2022,
     seasonCount: 2,
     episodeCount: 19,
+    seasonBreakdown: [
+      { seasonNumber: 1, name: "Season 1", episodeCount: 9, airDate: "2022-02-18", status: "released" },
+      { seasonNumber: 2, name: "Season 2", episodeCount: 10, airDate: "2025-01-17", status: "released" },
+    ],
     durationMinutesPerEpisode: 50,
     studio: "Red Hour Productions, Fifth Season",
     rating: 0,
@@ -161,6 +165,7 @@ export const emptyDraft = {
   chapterCount: "",
   seasonCount: "",
   episodeCount: "",
+  seasonBreakdown: [],
   durationMinutesPerEpisode: "",
   studio: "",
   rating: 3,

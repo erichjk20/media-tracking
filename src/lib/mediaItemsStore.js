@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from "./supabase";
+import { normalizeSeasonBreakdown } from "./mediaUtils";
 
 const tableName = "library_items";
 
@@ -111,8 +112,8 @@ function dbRowToMediaItem(row) {
     title: row.title || movieDetails.movie_title || bookDetails.book_title || mangaDetails.manga_title || tvDetails.tv_show_title || "",
     creator: row.creator || "",
     director: movieDetails.director || row.director || "",
-    genre: movieDetails.genre || row.genre || "",
-    releaseYear: movieDetails.release_year || row.release_year || "",
+    genre: movieDetails.genre || tvDetails.genre || row.genre || "",
+    releaseYear: movieDetails.release_year || tvDetails.release_year || row.release_year || "",
     durationMinutes: movieDetails.duration_minutes || row.duration_minutes || "",
     pageCount: bookDetails.page_count || "",
     publisher: bookDetails.publisher || "",
@@ -123,6 +124,7 @@ function dbRowToMediaItem(row) {
     chapterCount: mangaDetails.chapter_count || "",
     seasonCount: tvDetails.season_count || "",
     episodeCount: tvDetails.episode_count || "",
+    seasonBreakdown: normalizeSeasonBreakdown(tvDetails.season_breakdown),
     durationMinutesPerEpisode: tvDetails.duration_minutes_per_episode || "",
     studio: tvDetails.studio || "",
     rating: row.rating || 0,
@@ -169,27 +171,33 @@ async function saveMediaItemDetails(item) {
   if (!error) return;
 
   const detailTitleColumn = detailTitleColumns[table];
-  if (detailTitleColumn && row[detailTitleColumn] !== undefined && isMissingColumnError(error, detailTitleColumn)) {
-    const { [detailTitleColumn]: _detailTitle, ...rowWithoutDetailTitle } = row;
-    const { error: retryError } = await supabase.from(table).upsert(rowWithoutDetailTitle);
-    if (!retryError) return;
-    if (table === "tv_details" && rowWithoutDetailTitle.studio !== undefined && isMissingColumnError(retryError, "studio")) {
-      const { studio, ...rowWithoutDetailTitleOrStudio } = rowWithoutDetailTitle;
-      const { error: secondRetryError } = await supabase.from(table).upsert(rowWithoutDetailTitleOrStudio);
-      if (!secondRetryError) return;
-      throw secondRetryError;
-    }
-    throw retryError;
-  }
+  const compatibleColumns = [
+    detailTitleColumn,
+    ...(table === "tv_details" ? ["genre", "release_year", "studio", "season_breakdown"] : []),
+  ];
 
-  if (table === "tv_details" && row.studio !== undefined && isMissingColumnError(error, "studio")) {
-    const { studio, ...rowWithoutStudio } = row;
-    const { error: retryError } = await supabase.from(table).upsert(rowWithoutStudio);
-    if (!retryError) return;
-    throw retryError;
-  }
+  await upsertDroppingMissingColumns(table, row, compatibleColumns, error);
+}
 
-  throw error;
+async function upsertDroppingMissingColumns(table, row, columns, initialError) {
+  const compatibleRow = { ...row };
+  const remainingColumns = new Set(columns.filter(Boolean));
+  let error = initialError;
+
+  while (error) {
+    const missingColumn = [...remainingColumns].find(
+      (column) => compatibleRow[column] !== undefined && isMissingColumnError(error, column),
+    );
+
+    if (!missingColumn) throw error;
+
+    delete compatibleRow[missingColumn];
+    remainingColumns.delete(missingColumn);
+
+    const retry = await supabase.from(table).upsert(compatibleRow);
+    if (!retry.error) return;
+    error = retry.error;
+  }
 }
 
 async function removeStaleDetailRows(itemId, category) {
@@ -259,9 +267,12 @@ function mediaItemToDetailRow(item) {
     return {
       library_item_id: item.id,
       tv_show_title: item.title || null,
+      genre: item.genre || getLabeledNoteValue(item.notes, "Genre") || null,
+      release_year: validYearOrNull(item.releaseYear) || validYearOrNull(getLabeledNoteValue(item.notes, "Year")),
       studio: item.studio || getLabeledNoteValue(item.notes, "Studio") || null,
       season_count: nonNegativeNumberOrNull(item.seasonCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Seasons")),
       episode_count: nonNegativeNumberOrNull(item.episodeCount) || parseNonNegativeInteger(getLabeledNoteValue(item.notes, "Episodes")),
+      season_breakdown: normalizeSeasonBreakdown(item.seasonBreakdown),
       duration_minutes_per_episode:
         positiveNumberOrNull(item.durationMinutesPerEpisode) || parseDurationMinutes(getLabeledNoteValue(item.notes, "Duration per episode")),
       updated_at: new Date().toISOString(),

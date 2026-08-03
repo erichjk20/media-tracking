@@ -12,6 +12,22 @@
     min-height: 100svh;
   }
 
+  .app-shell {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7.25rem);
+  }
+
+  .app-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  }
+
+  .bottom-nav-shell {
+    bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
+  }
+
+  .floating-add-shell {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
+  }
+
   .auth-frame {
     min-height: calc(100vh - 4rem);
     min-height: calc(100svh - 4rem);
@@ -20,6 +36,20 @@
   .editor-sheet-frame {
     max-height: 92vh;
     max-height: 92svh;
+  }
+
+  @media (min-width: 640px) {
+    .app-shell {
+      padding-bottom: 7rem;
+    }
+
+    .app-header {
+      padding-top: 0;
+    }
+
+    .floating-add-shell {
+      bottom: 6rem;
+    }
   }
 }
 

@@ -8,8 +8,8 @@ function BottomNav({ activeCategory, activeView, onShowCategory, onShowProfile }
   ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 px-4">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-xl border border-stone-300/80 bg-white/80 p-1 shadow-[0_18px_55px_rgba(31,41,55,0.22)] backdrop-blur-xl dark:border-white/10 dark:bg-[#11100e]/90 dark:shadow-[0_18px_55px_rgba(0,0,0,0.5)]">
+    <nav className="bottom-nav-shell fixed inset-x-0 z-30 px-3">
+      <div className="mx-auto grid w-full max-w-md grid-cols-5 gap-1 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#14120f]/[0.88] p-1.5 shadow-[0_12px_34px_rgba(0,0,0,0.34)] backdrop-blur-xl">
         {navItems.map((entry) => {
           const Icon = entry.icon;
           const isProfile = entry.id === "profile";
@@ -19,15 +19,15 @@ function BottomNav({ activeCategory, activeView, onShowCategory, onShowProfile }
           return (
             <button
               key={entry.id}
-              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-semibold transition ${
-                isActive ? "bg-shelf-accent-deep text-white shadow-sm" : "text-stone-600 hover:bg-white/70 dark:text-stone-300 dark:hover:bg-white/5"
+              className={`flex min-h-[3.05rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10.5px] font-semibold leading-none transition ${
+                isActive ? "bg-shelf-accent-bright/15 text-shelf-accent-soft ring-1 ring-inset ring-shelf-accent-bright/20" : "text-stone-300 hover:bg-white/5 hover:text-stone-100"
               }`}
               onClick={() => (isProfile ? onShowProfile() : onShowCategory(entry.id))}
               type="button"
               aria-label={entry.label}
               title={entry.label}
             >
-              <Icon size={18} />
+              <Icon size={19} strokeWidth={isActive ? 2.4 : 2.1} />
               <span className="max-w-full truncate">{label}</span>
             </button>
           );

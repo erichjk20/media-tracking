@@ -439,7 +439,7 @@ function App() {
   }
 
   return (
-    <main className="app-screen bg-transparent pb-28">
+    <main className="app-screen app-shell bg-transparent">
       <AppHeader />
 
       {storageMessage && (

@@ -6,6 +6,7 @@ import CompleteItemDialog from "./components/CompleteItemDialog";
 import DeleteItemDialog from "./components/DeleteItemDialog";
 import EditorSheet from "./components/EditorSheet";
 import FloatingAddButton from "./components/FloatingAddButton";
+import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import ProfileView from "./components/ProfileView";
@@ -45,7 +46,7 @@ function App() {
   const [storageMessage, setStorageMessage] = useState(
     isSupabaseConfigured ? "Checking your session..." : "",
   );
-  const [activeView, setActiveView] = useState("library");
+  const [activeView, setActiveView] = useState("home");
   const [activeCategory, setActiveCategory] = useState("books");
   const [activeStatus, setActiveStatus] = useState("Completed");
   const [activeBookSubtype, setActiveBookSubtype] = useState("all");
@@ -56,6 +57,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState(() => createMediaDraft());
   const [editingId, setEditingId] = useState(null);
+  const [editorOrigin, setEditorOrigin] = useState("library");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [completingItemId, setCompletingItemId] = useState(null);
@@ -90,6 +92,7 @@ function App() {
     lookupQuery,
     lookupResults,
     lookupStatus,
+    queueLookup,
     resetLookupState,
     searchDetails,
     setBookLanguage,
@@ -109,7 +112,7 @@ function App() {
   );
 
   useEffect(() => {
-    setActiveView("library");
+    setActiveView("home");
   }, [user?.id]);
 
   useEffect(() => {
@@ -252,8 +255,13 @@ function App() {
           ? current.map((item) => (item.id === editingId ? savedItem : item))
           : [...current, savedItem],
       );
+      if (!editingId && editorOrigin === "home") {
+        setActiveCategory(savedItem.category);
+        setActiveView("library");
+      }
       resetForm();
       setIsEditorOpen(false);
+      setEditorOrigin("library");
     } catch (error) {
       console.error("Supabase save failed", error);
       setStorageMessage(`Could not save to your private library. ${error.message || ""}`.trim());
@@ -276,6 +284,7 @@ function App() {
     setEditingId(item.id);
     setActiveCategory(item.category);
     setActiveStatus(item.status);
+    setEditorOrigin("library");
     resetLookupState();
     setIsEditorOpen(true);
   }
@@ -328,6 +337,7 @@ function App() {
       status: activeStatus,
     }));
     setEditingId(null);
+    setEditorOrigin("library");
     resetLookupState();
     setIsEditorOpen(true);
   }
@@ -336,6 +346,7 @@ function App() {
     resetForm();
     resetLookupState();
     setIsEditorOpen(false);
+    setEditorOrigin("library");
   }
 
   function requestDeleteItem(id) {
@@ -412,6 +423,13 @@ function App() {
     setActiveView("library");
   }
 
+  function showHome() {
+    setSelectedItemId(null);
+    setCompletingItemId(null);
+    setDeletingItemId(null);
+    setActiveView("home");
+  }
+
   function showProfile() {
     setActiveView("profile");
   }
@@ -419,6 +437,28 @@ function App() {
   function showCategory(categoryId) {
     showLibrary();
     setActiveCategory(categoryId);
+  }
+
+  function startHomeLookup({ categoryId, query: homeQuery }) {
+    const subtype = getDefaultSubtype(categoryId);
+
+    setActiveCategory(categoryId);
+    setDraft(createMediaDraft({
+      category: categoryId,
+      subtype,
+      status: activeStatus,
+      title: homeQuery,
+    }));
+    setEditingId(null);
+    setEditorOrigin("home");
+    resetLookupState();
+    queueLookup({
+      categoryId,
+      query: homeQuery,
+      status: activeStatus,
+      subtype,
+    });
+    setIsEditorOpen(true);
   }
 
   if (isSupabaseConfigured && authStatus === "loading") {
@@ -439,8 +479,8 @@ function App() {
   }
 
   return (
-    <main className="app-screen app-shell bg-transparent">
-      <AppHeader />
+    <main className={`app-screen bg-transparent ${activeView === "home" ? "" : "app-shell"}`}>
+      {activeView !== "home" && <AppHeader onHomeClick={showHome} />}
 
       {storageMessage && (
         <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -450,7 +490,14 @@ function App() {
         </div>
       )}
 
-      {activeView === "profile" ? (
+      {activeView === "home" ? (
+        <HomeView
+          activeCategory={activeCategory}
+          onBrowseLibrary={showLibrary}
+          onCategoryChange={setActiveCategory}
+          onSearch={startHomeLookup}
+        />
+      ) : activeView === "profile" ? (
         <ProfileView
           metrics={libraryMetrics}
           onOpenItem={openItemDetails}
@@ -547,12 +594,14 @@ function App() {
         />
       )}
 
-      <BottomNav
-        activeCategory={activeCategory}
-        activeView={activeView}
-        onShowCategory={showCategory}
-        onShowProfile={showProfile}
-      />
+      {activeView !== "home" && (
+        <BottomNav
+          activeCategory={activeCategory}
+          activeView={activeView}
+          onShowCategory={showCategory}
+          onShowProfile={showProfile}
+        />
+      )}
     </main>
   );
 

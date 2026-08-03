@@ -25,6 +25,14 @@ import {
   updateUserProfileDisplayName,
 } from "./lib/supabase";
 import {
+  bookSubtypeOptions,
+  categories,
+  movieSubtypeOptions,
+  sortOptions,
+  statuses,
+  tvSubtypeOptions,
+} from "./lib/mediaConfig";
+import {
   createMediaDraft,
   getDefaultSubtype,
   getStoredProfile,
@@ -36,7 +44,47 @@ import { useLibraryMetrics } from "./hooks/useLibraryMetrics";
 import { useMediaLookup } from "./hooks/useMediaLookup";
 import { useShelfData } from "./hooks/useShelfData";
 
+const uiStateStorageKey = "media-shelf-ui-state";
+
+const defaultUiState = {
+  activeView: "home",
+  activeCategory: "books",
+  activeStatus: "Completed",
+  activeBookSubtype: "all",
+  activeMovieSubtype: "all",
+  activeTvSubtype: "all",
+  shelfView: "grid",
+  sortOrder: "recent",
+  query: "",
+};
+
+function getStoredUiState() {
+  try {
+    const stored = window.localStorage.getItem(uiStateStorageKey);
+    const parsedState = stored ? JSON.parse(stored) : {};
+
+    return {
+      activeView: getAllowedValue(parsedState.activeView, ["home", "library", "profile"], defaultUiState.activeView),
+      activeCategory: getAllowedValue(parsedState.activeCategory, categories.map((category) => category.id), defaultUiState.activeCategory),
+      activeStatus: getAllowedValue(parsedState.activeStatus, statuses, defaultUiState.activeStatus),
+      activeBookSubtype: getAllowedValue(parsedState.activeBookSubtype, bookSubtypeOptions.map((option) => option.value), defaultUiState.activeBookSubtype),
+      activeMovieSubtype: getAllowedValue(parsedState.activeMovieSubtype, movieSubtypeOptions.map((option) => option.value), defaultUiState.activeMovieSubtype),
+      activeTvSubtype: getAllowedValue(parsedState.activeTvSubtype, tvSubtypeOptions.map((option) => option.value), defaultUiState.activeTvSubtype),
+      shelfView: getAllowedValue(parsedState.shelfView, ["grid", "list"], defaultUiState.shelfView),
+      sortOrder: getAllowedValue(parsedState.sortOrder, sortOptions.map((option) => option.value), defaultUiState.sortOrder),
+      query: typeof parsedState.query === "string" ? parsedState.query : defaultUiState.query,
+    };
+  } catch {
+    return defaultUiState;
+  }
+}
+
+function getAllowedValue(value, allowedValues, fallback) {
+  return allowedValues.includes(value) ? value : fallback;
+}
+
 function App() {
+  const [initialUiState] = useState(getStoredUiState);
   const [session, setSession] = useState(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(hasPasswordRecoveryRedirect);
   const [authStatus, setAuthStatus] = useState(isSupabaseConfigured ? "loading" : "local");
@@ -46,15 +94,15 @@ function App() {
   const [storageMessage, setStorageMessage] = useState(
     isSupabaseConfigured ? "Checking your session..." : "",
   );
-  const [activeView, setActiveView] = useState("home");
-  const [activeCategory, setActiveCategory] = useState("books");
-  const [activeStatus, setActiveStatus] = useState("Completed");
-  const [activeBookSubtype, setActiveBookSubtype] = useState("all");
-  const [activeMovieSubtype, setActiveMovieSubtype] = useState("all");
-  const [activeTvSubtype, setActiveTvSubtype] = useState("all");
-  const [shelfView, setShelfView] = useState("grid");
-  const [sortOrder, setSortOrder] = useState("recent");
-  const [query, setQuery] = useState("");
+  const [activeView, setActiveView] = useState(initialUiState.activeView);
+  const [activeCategory, setActiveCategory] = useState(initialUiState.activeCategory);
+  const [activeStatus, setActiveStatus] = useState(initialUiState.activeStatus);
+  const [activeBookSubtype, setActiveBookSubtype] = useState(initialUiState.activeBookSubtype);
+  const [activeMovieSubtype, setActiveMovieSubtype] = useState(initialUiState.activeMovieSubtype);
+  const [activeTvSubtype, setActiveTvSubtype] = useState(initialUiState.activeTvSubtype);
+  const [shelfView, setShelfView] = useState(initialUiState.shelfView);
+  const [sortOrder, setSortOrder] = useState(initialUiState.sortOrder);
+  const [query, setQuery] = useState(initialUiState.query);
   const [draft, setDraft] = useState(() => createMediaDraft());
   const [editingId, setEditingId] = useState(null);
   const [editorOrigin, setEditorOrigin] = useState("library");
@@ -112,10 +160,6 @@ function App() {
   );
 
   useEffect(() => {
-    setActiveView("home");
-  }, [user?.id]);
-
-  useEffect(() => {
     if (!isSupabaseConfigured) return;
 
     let isCurrent = true;
@@ -149,6 +193,32 @@ function App() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const nextUiState = {
+      activeView,
+      activeCategory,
+      activeStatus,
+      activeBookSubtype,
+      activeMovieSubtype,
+      activeTvSubtype,
+      shelfView,
+      sortOrder,
+      query,
+    };
+
+    window.localStorage.setItem(uiStateStorageKey, JSON.stringify(nextUiState));
+  }, [
+    activeBookSubtype,
+    activeCategory,
+    activeMovieSubtype,
+    activeStatus,
+    activeTvSubtype,
+    activeView,
+    query,
+    shelfView,
+    sortOrder,
+  ]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;

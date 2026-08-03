@@ -33,7 +33,7 @@ Each media item contains:
 
 ## Current Implementation
 
-This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email/password signup and login identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`.
+This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email/password signup and login identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`. Lightweight UI location and library filter state is persisted in `localStorage` under `media-shelf-ui-state` so refreshing returns to the current screen instead of resetting to Home.
 
 The main app supports:
 
@@ -41,6 +41,7 @@ The main app supports:
 - Email/password signup and sign-in when Supabase is configured
 - Private per-user libraries backed by Supabase Auth and row-level security
 - Home/Library view switching
+- Refresh restoration for the last active view, category, shelf filters, sort, layout mode, and search query
 - Category switching
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
@@ -87,11 +88,19 @@ Tracked/source files:
 ├── .gitignore
 ├── README.md
 ├── PROJECT_CONTEXT.md
+├── netlify.toml
 ├── index.html
 ├── package-lock.json
 ├── package.json
 ├── postcss.config.js
 ├── eslint.config.js
+├── netlify
+│   └── functions
+│       └── aladin-books.js
+├── public
+│   ├── app-icon.png
+│   ├── app-icon.svg
+│   └── site.webmanifest
 ├── supabase
 │   └── schema.sql
 ├── tailwind.config.js
@@ -108,12 +117,13 @@ Tracked/source files:
     │   ├── DeleteItemDialog.jsx
     │   ├── DetailsLookup.jsx
     │   ├── EditorSheet.jsx
-    │   ├── HomeCommand.jsx
+    │   ├── FloatingAddButton.jsx
     │   ├── HomeView.jsx
     │   ├── LibraryView.jsx
     │   ├── MediaCards.jsx
     │   ├── MediaCover.jsx
     │   ├── MediaDetailOverlay.jsx
+    │   ├── ProfileView.jsx
     │   ├── Rating.jsx
     │   └── ShelfControls.jsx
     ├── hooks
@@ -145,6 +155,7 @@ Both are ignored by Git.
 
 - Coordinates top-level app state, auth/session loading, storage mode, view switching, item CRUD behavior, and add/edit form handling.
 - Loads and saves signed-in media items through Supabase, or uses localStorage only when Supabase is not configured.
+- Persists lightweight UI navigation and library filter state to `media-shelf-ui-state` so page refresh restores the current screen without reopening transient overlays or edit dialogs.
 
 `src/hooks/useMediaLookup.js`
 
@@ -159,7 +170,6 @@ Both are ignored by Git.
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
 - `AuthView.jsx` owns email/password signup, login, and password reset flows.
 - `HomeView.jsx` owns homepage command state and lookup handoff.
-- `HomeCommand.jsx` owns the centered quick-log command controls.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
 - `DetailsLookup.jsx` owns user-facing lookup search and result selection without exposing provider/debug details.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view and released-season breakdown display for TV Shows.

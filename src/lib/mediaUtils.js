@@ -150,6 +150,7 @@ export function getLookupSourceLabel(source) {
     omdb: "OMDb",
     jikan: "Jikan",
     "jikan-anime": "Jikan",
+    mangadex: "MangaDex",
   };
   return labels[source] || source;
 }
@@ -157,7 +158,7 @@ export function getLookupSourceLabel(source) {
 function getLookupResultId(source, result) {
   if (source === "omdb") return result.imdbID;
   if (source === "tmdb") return `${result.mediaType}-${result.id}`;
-  if (source === "open-library" || source === "jikan" || source === "jikan-anime" || source === "aladin") return result.id;
+  if (source === "open-library" || source === "jikan" || source === "jikan-anime" || source === "aladin" || source === "mangadex") return result.id;
   return result.title || result.Title || source;
 }
 

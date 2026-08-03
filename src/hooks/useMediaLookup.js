@@ -111,7 +111,11 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     if (!providerResults.length && fallbackProviders.length) {
       const fallbackSearch = await runProviderSearches(fallbackProviders);
       providerResults = fallbackSearch.providerResults;
-      messages = fallbackSearch.messages.length ? fallbackSearch.messages : messages;
+      messages = fallbackSearch.providerResults.length
+        ? fallbackSearch.messages
+        : fallbackSearch.messages.length
+          ? fallbackSearch.messages
+          : messages;
     }
 
     const dedupedResults = dedupeLookupResults(providerResults, preferredProvider);

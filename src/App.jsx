@@ -5,7 +5,6 @@ import BottomNav from "./components/BottomNav";
 import CompleteItemDialog from "./components/CompleteItemDialog";
 import DeleteItemDialog from "./components/DeleteItemDialog";
 import EditorSheet from "./components/EditorSheet";
-import FloatingAddButton from "./components/FloatingAddButton";
 import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
@@ -83,6 +82,14 @@ function getAllowedValue(value, allowedValues, fallback) {
   return allowedValues.includes(value) ? value : fallback;
 }
 
+function getAddLabel(categoryId) {
+  if (categoryId === "books") return "book";
+  if (categoryId === "movies") return "movie";
+  if (categoryId === "tv") return "TV show";
+  if (categoryId === "manga") return "manga";
+  return "item";
+}
+
 function App() {
   const [initialUiState] = useState(getStoredUiState);
   const [session, setSession] = useState(null);
@@ -106,6 +113,7 @@ function App() {
   const [draft, setDraft] = useState(() => createMediaDraft());
   const [editingId, setEditingId] = useState(null);
   const [editorOrigin, setEditorOrigin] = useState("library");
+  const [editorMode, setEditorMode] = useState("search");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [completingItemId, setCompletingItemId] = useState(null);
@@ -333,6 +341,7 @@ function App() {
       resetForm();
       setIsEditorOpen(false);
       setEditorOrigin("library");
+      setEditorMode("search");
     } catch (error) {
       console.error("Supabase save failed", error);
       setStorageMessage(`Could not save to your private library. ${error.message || ""}`.trim());
@@ -356,6 +365,7 @@ function App() {
     setActiveCategory(item.category);
     setActiveStatus(item.status);
     setEditorOrigin("library");
+    setEditorMode("search");
     resetLookupState();
     setIsEditorOpen(true);
   }
@@ -399,7 +409,7 @@ function App() {
     }
   }
 
-  function startAddItem() {
+  function startAddItem(mode = "search") {
     const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
     setDraft(createMediaDraft({
@@ -409,6 +419,7 @@ function App() {
     }));
     setEditingId(null);
     setEditorOrigin("library");
+    setEditorMode(mode);
     resetLookupState();
     setIsEditorOpen(true);
   }
@@ -418,6 +429,7 @@ function App() {
     resetLookupState();
     setIsEditorOpen(false);
     setEditorOrigin("library");
+    setEditorMode("search");
   }
 
   function requestDeleteItem(id) {
@@ -522,6 +534,7 @@ function App() {
     }));
     setEditingId(null);
     setEditorOrigin("home");
+    setEditorMode("search");
     resetLookupState();
     queueLookup({
       categoryId,
@@ -551,7 +564,14 @@ function App() {
 
   return (
     <main className={`app-screen bg-transparent ${activeView === "home" ? "" : "app-shell"}`}>
-      {activeView !== "home" && <AppHeader onHomeClick={showHome} />}
+      {activeView !== "home" && (
+        <AppHeader
+          addLabel={getAddLabel(activeCategory)}
+          onAddManualClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("manual") : undefined}
+          onAddSearchClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("search") : undefined}
+          onHomeClick={showHome}
+        />
+      )}
 
       {storageMessage && (
         <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -608,10 +628,6 @@ function App() {
         />
       )}
 
-      {activeView === "library" && !isEditorOpen && !selectedItem && (
-        <FloatingAddButton categoryLabel={category.label.toLowerCase()} onClick={startAddItem} />
-      )}
-
       {selectedItem && (
         <MediaDetailOverlay
           item={selectedItem}
@@ -649,6 +665,7 @@ function App() {
           category={category}
           draft={draft}
           editingId={editingId}
+          editorMode={editorMode}
           onClose={closeEditor}
           onLookupQueryChange={setLookupQuery}
           onApplyLookupResult={applyLookupResult}

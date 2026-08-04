@@ -25,6 +25,7 @@ function EditorSheet({
   category,
   draft,
   editingId,
+  editorMode = "search",
   lookupMessage,
   lookupProviders,
   lookupQuery,
@@ -45,8 +46,9 @@ function EditorSheet({
   const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
   const lookupPrompt = editingId ? `Search ${lookupCategoryLabel.toLowerCase()} title` : "Find a title to add";
   const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
-  const [isLookupEditorOpen, setIsLookupEditorOpen] = useState(false);
-  const shouldShowLookup = canLookupDetails && (!hasSelectedLookup || isLookupEditorOpen || editingId);
+  const [isLookupEditorOpen, setIsLookupEditorOpen] = useState(editorMode !== "manual");
+  const shouldShowLookup = canLookupDetails && (isLookupEditorOpen || editingId);
+  const shouldShowLookupLauncher = canLookupDetails && !editingId && !hasSelectedLookup && !isLookupEditorOpen;
   const primaryActionLabel = editingId ? "Save changes" : "Add to shelf";
   const canSubmit = Boolean(draft.title.trim());
 
@@ -105,6 +107,20 @@ function EditorSheet({
             />
           )}
 
+          {shouldShowLookupLauncher && (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-shelf-accent/20 bg-shelf-accent-deep/10 px-3 text-sm font-semibold text-shelf-accent-soft transition hover:border-shelf-accent-bright/30 hover:bg-shelf-accent-deep hover:text-white focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35"
+              onClick={() => {
+                onLookupQueryChange(draft.title);
+                setIsLookupEditorOpen(true);
+              }}
+              type="button"
+            >
+              <Search size={15} />
+              Search title instead
+            </button>
+          )}
+
           <ShelfSelector
             activeStatus={draft.status}
             onChange={(status) => {
@@ -142,6 +158,7 @@ function EditorSheet({
           ) : (
             <>
               <EditableDetailsFields
+                autoFocusTitle={editorMode === "manual" && !isLookupEditorOpen}
                 category={category}
                 draft={draft}
                 isImageEditorOpen={isImageEditorOpen}
@@ -251,6 +268,7 @@ function ShelfSelector({ activeStatus, onChange }) {
 }
 
 function EditableDetailsFields({
+  autoFocusTitle = false,
   category,
   draft,
   isImageEditorOpen,
@@ -263,6 +281,7 @@ function EditableDetailsFields({
       <Field label="Title">
         <input
           className="input"
+          autoFocus={autoFocusTitle}
           value={draft.title}
           onChange={(event) => onUpdateDraft("title", event.target.value)}
           placeholder="The Left Hand of Darkness"

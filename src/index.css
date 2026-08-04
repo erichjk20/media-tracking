@@ -24,10 +24,6 @@
     bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
   }
 
-  .floating-add-shell {
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
-  }
-
   .auth-frame {
     min-height: calc(100vh - 4rem);
     min-height: calc(100svh - 4rem);
@@ -47,9 +43,6 @@
       padding-top: 0;
     }
 
-    .floating-add-shell {
-      bottom: 6rem;
-    }
   }
 }
 

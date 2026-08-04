@@ -132,6 +132,7 @@ function App() {
     sortOrder,
   });
   const {
+    appliedLookupSourceLabel,
     applyLookupResult,
     bookLanguage,
     canUseBookLookup,
@@ -642,6 +643,7 @@ function App() {
       {isEditorOpen && (
         <EditorSheet
           activeStatus={activeStatus}
+          appliedLookupSourceLabel={appliedLookupSourceLabel}
           bookLanguage={bookLanguage}
           canUseBookLookup={canUseBookLookup}
           category={category}

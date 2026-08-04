@@ -1,5 +1,5 @@
-import { Check, ImagePlus, Pencil, Plus, Save, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { Check, ImagePlus, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   bookSubtypeOptions,
   categories,
@@ -8,12 +8,18 @@ import {
   statuses,
   tvSubtypeOptions,
 } from "../lib/mediaConfig";
+import {
+  getItemTileMeta,
+  getPrimaryCreator,
+  getSubtypeLabel,
+} from "../lib/mediaUtils";
 import DetailsLookup from "./DetailsLookup";
 import MediaCover from "./MediaCover";
 import Rating from "./Rating";
 
 function EditorSheet({
   activeStatus,
+  appliedLookupSourceLabel,
   bookLanguage,
   canUseBookLookup,
   category,
@@ -35,10 +41,18 @@ function EditorSheet({
   setActiveStatus,
 }) {
   const canLookupDetails = lookupProviders.length > 0;
+  const hasSelectedLookup = !editingId && Boolean(appliedLookupSourceLabel);
   const lookupCategoryLabel = draft.category === "tv" && draft.subtype === "anime" ? "Anime" : category.label;
   const lookupPrompt = editingId ? `Search ${lookupCategoryLabel.toLowerCase()} title` : "Find a title to add";
   const [isImageEditorOpen, setIsImageEditorOpen] = useState(false);
-  const getShelfLabel = (status) => (status === "Completed" ? "Completed" : statusLabels[status] || status);
+  const [isLookupEditorOpen, setIsLookupEditorOpen] = useState(false);
+  const shouldShowLookup = canLookupDetails && (!hasSelectedLookup || isLookupEditorOpen || editingId);
+  const primaryActionLabel = editingId ? "Save changes" : "Add to shelf";
+  const canSubmit = Boolean(draft.title.trim());
+
+  useEffect(() => {
+    if (appliedLookupSourceLabel) setIsLookupEditorOpen(false);
+  }, [appliedLookupSourceLabel]);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-stone-950/45 dark:bg-black/75 sm:items-center sm:justify-center">
@@ -60,13 +74,25 @@ function EditorSheet({
         </div>
 
         <form className="mt-5 space-y-4" onSubmit={onSubmit}>
-          {canLookupDetails && (
+          {hasSelectedLookup && (
+            <SelectedItemSummary
+              category={category}
+              draft={draft}
+              onChangeLookup={() => {
+                onLookupQueryChange(draft.title);
+                setIsLookupEditorOpen(true);
+              }}
+              sourceLabel={appliedLookupSourceLabel}
+            />
+          )}
+
+          {shouldShowLookup && (
             <DetailsLookup
               bookLanguage={bookLanguage}
               categoryLabel={lookupCategoryLabel}
               canUseBookLookup={canUseBookLookup}
               lookupProviders={lookupProviders}
-              message={lookupMessage}
+              message={hasSelectedLookup ? "" : lookupMessage}
               onApply={onApplyLookupResult}
               onBookLanguageChange={onBookLanguageChange}
               onQueryChange={onLookupQueryChange}
@@ -75,127 +101,17 @@ function EditorSheet({
               query={lookupQuery}
               results={lookupResults}
               status={lookupStatus}
-              title={editingId ? "Find details" : "Find title to add"}
+              title={hasSelectedLookup ? "Change result" : editingId ? "Find details" : "Find title to add"}
             />
           )}
 
-          <FieldGroup label="Shelf">
-            <div className="grid grid-cols-2 gap-2 rounded-md border border-stone-300 bg-stone-100 p-1 dark:border-white/10 dark:bg-[#12110f]">
-              {statuses.map((status) => {
-                const isActive = draft.status === status;
-                return (
-                  <button
-                    key={status}
-                    className={`inline-flex h-10 items-center justify-center rounded px-3 text-sm font-semibold transition ${
-                      isActive
-                        ? "bg-white text-stone-950 shadow-sm dark:bg-[#24211e] dark:text-[#eee9df]"
-                        : "text-stone-600 hover:bg-white/70 dark:text-stone-400 dark:hover:bg-white/5"
-                    }`}
-                    onClick={() => {
-                      onUpdateDraft("status", status);
-                      setActiveStatus(status);
-                    }}
-                    type="button"
-                    aria-pressed={isActive}
-                  >
-                    {getShelfLabel(status)}
-                  </button>
-                );
-              })}
-            </div>
-          </FieldGroup>
-
-          <Field label="Title">
-            <input
-              className="input"
-              value={draft.title}
-              onChange={(event) => onUpdateDraft("title", event.target.value)}
-              placeholder="The Left Hand of Darkness"
-              required
-            />
-          </Field>
-
-          <Field label={category.creatorLabel}>
-            <input
-              className="input"
-              value={draft.creator}
-              onChange={(event) => onUpdateDraft("creator", event.target.value)}
-              placeholder="Creator or author"
-            />
-          </Field>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Category">
-              <select
-                className="input"
-                value={draft.category}
-                onChange={(event) => {
-                  onUpdateDraft("category", event.target.value);
-                  setActiveCategory(event.target.value);
-                }}
-              >
-                {categories.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          {draft.category === "movies" && (
-            <Field label="Movie type">
-              <select
-                className="input"
-                value={draft.subtype || "movie"}
-                onChange={(event) => onUpdateDraft("subtype", event.target.value)}
-              >
-                {movieSubtypeOptions
-                  .filter((option) => option.value !== "all")
-                  .map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.formLabel || option.label}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          )}
-
-          {draft.category === "books" && (
-            <Field label="Book type">
-              <select
-                className="input"
-                value={draft.subtype || "book"}
-                onChange={(event) => onUpdateDraft("subtype", event.target.value)}
-              >
-                {bookSubtypeOptions
-                  .filter((option) => option.value !== "all")
-                  .map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.formLabel || option.label}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          )}
-
-          {draft.category === "tv" && (
-            <Field label="TV type">
-              <select
-                className="input"
-                value={draft.subtype || "tv"}
-                onChange={(event) => onUpdateDraft("subtype", event.target.value)}
-              >
-                {tvSubtypeOptions
-                  .filter((option) => option.value !== "all")
-                  .map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.formLabel || option.label}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-          )}
+          <ShelfSelector
+            activeStatus={draft.status}
+            onChange={(status) => {
+              onUpdateDraft("status", status);
+              setActiveStatus(status);
+            }}
+          />
 
           {draft.status === "Completed" && (
             <FieldGroup label="Rating">
@@ -203,42 +119,282 @@ function EditorSheet({
             </FieldGroup>
           )}
 
-          <CoverField
-            imageUrl={draft.imageUrl}
-            isImageEditorOpen={isImageEditorOpen}
-            onImageEditorOpenChange={setIsImageEditorOpen}
-            onUpdateImageUrl={(value) => onUpdateDraft("imageUrl", value)}
-            title={draft.title}
-          />
-
-          <Field label="Synopsis">
-            <textarea
-              className="input min-h-32 resize-y py-3"
-              value={draft.synopsis}
-              onChange={(event) => onUpdateDraft("synopsis", event.target.value)}
-              placeholder="What is this about?"
-            />
-          </Field>
-
-          <Field label="Personal notes">
-            <textarea
-              className="input min-h-28 resize-y py-3"
-              value={draft.notes}
-              onChange={(event) => onUpdateDraft("notes", event.target.value)}
-              placeholder="Why it belongs here"
-            />
-          </Field>
-
-          <button
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35"
-            type="submit"
-          >
-            {editingId ? <Save size={17} /> : <Plus size={17} />}
-            {editingId ? "Save changes" : "Add to shelf"}
-          </button>
+          {hasSelectedLookup ? (
+            <>
+              <NotesField notes={draft.notes} onUpdateNotes={(value) => onUpdateDraft("notes", value)} />
+              <SubmitButton disabled={!canSubmit} editingId={editingId} label={primaryActionLabel} />
+              <details className="rounded-lg border border-stone-300 bg-stone-50 p-3 dark:border-white/10 dark:bg-[#12110f]/70">
+                <summary className="cursor-pointer text-sm font-semibold text-stone-700 marker:text-stone-500 dark:text-stone-200">
+                  Edit details
+                </summary>
+                <div className="mt-4 space-y-4">
+                  <EditableDetailsFields
+                    category={category}
+                    draft={draft}
+                    isImageEditorOpen={isImageEditorOpen}
+                    onImageEditorOpenChange={setIsImageEditorOpen}
+                    onUpdateDraft={onUpdateDraft}
+                    setActiveCategory={setActiveCategory}
+                  />
+                </div>
+              </details>
+            </>
+          ) : (
+            <>
+              <EditableDetailsFields
+                category={category}
+                draft={draft}
+                isImageEditorOpen={isImageEditorOpen}
+                onImageEditorOpenChange={setIsImageEditorOpen}
+                onUpdateDraft={onUpdateDraft}
+                setActiveCategory={setActiveCategory}
+              />
+              <NotesField notes={draft.notes} onUpdateNotes={(value) => onUpdateDraft("notes", value)} />
+              <SubmitButton disabled={!canSubmit} editingId={editingId} label={primaryActionLabel} />
+            </>
+          )}
         </form>
       </section>
     </div>
+  );
+}
+
+function getShelfLabel(status) {
+  return status === "Completed" ? "Completed" : statusLabels[status] || status;
+}
+
+function SelectedItemSummary({ category, draft, onChangeLookup, sourceLabel }) {
+  const creator = getPrimaryCreator(draft) || draft.creator;
+  const meta = getItemTileMeta(draft);
+  const subtypeLabel = getSubtypeLabel(draft);
+
+  return (
+    <section className="border-b border-stone-200 pb-4 dark:border-white/10">
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-xs font-semibold text-stone-500 dark:text-stone-400">
+          {sourceLabel ? `${sourceLabel} result selected` : "Result selected"}
+        </p>
+        <button
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-stone-300 px-2.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
+          onClick={onChangeLookup}
+          type="button"
+        >
+          <Search size={13} />
+          Change
+        </button>
+      </div>
+
+      <div className="mt-3 grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-3">
+        <MediaCover
+          className="flex h-24 w-16 items-end rounded-md p-2 text-[11px] font-semibold text-white"
+          fallbackClassName="justify-center text-center"
+          imageClassName="h-24 w-16 rounded-md object-cover"
+          src={draft.imageUrl}
+          title={draft.title || "Cover"}
+        />
+
+        <div className="min-w-0 self-center">
+          <h3 className="line-clamp-2 break-words text-lg font-semibold leading-6 text-stone-950 dark:text-[#eee9df]">
+            {draft.title || "Untitled"}
+          </h3>
+          {creator && (
+            <p className="mt-1 truncate text-sm text-stone-600 dark:text-stone-400" title={creator}>
+              {creator}
+            </p>
+          )}
+          {meta && (
+            <p className="mt-1 truncate text-xs font-medium text-stone-500 dark:text-stone-400" title={meta}>
+              {meta}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded bg-shelf-accent-deep px-2 py-1 text-[11px] font-semibold text-white">
+              {category.label}
+            </span>
+            {subtypeLabel && (
+              <span className="rounded bg-white/10 px-2 py-1 text-[11px] font-semibold text-stone-700 dark:text-stone-300">
+                {subtypeLabel}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ShelfSelector({ activeStatus, onChange }) {
+  return (
+    <FieldGroup label="Shelf">
+      <div className="grid grid-cols-2 gap-2 rounded-md border border-stone-300 bg-stone-100 p-1 dark:border-white/10 dark:bg-[#12110f]">
+        {statuses.map((status) => {
+          const isActive = activeStatus === status;
+          return (
+            <button
+              key={status}
+              className={`inline-flex h-10 items-center justify-center rounded px-3 text-sm font-semibold transition ${
+                isActive
+                  ? "bg-white text-stone-950 shadow-sm dark:bg-[#24211e] dark:text-[#eee9df]"
+                  : "text-stone-600 hover:bg-white/70 dark:text-stone-400 dark:hover:bg-white/5"
+              }`}
+              onClick={() => onChange(status)}
+              type="button"
+              aria-pressed={isActive}
+            >
+              {getShelfLabel(status)}
+            </button>
+          );
+        })}
+      </div>
+    </FieldGroup>
+  );
+}
+
+function EditableDetailsFields({
+  category,
+  draft,
+  isImageEditorOpen,
+  onImageEditorOpenChange,
+  onUpdateDraft,
+  setActiveCategory,
+}) {
+  return (
+    <>
+      <Field label="Title">
+        <input
+          className="input"
+          value={draft.title}
+          onChange={(event) => onUpdateDraft("title", event.target.value)}
+          placeholder="The Left Hand of Darkness"
+          required
+        />
+      </Field>
+
+      <Field label={category.creatorLabel}>
+        <input
+          className="input"
+          value={draft.creator}
+          onChange={(event) => onUpdateDraft("creator", event.target.value)}
+          placeholder="Creator or author"
+        />
+      </Field>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Category">
+          <select
+            className="input"
+            value={draft.category}
+            onChange={(event) => {
+              onUpdateDraft("category", event.target.value);
+              setActiveCategory(event.target.value);
+            }}
+          >
+            {categories.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {draft.category === "movies" && (
+        <Field label="Movie type">
+          <select
+            className="input"
+            value={draft.subtype || "movie"}
+            onChange={(event) => onUpdateDraft("subtype", event.target.value)}
+          >
+            {movieSubtypeOptions
+              .filter((option) => option.value !== "all")
+              .map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.formLabel || option.label}
+                </option>
+              ))}
+          </select>
+        </Field>
+      )}
+
+      {draft.category === "books" && (
+        <Field label="Book type">
+          <select
+            className="input"
+            value={draft.subtype || "book"}
+            onChange={(event) => onUpdateDraft("subtype", event.target.value)}
+          >
+            {bookSubtypeOptions
+              .filter((option) => option.value !== "all")
+              .map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.formLabel || option.label}
+                </option>
+              ))}
+          </select>
+        </Field>
+      )}
+
+      {draft.category === "tv" && (
+        <Field label="TV type">
+          <select
+            className="input"
+            value={draft.subtype || "tv"}
+            onChange={(event) => onUpdateDraft("subtype", event.target.value)}
+          >
+            {tvSubtypeOptions
+              .filter((option) => option.value !== "all")
+              .map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.formLabel || option.label}
+                </option>
+              ))}
+          </select>
+        </Field>
+      )}
+
+      <CoverField
+        imageUrl={draft.imageUrl}
+        isImageEditorOpen={isImageEditorOpen}
+        onImageEditorOpenChange={onImageEditorOpenChange}
+        onUpdateImageUrl={(value) => onUpdateDraft("imageUrl", value)}
+        title={draft.title}
+      />
+
+      <Field label="Synopsis">
+        <textarea
+          className="input min-h-32 resize-y py-3"
+          value={draft.synopsis}
+          onChange={(event) => onUpdateDraft("synopsis", event.target.value)}
+          placeholder="What is this about?"
+        />
+      </Field>
+    </>
+  );
+}
+
+function NotesField({ notes, onUpdateNotes }) {
+  return (
+    <Field label="Personal notes">
+      <textarea
+        className="input min-h-28 resize-y py-3"
+        value={notes}
+        onChange={(event) => onUpdateNotes(event.target.value)}
+        placeholder="Why it belongs here"
+      />
+    </Field>
+  );
+}
+
+function SubmitButton({ disabled, editingId, label }) {
+  return (
+    <button
+      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-500"
+      disabled={disabled}
+      type="submit"
+    >
+      {editingId ? <Save size={17} /> : <Plus size={17} />}
+      {label}
+    </button>
   );
 }
 

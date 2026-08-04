@@ -60,6 +60,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   const [bookLanguage, setBookLanguage] = useState(openLibraryCanonicalBookLanguage);
   const [pendingLookup, setPendingLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
+  const [appliedLookupSourceLabel, setAppliedLookupSourceLabel] = useState("");
 
   const lookupProviders = useMemo(
     () => getLookupProviders(draft.category, draft.subtype),
@@ -72,6 +73,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setLookupResults([]);
     setLookupStatus("idle");
     setLookupMessage("");
+    setAppliedLookupSourceLabel("");
   }, []);
 
   const searchDetails = useCallback(async (event) => {
@@ -88,6 +90,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setLookupStatus("loading");
     setLookupMessage("");
     setLookupResults([]);
+    setAppliedLookupSourceLabel("");
 
     const runProviderSearches = async (activeProviders) => {
       const searches = activeProviders.map((provider) => {
@@ -167,6 +170,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       setLookupQuery("");
       setLookupResults([]);
       setLookupStatus("success");
+      setAppliedLookupSourceLabel(lookupResult.sourceLabel);
     } catch (error) {
       setLookupStatus("error");
       setLookupMessage(error.message || "Could not apply that result.");
@@ -186,6 +190,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setLookupResults([]);
     setLookupStatus("idle");
     setLookupMessage("");
+    setAppliedLookupSourceLabel("");
     setShouldRunLookup(Boolean(pendingLookup.query.trim()));
     setPendingLookup(null);
   }, [draft.category, draft.status, draft.subtype, isEditorOpen, pendingLookup]);
@@ -198,6 +203,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   }, [isEditorOpen, lookupQuery, searchDetails, shouldRunLookup]);
 
   return {
+    appliedLookupSourceLabel,
     bookLanguage,
     canUseBookLookup,
     lookupMessage,

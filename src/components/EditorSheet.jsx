@@ -160,7 +160,7 @@ function EditorSheet({
 }
 
 function getShelfLabel(status) {
-  return status === "Completed" ? "Completed" : statusLabels[status] || status;
+  return statusLabels[status] || status;
 }
 
 function SelectedItemSummary({ category, draft, onChangeLookup, sourceLabel }) {

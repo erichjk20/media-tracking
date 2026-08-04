@@ -44,8 +44,8 @@ export function MediaItemCard({ item, onComplete, onDelete, onEdit, onOpen }) {
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-shelf-accent/20 text-shelf-accent-soft transition hover:bg-shelf-accent-deep/15"
                   onClick={() => onComplete(item)}
                   type="button"
-                  aria-label={`Mark ${item.title} completed`}
-                  title={`Mark ${item.title} completed`}
+                  aria-label={`Mark ${item.title} done`}
+                  title={`Mark ${item.title} done`}
                 >
                   <Check size={14} />
                 </button>

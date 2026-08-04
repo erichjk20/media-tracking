@@ -142,7 +142,7 @@ function ProfileView({
                   <div className="mt-4">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold">
                       <span className="text-stone-300">
-                        {metrics.completedCount} completed <span className="text-stone-600">/</span> {metrics.plannedCount} planned
+                        {metrics.completedCount} done <span className="text-stone-600">/</span> {metrics.plannedCount} want
                       </span>
                       <span className="text-stone-600">/</span>
                       <span className="text-stone-400">{formatAverageRating(metrics.averageRating)} avg rating</span>

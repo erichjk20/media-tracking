@@ -13,7 +13,7 @@ function CompleteItemDialog({
     <ConfirmDialog
       confirmIcon={Check}
       confirmLabel="Done"
-      eyebrow="Move to completed"
+      eyebrow="Move to Done"
       onClose={onClose}
       onConfirm={onConfirm}
       title={item.title}

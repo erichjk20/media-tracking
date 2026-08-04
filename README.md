@@ -4,7 +4,7 @@ Track your media without the noise.
 
 ## App Flow
 
-Signed-in users land on a centered quick-log homepage. Choose a media type, search a title, and the add sheet opens with lookup results for that category. The add sheet keeps the shelf choice fast with a Completed/Want segmented control, so the homepage stays focused on finding the media first.
+Signed-in users land on a centered quick-log homepage. Choose a media type, search a title, and the add sheet opens with lookup results for that category. The add sheet keeps the shelf choice fast with a Done/Want segmented control, so the homepage stays focused on finding the media first.
 
 Lookup results populate the form and cover art automatically. The add sheet shows a cover preview by default; users can add, change, remove, or paste a cover URL only when they need to override the sourced image. Library browsing, stats, and recently added items live outside the homepage so the first screen stays focused on logging.
 

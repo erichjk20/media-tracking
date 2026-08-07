@@ -1,7 +1,6 @@
 import { Library } from "lucide-react";
 import {
   bookSubtypeOptions,
-  movieSubtypeOptions,
   tvSubtypeOptions,
 } from "../lib/mediaConfig";
 import { MediaItemCard, MediaPosterCard } from "./MediaCards";
@@ -16,15 +15,12 @@ import {
 function LibraryView({
   activeBookSubtype,
   activeCategory,
-  activeMovieSubtype,
   activeShelfCounts,
   activeStatus,
   activeTvSubtype,
   bookSubtypeCounts,
   category,
-  movieSubtypeCounts,
   onActiveBookSubtypeChange,
-  onActiveMovieSubtypeChange,
   onActiveStatusChange,
   onActiveTvSubtypeChange,
   onCompleteItem,
@@ -52,17 +48,6 @@ function LibraryView({
         counts={bookSubtypeCounts}
         onChange={onActiveBookSubtypeChange}
         options={bookSubtypeOptions}
-      />
-    );
-  }
-
-  if (activeCategory === "movies") {
-    subtypeFilter = (
-      <SubtypeFilter
-        activeSubtype={activeMovieSubtype}
-        counts={movieSubtypeCounts}
-        onChange={onActiveMovieSubtypeChange}
-        options={movieSubtypeOptions}
       />
     );
   }

@@ -47,7 +47,7 @@ create table if not exists public.library_items (
   category text not null check (category in ('books', 'movies', 'tv', 'manga')),
   subtype text check (
     subtype is null
-    or subtype in ('book', 'korean-book', 'movie', 'anime-movie', 'korean-movie', 'tv', 'anime', 'kdrama')
+    or subtype in ('book', 'korean-book', 'movie', 'tv', 'anime')
   ),
   status text not null check (status in ('completed', 'want')),
   status_changed_at timestamptz not null default now(),
@@ -99,11 +99,21 @@ alter column user_id set default auth.uid();
 alter table public.library_items
 drop constraint if exists library_items_subtype_check;
 
+update public.library_items
+set subtype = 'movie'
+where category = 'movies'
+  and subtype in ('anime-movie', 'korean-movie');
+
+update public.library_items
+set subtype = 'tv'
+where category = 'tv'
+  and subtype in ('scripted', 'kdrama');
+
 alter table public.library_items
 add constraint library_items_subtype_check
 check (
   subtype is null
-  or subtype in ('book', 'korean-book', 'movie', 'anime-movie', 'korean-movie', 'tv', 'anime', 'kdrama')
+  or subtype in ('book', 'korean-book', 'movie', 'tv', 'anime')
 );
 
 alter table public.library_items
@@ -445,6 +455,17 @@ on public.library_items (status_changed_at desc);
 
 create index if not exists library_items_title_idx
 on public.library_items (lower(title));
+
+-- Prevent duplicate entries per user, category, and normalized title.
+-- Existing duplicates must be merged or deleted before this index can be applied.
+drop index if exists public.library_items_user_duplicate_title_idx;
+
+create unique index if not exists library_items_user_duplicate_title_idx
+on public.library_items (
+  user_id,
+  category,
+  lower(regexp_replace(regexp_replace(trim(title), '[^[:alnum:]]+', ' ', 'g'), '[[:space:]]+', ' ', 'g'))
+);
 
 create index if not exists movie_details_director_idx
 on public.movie_details (lower(director));

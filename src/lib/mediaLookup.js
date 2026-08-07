@@ -33,10 +33,10 @@ export function getFallbackLookupProviders(category, subtype = "", attemptedProv
   if (category === "books" && subtype === "korean-book" && !attemptedProviderIds.includes("open-library")) {
     return [{ id: "open-library", label: "Open Library" }];
   }
-  if (category === "movies" && subtype !== "korean-movie" && !attemptedProviderIds.includes("omdb")) {
+  if (category === "movies" && !attemptedProviderIds.includes("omdb")) {
     return [{ id: "omdb", label: "OMDb" }];
   }
-  if (category === "tv" && subtype !== "kdrama" && !attemptedProviderIds.includes("omdb")) {
+  if (category === "tv" && !attemptedProviderIds.includes("omdb")) {
     return [{ id: "omdb", label: "OMDb" }];
   }
   if (category === "manga" && !attemptedProviderIds.includes("mangadex")) {
@@ -337,8 +337,6 @@ export async function getTmdbItemPatch(result, currentItem) {
     throw new Error(detail.status_message || "Could not load TMDb details.");
   }
 
-  const countries = getTmdbCountries(detail, result.mediaType);
-  const isKorean = countries.includes("KR");
   const title =
     result.mediaType === "movie" || result.mediaType === "tv"
       ? cleanTmdbValue(detail.title || detail.name) || cleanTmdbValue(result.title)
@@ -356,14 +354,7 @@ export async function getTmdbItemPatch(result, currentItem) {
 
   return {
     category: result.mediaType === "movie" ? "movies" : "tv",
-    subtype:
-      result.mediaType === "movie"
-        ? isKorean
-          ? "korean-movie"
-          : currentItem.subtype || "movie"
-        : isKorean
-          ? "kdrama"
-          : currentItem.subtype || "tv",
+    subtype: result.mediaType === "movie" ? "movie" : getDefaultSubtype("tv", currentItem.subtype),
     title,
     creator,
     director: result.mediaType === "movie" ? creator : "",
@@ -500,10 +491,6 @@ async function fetchTmdbSearchResults(searchText, mediaType, subtype, language) 
   url.searchParams.set("language", language);
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("page", "1");
-  if (mediaType === "movie" && subtype === "korean-movie") {
-    url.searchParams.set("region", "KR");
-  }
-
   const response = await fetch(url, getTmdbRequestOptions());
   const data = await response.json();
 
@@ -535,13 +522,6 @@ function normalizeTmdbResult(result, mediaType) {
     overview: result.overview,
     voteAverage: result.vote_average,
   };
-}
-
-function getTmdbCountries(detail, mediaType) {
-  if (mediaType === "movie") {
-    return (detail.production_countries || []).map((country) => country.iso_3166_1);
-  }
-  return detail.origin_country || [];
 }
 
 function getTmdbDirector(detail) {

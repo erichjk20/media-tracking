@@ -148,7 +148,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       } else if (lookupResult.source === "tmdb") {
         const patch = withoutPersonalNotes(await getTmdbItemPatch(lookupResult.result, draft));
         applyPatch(setDraft, patch);
-        setLookupMessage(patch.subtype === "korean-movie" || patch.subtype === "kdrama" ? "Korean media details added." : "Details added. You can adjust the type before saving.");
+        setLookupMessage("Details added. You can adjust the type before saving.");
       } else if (lookupResult.source === "open-library") {
         const patch = withoutPersonalNotes(getOpenLibraryItemPatch(lookupResult.result, draft));
         applyPatch(setDraft, patch);

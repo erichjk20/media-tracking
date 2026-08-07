@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import {
   bookSubtypeOptions,
   categories,
-  movieSubtypeOptions,
   statuses,
   tvSubtypeOptions,
 } from "../lib/mediaConfig";
@@ -27,7 +26,6 @@ function getSubtypeCounts(items, activeStatus, options, defaultSubtype) {
 export function useShelfData({
   activeBookSubtype,
   activeCategory,
-  activeMovieSubtype,
   activeStatus,
   activeTvSubtype,
   items,
@@ -46,10 +44,6 @@ export function useShelfData({
         return (item.subtype || "book") === activeBookSubtype;
       })
       .filter(({ item }) => {
-        if (activeCategory !== "movies" || activeMovieSubtype === "all") return true;
-        return (item.subtype || "movie") === activeMovieSubtype;
-      })
-      .filter(({ item }) => {
         if (activeCategory !== "tv" || activeTvSubtype === "all") return true;
         return (item.subtype || "tv") === activeTvSubtype;
       })
@@ -59,7 +53,7 @@ export function useShelfData({
       })
       .sort((a, b) => compareShelfItems(a, b, sortOrder))
       .map(({ item }) => item);
-  }, [activeBookSubtype, activeCategory, activeMovieSubtype, activeStatus, activeTvSubtype, items, query, sortOrder]);
+  }, [activeBookSubtype, activeCategory, activeStatus, activeTvSubtype, items, query, sortOrder]);
 
   const counts = useMemo(() => {
     return categories.reduce((categoryCounts, currentCategory) => {
@@ -72,15 +66,6 @@ export function useShelfData({
       return categoryCounts;
     }, {});
   }, [items]);
-
-  const movieSubtypeCounts = useMemo(() => {
-    return getSubtypeCounts(
-      items.filter((item) => item.category === "movies"),
-      activeStatus,
-      movieSubtypeOptions,
-      "movie",
-    );
-  }, [activeStatus, items]);
 
   const bookSubtypeCounts = useMemo(() => {
     return getSubtypeCounts(
@@ -104,13 +89,11 @@ export function useShelfData({
     let activeSubtype = "all";
 
     if (activeCategory === "books") activeSubtype = activeBookSubtype;
-    if (activeCategory === "movies") activeSubtype = activeMovieSubtype;
     if (activeCategory === "tv") activeSubtype = activeTvSubtype;
 
     const shelfItems = items.filter((item) => {
       if (item.category !== activeCategory) return false;
       if (activeCategory === "books" && activeSubtype !== "all") return (item.subtype || "book") === activeSubtype;
-      if (activeCategory === "movies" && activeSubtype !== "all") return (item.subtype || "movie") === activeSubtype;
       if (activeCategory === "tv" && activeSubtype !== "all") return (item.subtype || "tv") === activeSubtype;
       return true;
     });
@@ -119,14 +102,13 @@ export function useShelfData({
       statusCounts[status] = shelfItems.filter((item) => item.status === status).length;
       return statusCounts;
     }, {});
-  }, [activeBookSubtype, activeCategory, activeMovieSubtype, activeTvSubtype, items]);
+  }, [activeBookSubtype, activeCategory, activeTvSubtype, items]);
 
   return {
     activeShelfCounts,
     bookSubtypeCounts,
     category,
     counts,
-    movieSubtypeCounts,
     tvSubtypeCounts,
     visibleItems,
   };

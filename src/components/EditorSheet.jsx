@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import {
   bookSubtypeOptions,
   categories,
-  movieSubtypeOptions,
   statusLabels,
   statuses,
   tvSubtypeOptions,
@@ -25,6 +24,7 @@ function EditorSheet({
   category,
   draft,
   editingId,
+  editorMessage,
   editorMode = "search",
   lookupMessage,
   lookupProviders,
@@ -119,6 +119,12 @@ function EditorSheet({
               <Search size={15} />
               Search title instead
             </button>
+          )}
+
+          {editorMessage && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-200">
+              {editorMessage}
+            </p>
           )}
 
           <ShelfSelector
@@ -317,24 +323,6 @@ function EditableDetailsFields({
         </Field>
       </div>
 
-      {draft.category === "movies" && (
-        <Field label="Movie type">
-          <select
-            className="input"
-            value={draft.subtype || "movie"}
-            onChange={(event) => onUpdateDraft("subtype", event.target.value)}
-          >
-            {movieSubtypeOptions
-              .filter((option) => option.value !== "all")
-              .map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.formLabel || option.label}
-                </option>
-              ))}
-          </select>
-        </Field>
-      )}
-
       {draft.category === "books" && (
         <Field label="Book type">
           <select
@@ -354,7 +342,7 @@ function EditableDetailsFields({
       )}
 
       {draft.category === "tv" && (
-        <Field label="TV type">
+        <Field label="TV format">
           <select
             className="input"
             value={draft.subtype || "tv"}

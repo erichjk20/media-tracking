@@ -31,13 +31,6 @@ export const omdbTypesByCategory = {
 export const tmdbCanonicalMediaLanguage = "en-US";
 export const openLibraryCanonicalBookLanguage = "en";
 
-export const movieSubtypeOptions = [
-  { value: "all", label: "All" },
-  { value: "movie", label: "General" },
-  { value: "anime-movie", label: "Anime", formLabel: "Anime movie" },
-  { value: "korean-movie", label: "Korean", formLabel: "Korean movie" },
-];
-
 export const bookSubtypeOptions = [
   { value: "all", label: "All" },
   { value: "book", label: "General" },
@@ -46,9 +39,8 @@ export const bookSubtypeOptions = [
 
 export const tvSubtypeOptions = [
   { value: "all", label: "All" },
-  { value: "tv", label: "General" },
+  { value: "tv", label: "General", formLabel: "General show" },
   { value: "anime", label: "Anime" },
-  { value: "kdrama", label: "Korean" },
 ];
 
 export const defaultItems = [
@@ -89,6 +81,7 @@ export const defaultItems = [
   {
     id: "tv-1",
     category: "tv",
+    subtype: "tv",
     status: "Want to Watch/Read",
     title: "Severance",
     creator: "Dan Erickson",

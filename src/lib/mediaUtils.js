@@ -2,7 +2,6 @@ import {
   bookSubtypeOptions,
   defaultItems,
   emptyDraft,
-  movieSubtypeOptions,
   openLibraryCanonicalBookLanguage,
   tvSubtypeOptions,
 } from "./mediaConfig";
@@ -52,7 +51,7 @@ export function getLocalStorageItems() {
 export function normalizeItems(items) {
   return items.map((item) => {
     const category = item.category === "anime" ? "tv" : item.category;
-    const subtype = item.category === "anime" ? "anime" : item.subtype;
+    const subtype = getMigratedSubtype(category, item.category === "anime" ? "anime" : item.subtype);
     const defaultItem = defaultItems.find((previewItem) => previewItem.id === item.id) || {};
 
     return {
@@ -97,9 +96,15 @@ export function normalizeSeasonBreakdown(seasons) {
 
 export function getDefaultSubtype(category, subtype = "") {
   if (category === "books") return bookSubtypeOptions.some((option) => option.value === subtype) && subtype !== "all" ? subtype : "book";
-  if (category === "movies") return movieSubtypeOptions.some((option) => option.value === subtype) && subtype !== "all" ? subtype : "movie";
+  if (category === "movies") return "movie";
   if (category === "tv") return tvSubtypeOptions.some((option) => option.value === subtype) && subtype !== "all" ? subtype : "tv";
   return "";
+}
+
+function getMigratedSubtype(category, subtype = "") {
+  if (category === "movies" && (subtype === "anime-movie" || subtype === "korean-movie")) return "movie";
+  if (category === "tv" && (subtype === "scripted" || subtype === "kdrama")) return "tv";
+  return subtype;
 }
 
 export function getSelectableSubtype(category, subtype = "") {
@@ -122,6 +127,13 @@ export function createMediaDraft({
   };
 }
 
+export function findDuplicateMediaItem(items, candidateItem, ignoredItemId = "") {
+  const candidateKey = getMediaItemDuplicateKey(candidateItem);
+  if (!candidateKey) return null;
+
+  return items.find((item) => item.id !== ignoredItemId && getMediaItemDuplicateKey(item) === candidateKey) || null;
+}
+
 export function compareShelfItems(a, b, sortOrder) {
   if (sortOrder === "title-asc") return compareTitles(a.item, b.item);
   if (sortOrder === "title-desc") return compareTitles(b.item, a.item);
@@ -134,6 +146,23 @@ export function compareShelfItems(a, b, sortOrder) {
   }
 
   return getShelfSortValue(b.item, b.index) - getShelfSortValue(a.item, a.index) || compareTitles(a.item, b.item);
+}
+
+function getMediaItemDuplicateKey(item) {
+  const normalizedTitle = normalizeDuplicateTitle(item.title);
+  if (!normalizedTitle) return "";
+
+  const category = item.category === "anime" ? "tv" : item.category;
+  return [category, normalizedTitle].join("|");
+}
+
+function normalizeDuplicateTitle(title) {
+  return String(title || "")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function compareTitles(a, b) {
@@ -514,9 +543,6 @@ export function getOpenLibraryCoverUrl(coverId) {
 
 export function getSubtypeLabel(item) {
   if (item.category === "books" && item.subtype === "korean-book") return "Korean book";
-  if (item.category === "movies" && item.subtype === "anime-movie") return "Anime movie";
-  if (item.category === "movies" && item.subtype === "korean-movie") return "Korean movie";
-  if (item.category === "tv" && item.subtype === "anime") return "Anime";
-  if (item.category === "tv" && item.subtype === "kdrama") return "Korean TV";
+  if (item.category === "tv" && getDefaultSubtype("tv", item.subtype) === "anime") return "Anime";
   return "";
 }

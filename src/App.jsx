@@ -26,13 +26,13 @@ import {
 import {
   bookSubtypeOptions,
   categories,
-  movieSubtypeOptions,
   sortOptions,
   statuses,
   tvSubtypeOptions,
 } from "./lib/mediaConfig";
 import {
   createMediaDraft,
+  findDuplicateMediaItem,
   getDefaultSubtype,
   getStoredProfile,
   getStoredItems,
@@ -50,7 +50,6 @@ const defaultUiState = {
   activeCategory: "books",
   activeStatus: "Completed",
   activeBookSubtype: "all",
-  activeMovieSubtype: "all",
   activeTvSubtype: "all",
   shelfView: "grid",
   sortOrder: "recent",
@@ -67,7 +66,6 @@ function getStoredUiState() {
       activeCategory: getAllowedValue(parsedState.activeCategory, categories.map((category) => category.id), defaultUiState.activeCategory),
       activeStatus: getAllowedValue(parsedState.activeStatus, statuses, defaultUiState.activeStatus),
       activeBookSubtype: getAllowedValue(parsedState.activeBookSubtype, bookSubtypeOptions.map((option) => option.value), defaultUiState.activeBookSubtype),
-      activeMovieSubtype: getAllowedValue(parsedState.activeMovieSubtype, movieSubtypeOptions.map((option) => option.value), defaultUiState.activeMovieSubtype),
       activeTvSubtype: getAllowedValue(parsedState.activeTvSubtype, tvSubtypeOptions.map((option) => option.value), defaultUiState.activeTvSubtype),
       shelfView: getAllowedValue(parsedState.shelfView, ["grid", "list"], defaultUiState.shelfView),
       sortOrder: getAllowedValue(parsedState.sortOrder, sortOptions.map((option) => option.value), defaultUiState.sortOrder),
@@ -105,7 +103,6 @@ function App() {
   const [activeCategory, setActiveCategory] = useState(initialUiState.activeCategory);
   const [activeStatus, setActiveStatus] = useState(initialUiState.activeStatus);
   const [activeBookSubtype, setActiveBookSubtype] = useState(initialUiState.activeBookSubtype);
-  const [activeMovieSubtype, setActiveMovieSubtype] = useState(initialUiState.activeMovieSubtype);
   const [activeTvSubtype, setActiveTvSubtype] = useState(initialUiState.activeTvSubtype);
   const [shelfView, setShelfView] = useState(initialUiState.shelfView);
   const [sortOrder, setSortOrder] = useState(initialUiState.sortOrder);
@@ -114,6 +111,7 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editorOrigin, setEditorOrigin] = useState("library");
   const [editorMode, setEditorMode] = useState("search");
+  const [editorMessage, setEditorMessage] = useState("");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [completingItemId, setCompletingItemId] = useState(null);
@@ -126,13 +124,11 @@ function App() {
     activeShelfCounts,
     bookSubtypeCounts,
     category,
-    movieSubtypeCounts,
     tvSubtypeCounts,
     visibleItems,
   } = useShelfData({
     activeBookSubtype,
     activeCategory,
-    activeMovieSubtype,
     activeStatus,
     activeTvSubtype,
     items,
@@ -209,7 +205,6 @@ function App() {
       activeCategory,
       activeStatus,
       activeBookSubtype,
-      activeMovieSubtype,
       activeTvSubtype,
       shelfView,
       sortOrder,
@@ -220,7 +215,6 @@ function App() {
   }, [
     activeBookSubtype,
     activeCategory,
-    activeMovieSubtype,
     activeStatus,
     activeTvSubtype,
     activeView,
@@ -325,6 +319,11 @@ function App() {
       notes: draft.notes.trim(),
       imageUrl: draft.imageUrl.trim(),
     };
+    const duplicateItem = findDuplicateMediaItem(items, nextItem, editingId);
+    if (duplicateItem) {
+      setEditorMessage(`"${nextItem.title}" is already in your ${category.label.toLowerCase()} shelf.`);
+      return;
+    }
 
     try {
       const savedItem = shouldUseSupabase ? await saveMediaItem(nextItem, user.id) : nextItem;
@@ -349,7 +348,7 @@ function App() {
   }
 
   function resetForm() {
-    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
+    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
     setDraft(createMediaDraft({
       category: activeCategory,
@@ -357,6 +356,7 @@ function App() {
       status: activeStatus,
     }));
     setEditingId(null);
+    setEditorMessage("");
   }
 
   function startEdit(item) {
@@ -366,6 +366,7 @@ function App() {
     setActiveStatus(item.status);
     setEditorOrigin("library");
     setEditorMode("search");
+    setEditorMessage("");
     resetLookupState();
     setIsEditorOpen(true);
   }
@@ -410,7 +411,7 @@ function App() {
   }
 
   function startAddItem(mode = "search") {
-    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "movies" ? activeMovieSubtype : activeCategory === "books" ? activeBookSubtype : "";
+    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
     setDraft(createMediaDraft({
       category: activeCategory,
@@ -420,6 +421,7 @@ function App() {
     setEditingId(null);
     setEditorOrigin("library");
     setEditorMode(mode);
+    setEditorMessage("");
     resetLookupState();
     setIsEditorOpen(true);
   }
@@ -427,6 +429,7 @@ function App() {
   function closeEditor() {
     resetForm();
     resetLookupState();
+    setEditorMessage("");
     setIsEditorOpen(false);
     setEditorOrigin("library");
     setEditorMode("search");
@@ -491,6 +494,7 @@ function App() {
   }
 
   function updateDraft(field, value) {
+    setEditorMessage("");
     setDraft((current) => ({
       ...current,
       [field]: value,
@@ -535,6 +539,7 @@ function App() {
     setEditingId(null);
     setEditorOrigin("home");
     setEditorMode("search");
+    setEditorMessage("");
     resetLookupState();
     queueLookup({
       categoryId,
@@ -602,15 +607,12 @@ function App() {
         <LibraryView
           activeBookSubtype={activeBookSubtype}
           activeCategory={activeCategory}
-          activeMovieSubtype={activeMovieSubtype}
           activeShelfCounts={activeShelfCounts}
           activeStatus={activeStatus}
           activeTvSubtype={activeTvSubtype}
           bookSubtypeCounts={bookSubtypeCounts}
           category={category}
-          movieSubtypeCounts={movieSubtypeCounts}
           onActiveBookSubtypeChange={setActiveBookSubtype}
-          onActiveMovieSubtypeChange={setActiveMovieSubtype}
           onActiveStatusChange={setActiveStatus}
           onActiveTvSubtypeChange={setActiveTvSubtype}
           onCompleteItem={startCompleteItem}
@@ -665,6 +667,7 @@ function App() {
           category={category}
           draft={draft}
           editingId={editingId}
+          editorMessage={editorMessage}
           editorMode={editorMode}
           onClose={closeEditor}
           onLookupQueryChange={setLookupQuery}

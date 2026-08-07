@@ -13,7 +13,7 @@ The app tracks exactly four top-level media categories:
 - TV Shows
 - Manga
 
-Anime series are tracked inside the TV Shows category with an Anime subtype. Anime movies stay inside Movies with an Anime Movie subtype.
+Anime series are tracked inside the TV Shows category with an Anime format. Movies stay under one Movies type. Narrower groupings like anime films, Korean films, or K-dramas are not first-class subtypes.
 
 Each category has exactly two shelves:
 
@@ -181,7 +181,7 @@ Both are ignored by Git.
 `src/lib/mediaLookup.js`
 
 - Owns external lookup provider selection, API requests, result normalization, and item patch creation for OMDb, TMDb, Open Library, Aladin, and Jikan.
-- Routes Movies and TV Shows, including Anime subtype entries, through TMDb.
+- Routes Movies and TV Shows, including Anime TV format entries, through TMDb.
 - Counts TV seasons from released, non-special TMDb seasons instead of raw `number_of_seasons`, so renewed/upcoming seasons do not inflate saved season totals.
 
 `src/lib/mediaUtils.js`
@@ -311,28 +311,27 @@ The lookup:
 
 - Searches OMDb by title with `s`.
 - Restricts results to `type=movie` for Movies and `type=series` for TV Shows.
-- Uses the Anime subtype under TV Shows for anime series.
+- Uses the Anime format under TV Shows for anime series.
 - Fetches selected result details by IMDb id with `i`.
 - Fills title, creator/director, poster URL, and notes with relevant OMDb metadata.
 - Leaves the user's personal 1-5 star rating separate from OMDb's IMDb score.
 
 ## TMDb Movie And TV Lookup
 
-Movies and TV Shows use TMDb as the primary unified add/edit lookup provider. Anime series stay in TV Shows with the Anime subtype, but use TMDb lookup so seasons are grouped under one show-level library item instead of being logged as separate season entries.
+Movies and TV Shows use TMDb as the primary unified add/edit lookup provider. Anime series stay in TV Shows with the Anime format, but use TMDb lookup so seasons are grouped under one show-level library item instead of being logged as separate season entries.
 
 The lookup:
 
 - Accepts English or Korean search text.
 - Searches TMDb movie results for Movies using English and Korean result languages behind the scenes.
 - Searches TMDb TV results for TV Shows using English and Korean result languages behind the scenes.
-- Uses TMDb TV results for Anime subtype entries, also adding Japanese result-language search behind the scenes.
+- Uses TMDb TV results for Anime format entries, also adding Japanese result-language search behind the scenes.
 - Always fetches selected TMDb details in English (`en-US`) so saved media metadata stays consistent.
 - Fills title, creator/director, poster URL, synopsis, and available runtime/count metadata from TMDb.
 - For TV Shows, counts seasons from `detail.seasons` by excluding specials (`season_number === 0`) and excluding seasons without an `air_date` on or before today.
 - For TV Shows, saves `seasonBreakdown` as released seasons only; renewed/upcoming seasons can exist in TMDb metadata but should not appear in the detail overlay or inflate the show-level count.
 - For TV Shows, derives episode count from released season buckets when possible, falling back to TMDb's detail-level episode total only when released season bucket totals are unavailable.
-- Automatically marks Korean movie results as `korean-movie` when TMDb country data includes `KR`.
-- Automatically marks Korean TV results as `kdrama` when TMDb origin country data includes `KR`.
+- Leaves country/language-specific grouping out of first-class movie and TV subtypes.
 
 The local TMDb credentials can be read from either:
 
@@ -351,18 +350,15 @@ Books support a lightweight `subtype` field:
 Movies support a lightweight `subtype` field:
 
 - `movie`
-- `anime-movie`
-- `korean-movie`
 
-The TV Shows category supports a lightweight `subtype` field:
+The TV Shows category supports a lightweight `subtype` field used only for the broad Anime distinction:
 
 - `tv`
 - `anime`
-- `kdrama`
 
-Existing saved book items without a subtype are normalized to `book` at load time. Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time.
+Existing saved book items without a subtype are normalized to `book` at load time. Existing saved movie items without a subtype are normalized to `movie` at load time. Existing saved TV items without a subtype are normalized to `tv` at load time. Legacy movie subtypes `anime-movie` and `korean-movie` normalize to `movie`; legacy TV subtype `kdrama` normalizes to `tv`.
 
-The Books shelf includes an `All / General / Korean` filter. The Movies shelf includes an `All / General / Anime / Korean` filter. The TV Shows shelf includes an `All / General / Anime / Korean` filter. Korean books stay under Books, anime movies and Korean movies stay under Movies, and anime series and K-Dramas stay under TV Shows.
+The Books shelf includes an `All / General / Korean` filter. The Movies shelf has no subtype filter. The TV Shows shelf includes `All / General / Anime` format filters.
 
 The local API key is read from:
 

@@ -12,15 +12,37 @@ import {
 } from "../lib/mediaUtils";
 
 function getSubtypeCounts(items, activeStatus, options, defaultSubtype) {
-  const shelfItems = items.filter((item) => item.status === activeStatus);
+  const subtypeCounts = Object.fromEntries(options.map((option) => [option.value, 0]));
 
-  return options.reduce((subtypeCounts, option) => {
-    subtypeCounts[option.value] =
-      option.value === "all"
-        ? shelfItems.length
-        : shelfItems.filter((item) => (item.subtype || defaultSubtype) === option.value).length;
-    return subtypeCounts;
-  }, {});
+  items.forEach((item) => {
+    if (item.status !== activeStatus) return;
+    const subtype = item.subtype || defaultSubtype;
+    subtypeCounts.all += 1;
+    if (subtypeCounts[subtype] !== undefined) subtypeCounts[subtype] += 1;
+  });
+
+  return subtypeCounts;
+}
+
+function createEmptyCategoryCounts() {
+  return Object.fromEntries(
+    categories.map((currentCategory) => [
+      currentCategory.id,
+      Object.fromEntries(statuses.map((status) => [status, 0])),
+    ]),
+  );
+}
+
+function getActiveSubtype(activeCategory, activeBookSubtype, activeTvSubtype) {
+  if (activeCategory === "books") return activeBookSubtype;
+  if (activeCategory === "tv") return activeTvSubtype;
+  return "all";
+}
+
+function matchesActiveSubtype(item, activeCategory, activeSubtype) {
+  if (activeCategory === "books" && activeSubtype !== "all") return (item.subtype || "book") === activeSubtype;
+  if (activeCategory === "tv" && activeSubtype !== "all") return (item.subtype || "tv") === activeSubtype;
+  return true;
 }
 
 export function useShelfData({
@@ -35,18 +57,13 @@ export function useShelfData({
   const category = categories.find((entry) => entry.id === activeCategory);
 
   const visibleItems = useMemo(() => {
+    const activeSubtype = getActiveSubtype(activeCategory, activeBookSubtype, activeTvSubtype);
     const queryTokens = getSearchTokens(query);
+
     return items
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => item.category === activeCategory && item.status === activeStatus)
-      .filter(({ item }) => {
-        if (activeCategory !== "books" || activeBookSubtype === "all") return true;
-        return (item.subtype || "book") === activeBookSubtype;
-      })
-      .filter(({ item }) => {
-        if (activeCategory !== "tv" || activeTvSubtype === "all") return true;
-        return (item.subtype || "tv") === activeTvSubtype;
-      })
+      .filter(({ item }) => matchesActiveSubtype(item, activeCategory, activeSubtype))
       .filter(({ item }) => {
         if (!queryTokens.length) return true;
         return getKeywordMatchScore([item.title, item.creator, item.synopsis, item.notes].join(" "), queryTokens) >= queryTokens.length;
@@ -56,15 +73,14 @@ export function useShelfData({
   }, [activeBookSubtype, activeCategory, activeStatus, activeTvSubtype, items, query, sortOrder]);
 
   const counts = useMemo(() => {
-    return categories.reduce((categoryCounts, currentCategory) => {
-      categoryCounts[currentCategory.id] = statuses.reduce((statusCounts, status) => {
-        statusCounts[status] = items.filter(
-          (item) => item.category === currentCategory.id && item.status === status,
-        ).length;
-        return statusCounts;
-      }, {});
-      return categoryCounts;
-    }, {});
+    const categoryCounts = createEmptyCategoryCounts();
+
+    items.forEach((item) => {
+      if (categoryCounts[item.category]?.[item.status] === undefined) return;
+      categoryCounts[item.category][item.status] += 1;
+    });
+
+    return categoryCounts;
   }, [items]);
 
   const bookSubtypeCounts = useMemo(() => {
@@ -86,22 +102,16 @@ export function useShelfData({
   }, [activeStatus, items]);
 
   const activeShelfCounts = useMemo(() => {
-    let activeSubtype = "all";
+    const activeSubtype = getActiveSubtype(activeCategory, activeBookSubtype, activeTvSubtype);
+    const statusCounts = Object.fromEntries(statuses.map((status) => [status, 0]));
 
-    if (activeCategory === "books") activeSubtype = activeBookSubtype;
-    if (activeCategory === "tv") activeSubtype = activeTvSubtype;
-
-    const shelfItems = items.filter((item) => {
-      if (item.category !== activeCategory) return false;
-      if (activeCategory === "books" && activeSubtype !== "all") return (item.subtype || "book") === activeSubtype;
-      if (activeCategory === "tv" && activeSubtype !== "all") return (item.subtype || "tv") === activeSubtype;
-      return true;
+    items.forEach((item) => {
+      if (item.category !== activeCategory) return;
+      if (!matchesActiveSubtype(item, activeCategory, activeSubtype)) return;
+      if (statusCounts[item.status] !== undefined) statusCounts[item.status] += 1;
     });
 
-    return statuses.reduce((statusCounts, status) => {
-      statusCounts[status] = shelfItems.filter((item) => item.status === status).length;
-      return statusCounts;
-    }, {});
+    return statusCounts;
   }, [activeBookSubtype, activeCategory, activeTvSubtype, items]);
 
   return {

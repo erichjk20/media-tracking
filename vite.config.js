@@ -6,6 +6,31 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), aladinApiPlugin(env.ALADIN_TTB_KEY || env.VITE_ALADIN_TTB_KEY)],
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "react-vendor",
+                test: /node_modules[\\/](react|react-dom)[\\/]/,
+                priority: 3,
+              },
+              {
+                name: "supabase-vendor",
+                test: /node_modules[\\/]@supabase[\\/]/,
+                priority: 2,
+              },
+              {
+                name: "ui-vendor",
+                test: /node_modules[\\/]lucide-react[\\/]/,
+                priority: 1,
+              },
+            ],
+          },
+        },
+      },
+    },
   };
 });
 

@@ -24,61 +24,20 @@ import {
   updateUserProfileDisplayName,
 } from "./lib/supabase";
 import {
-  bookSubtypeOptions,
-  categories,
-  sortOptions,
-  statuses,
-  tvSubtypeOptions,
-} from "./lib/mediaConfig";
-import {
   createMediaDraft,
   findDuplicateMediaItem,
   getDefaultSubtype,
   getStoredProfile,
   getStoredItems,
+  localMediaItemsStorageKey,
   normalizeItems,
+  prepareMediaItemForSave,
   saveStoredProfile,
 } from "./lib/mediaUtils";
 import { useLibraryMetrics } from "./hooks/useLibraryMetrics";
 import { useMediaLookup } from "./hooks/useMediaLookup";
+import { usePersistentUiState } from "./hooks/usePersistentUiState";
 import { useShelfData } from "./hooks/useShelfData";
-
-const uiStateStorageKey = "media-shelf-ui-state";
-
-const defaultUiState = {
-  activeView: "home",
-  activeCategory: "books",
-  activeStatus: "Completed",
-  activeBookSubtype: "all",
-  activeTvSubtype: "all",
-  shelfView: "grid",
-  sortOrder: "recent",
-  query: "",
-};
-
-function getStoredUiState() {
-  try {
-    const stored = window.localStorage.getItem(uiStateStorageKey);
-    const parsedState = stored ? JSON.parse(stored) : {};
-
-    return {
-      activeView: getAllowedValue(parsedState.activeView, ["home", "library", "profile"], defaultUiState.activeView),
-      activeCategory: getAllowedValue(parsedState.activeCategory, categories.map((category) => category.id), defaultUiState.activeCategory),
-      activeStatus: getAllowedValue(parsedState.activeStatus, statuses, defaultUiState.activeStatus),
-      activeBookSubtype: getAllowedValue(parsedState.activeBookSubtype, bookSubtypeOptions.map((option) => option.value), defaultUiState.activeBookSubtype),
-      activeTvSubtype: getAllowedValue(parsedState.activeTvSubtype, tvSubtypeOptions.map((option) => option.value), defaultUiState.activeTvSubtype),
-      shelfView: getAllowedValue(parsedState.shelfView, ["grid", "list"], defaultUiState.shelfView),
-      sortOrder: getAllowedValue(parsedState.sortOrder, sortOptions.map((option) => option.value), defaultUiState.sortOrder),
-      query: typeof parsedState.query === "string" ? parsedState.query : defaultUiState.query,
-    };
-  } catch {
-    return defaultUiState;
-  }
-}
-
-function getAllowedValue(value, allowedValues, fallback) {
-  return allowedValues.includes(value) ? value : fallback;
-}
 
 function getAddLabel(categoryId) {
   if (categoryId === "books") return "book";
@@ -89,7 +48,6 @@ function getAddLabel(categoryId) {
 }
 
 function App() {
-  const [initialUiState] = useState(getStoredUiState);
   const [session, setSession] = useState(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(hasPasswordRecoveryRedirect);
   const [authStatus, setAuthStatus] = useState(isSupabaseConfigured ? "loading" : "local");
@@ -99,14 +57,24 @@ function App() {
   const [storageMessage, setStorageMessage] = useState(
     isSupabaseConfigured ? "Checking your session..." : "",
   );
-  const [activeView, setActiveView] = useState(initialUiState.activeView);
-  const [activeCategory, setActiveCategory] = useState(initialUiState.activeCategory);
-  const [activeStatus, setActiveStatus] = useState(initialUiState.activeStatus);
-  const [activeBookSubtype, setActiveBookSubtype] = useState(initialUiState.activeBookSubtype);
-  const [activeTvSubtype, setActiveTvSubtype] = useState(initialUiState.activeTvSubtype);
-  const [shelfView, setShelfView] = useState(initialUiState.shelfView);
-  const [sortOrder, setSortOrder] = useState(initialUiState.sortOrder);
-  const [query, setQuery] = useState(initialUiState.query);
+  const {
+    activeBookSubtype,
+    activeCategory,
+    activeStatus,
+    activeTvSubtype,
+    activeView,
+    query,
+    setActiveBookSubtype,
+    setActiveCategory,
+    setActiveStatus,
+    setActiveTvSubtype,
+    setActiveView,
+    setQuery,
+    setShelfView,
+    setSortOrder,
+    shelfView,
+    sortOrder,
+  } = usePersistentUiState();
   const [draft, setDraft] = useState(() => createMediaDraft());
   const [editingId, setEditingId] = useState(null);
   const [editorOrigin, setEditorOrigin] = useState("library");
@@ -200,30 +168,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const nextUiState = {
-      activeView,
-      activeCategory,
-      activeStatus,
-      activeBookSubtype,
-      activeTvSubtype,
-      shelfView,
-      sortOrder,
-      query,
-    };
-
-    window.localStorage.setItem(uiStateStorageKey, JSON.stringify(nextUiState));
-  }, [
-    activeBookSubtype,
-    activeCategory,
-    activeStatus,
-    activeTvSubtype,
-    activeView,
-    query,
-    shelfView,
-    sortOrder,
-  ]);
-
-  useEffect(() => {
     if (!isSupabaseConfigured) return;
     if (authStatus === "loading") return;
 
@@ -277,48 +221,15 @@ function App() {
 
   useEffect(() => {
     if (isSupabaseConfigured || storageMode === "loading" || storageMode === "supabase") return;
-    window.localStorage.setItem("media-shelf-items", JSON.stringify(items));
+    window.localStorage.setItem(localMediaItemsStorageKey, JSON.stringify(items));
   }, [items, storageMode]);
 
   async function handleSubmit(event) {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
     if (!cleanedTitle) return;
-    const now = new Date().toISOString();
     const originalItem = editingId ? items.find((item) => item.id === editingId) : null;
-    const addedAt = editingId ? draft.addedAt || originalItem?.addedAt || now : now;
-    const statusChangedAt =
-      !editingId || draft.status !== originalItem?.status
-        ? now
-        : draft.statusChangedAt || originalItem?.statusChangedAt || addedAt;
-    const nextItem = {
-      ...draft,
-      id: editingId || crypto.randomUUID(),
-      addedAt,
-      statusChangedAt,
-      title: cleanedTitle,
-      creator: draft.creator.trim(),
-      director: draft.director.trim(),
-      genre: draft.genre.trim(),
-      releaseYear: draft.releaseYear ? Number(draft.releaseYear) : "",
-      durationMinutes: draft.durationMinutes ? Number(draft.durationMinutes) : "",
-      pageCount: draft.pageCount ? Number(draft.pageCount) : "",
-      publisher: draft.publisher.trim(),
-      isbn: draft.isbn.trim(),
-      author: draft.author.trim(),
-      artist: draft.artist.trim(),
-      volumeCount: draft.volumeCount ? Number(draft.volumeCount) : "",
-      chapterCount: draft.chapterCount ? Number(draft.chapterCount) : "",
-      seasonCount: draft.seasonCount ? Number(draft.seasonCount) : "",
-      episodeCount: draft.episodeCount ? Number(draft.episodeCount) : "",
-      durationMinutesPerEpisode: draft.durationMinutesPerEpisode ? Number(draft.durationMinutesPerEpisode) : "",
-      studio: draft.studio.trim(),
-      subtype: getDefaultSubtype(draft.category, draft.subtype),
-      rating: draft.status === "Completed" ? Number(draft.rating) : 0,
-      synopsis: draft.synopsis.trim(),
-      notes: draft.notes.trim(),
-      imageUrl: draft.imageUrl.trim(),
-    };
+    const nextItem = prepareMediaItemForSave({ draft, editingId, originalItem });
     const duplicateItem = findDuplicateMediaItem(items, nextItem, editingId);
     if (duplicateItem) {
       setEditorMessage(`"${nextItem.title}" is already in your ${category.label.toLowerCase()} shelf.`);
@@ -347,14 +258,19 @@ function App() {
     }
   }
 
-  function resetForm() {
+  function createActiveShelfDraft({ title = "" } = {}) {
     const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "books" ? activeBookSubtype : "";
 
-    setDraft(createMediaDraft({
+    return createMediaDraft({
       category: activeCategory,
-      subtype,
       status: activeStatus,
-    }));
+      subtype,
+      title,
+    });
+  }
+
+  function resetForm() {
+    setDraft(createActiveShelfDraft());
     setEditingId(null);
     setEditorMessage("");
   }
@@ -411,13 +327,7 @@ function App() {
   }
 
   function startAddItem(mode = "search") {
-    const subtype = activeCategory === "tv" ? activeTvSubtype : activeCategory === "books" ? activeBookSubtype : "";
-
-    setDraft(createMediaDraft({
-      category: activeCategory,
-      subtype,
-      status: activeStatus,
-    }));
+    setDraft(createActiveShelfDraft());
     setEditingId(null);
     setEditorOrigin("library");
     setEditorMode(mode);

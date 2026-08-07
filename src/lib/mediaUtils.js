@@ -7,6 +7,7 @@ import {
 } from "./mediaConfig";
 
 const localProfileStorageKey = "media-shelf-profile";
+export const localMediaItemsStorageKey = "media-shelf-items";
 
 export function getStoredProfile() {
   try {
@@ -32,7 +33,7 @@ export function saveStoredProfile(profile) {
 
 export function getStoredItems() {
   try {
-    const stored = window.localStorage.getItem("media-shelf-items");
+    const stored = window.localStorage.getItem(localMediaItemsStorageKey);
     return normalizeItems(stored ? JSON.parse(stored) : defaultItems);
   } catch {
     return normalizeItems(defaultItems);
@@ -41,7 +42,7 @@ export function getStoredItems() {
 
 export function getLocalStorageItems() {
   try {
-    const stored = window.localStorage.getItem("media-shelf-items");
+    const stored = window.localStorage.getItem(localMediaItemsStorageKey);
     return stored ? normalizeItems(JSON.parse(stored)) : [];
   } catch {
     return [];
@@ -124,6 +125,43 @@ export function createMediaDraft({
     status,
     title,
     rating: status === "Completed" ? 3 : 0,
+  };
+}
+
+export function prepareMediaItemForSave({ draft, editingId = "", originalItem = null, now = new Date().toISOString() }) {
+  const addedAt = editingId ? draft.addedAt || originalItem?.addedAt || now : now;
+  const statusChangedAt =
+    !editingId || draft.status !== originalItem?.status
+      ? now
+      : draft.statusChangedAt || originalItem?.statusChangedAt || addedAt;
+
+  return {
+    ...draft,
+    id: editingId || crypto.randomUUID(),
+    addedAt,
+    statusChangedAt,
+    title: draft.title.trim(),
+    creator: draft.creator.trim(),
+    director: draft.director.trim(),
+    genre: draft.genre.trim(),
+    releaseYear: draft.releaseYear ? Number(draft.releaseYear) : "",
+    durationMinutes: draft.durationMinutes ? Number(draft.durationMinutes) : "",
+    pageCount: draft.pageCount ? Number(draft.pageCount) : "",
+    publisher: draft.publisher.trim(),
+    isbn: draft.isbn.trim(),
+    author: draft.author.trim(),
+    artist: draft.artist.trim(),
+    volumeCount: draft.volumeCount ? Number(draft.volumeCount) : "",
+    chapterCount: draft.chapterCount ? Number(draft.chapterCount) : "",
+    seasonCount: draft.seasonCount ? Number(draft.seasonCount) : "",
+    episodeCount: draft.episodeCount ? Number(draft.episodeCount) : "",
+    durationMinutesPerEpisode: draft.durationMinutesPerEpisode ? Number(draft.durationMinutesPerEpisode) : "",
+    studio: draft.studio.trim(),
+    subtype: getDefaultSubtype(draft.category, draft.subtype),
+    rating: draft.status === "Completed" ? Number(draft.rating) : 0,
+    synopsis: draft.synopsis.trim(),
+    notes: draft.notes.trim(),
+    imageUrl: draft.imageUrl.trim(),
   };
 }
 

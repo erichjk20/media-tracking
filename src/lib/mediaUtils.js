@@ -482,7 +482,8 @@ function getLookupResultPriority(lookupResult) {
 }
 
 export function getLookupMessage(entry) {
-  return entry.status === "fulfilled" ? entry.value.message : entry.reason?.message;
+  const message = entry.status === "fulfilled" ? entry.value.message : entry.reason?.message;
+  return message === "Failed to fetch" ? "Lookup service is temporarily unreachable." : message;
 }
 
 export function getBookLookupLanguage(subtype, selectedLanguage = openLibraryCanonicalBookLanguage) {

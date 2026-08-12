@@ -25,7 +25,7 @@ export function getLookupProviders(category, subtype = "") {
   }
   if (category === "movies") return [{ id: "tmdb", label: "TMDb" }];
   if (category === "tv") return [{ id: "tmdb", label: "TMDb" }];
-  if (category === "manga") return [{ id: "jikan", label: "Jikan" }];
+  if (category === "manga") return [{ id: "mangadex", label: "MangaDex" }];
   return [];
 }
 
@@ -39,8 +39,8 @@ export function getFallbackLookupProviders(category, subtype = "", attemptedProv
   if (category === "tv" && !attemptedProviderIds.includes("omdb")) {
     return [{ id: "omdb", label: "OMDb" }];
   }
-  if (category === "manga" && !attemptedProviderIds.includes("mangadex")) {
-    return [{ id: "mangadex", label: "MangaDex" }];
+  if (category === "manga" && !attemptedProviderIds.includes("jikan")) {
+    return [{ id: "jikan", label: "Jikan" }];
   }
   return [];
 }
@@ -215,8 +215,8 @@ async function fetchMangaResults(searchText) {
     }
 
     return { results: results.map((result) => createLookupResult("jikan", result)), message: "" };
-  } catch (error) {
-    return { results: [], message: error.message || "Jikan lookup failed." };
+  } catch {
+    return { results: [], message: "Jikan lookup failed." };
   }
 }
 
@@ -249,8 +249,8 @@ async function fetchMangadexResults(searchText) {
     }
 
     return { results: results.map((result) => createLookupResult("mangadex", result)), message: "" };
-  } catch (error) {
-    return { results: [], message: error.message || "MangaDex lookup failed." };
+  } catch {
+    return { results: [], message: "MangaDex lookup failed." };
   }
 }
 
@@ -278,8 +278,8 @@ async function fetchAnimeResults(searchText) {
     }
 
     return { results: results.map((result) => createLookupResult("jikan-anime", result)), message: "" };
-  } catch (error) {
-    return { results: [], message: error.message || "Jikan anime lookup failed." };
+  } catch {
+    return { results: [], message: "Jikan anime lookup failed." };
   }
 }
 

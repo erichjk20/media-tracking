@@ -5,7 +5,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
-    plugins: [react(), aladinApiPlugin(env.ALADIN_TTB_KEY || env.VITE_ALADIN_TTB_KEY)],
+    plugins: [
+      react(),
+      aladinApiPlugin(env.ALADIN_TTB_KEY || env.VITE_ALADIN_TTB_KEY),
+      mangadexApiPlugin(),
+    ],
     build: {
       rolldownOptions: {
         output: {
@@ -87,6 +91,57 @@ function aladinApiPlugin(aladinTtbKey) {
       server.middlewares.use("/api/aladin/books", handleAladinBooks);
     },
   };
+}
+
+function mangadexApiPlugin() {
+  const handleMangadexManga = async (request, response) => {
+    if (!request.url) {
+      sendJson(response, 400, { message: "Missing request URL." });
+      return;
+    }
+
+    const requestUrl = new URL(request.url, "http://localhost");
+    const title = requestUrl.searchParams.get("title")?.trim();
+
+    if (!title) {
+      sendJson(response, 400, { message: "Enter a manga title to search." });
+      return;
+    }
+
+    try {
+      const mangadexUrl = buildMangadexMangaSearchUrl(requestUrl.searchParams);
+      const mangadexResponse = await fetch(mangadexUrl, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      const body = await mangadexResponse.text();
+
+      response.statusCode = mangadexResponse.status;
+      response.setHeader("Content-Type", mangadexResponse.headers.get("content-type") || "application/json; charset=utf-8");
+      response.end(body);
+    } catch {
+      sendJson(response, 502, { message: "MangaDex lookup failed. Check your connection and try again." });
+    }
+  };
+
+  return {
+    name: "mangadex-api",
+    configureServer(server) {
+      server.middlewares.use("/api/mangadex/manga", handleMangadexManga);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use("/api/mangadex/manga", handleMangadexManga);
+    },
+  };
+}
+
+function buildMangadexMangaSearchUrl(searchParams) {
+  const mangadexUrl = new URL("https://api.mangadex.org/manga");
+  for (const [key, value] of searchParams) {
+    mangadexUrl.searchParams.append(key, value);
+  }
+  return mangadexUrl;
 }
 
 function sendJson(response, statusCode, body) {

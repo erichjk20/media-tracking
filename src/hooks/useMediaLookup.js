@@ -3,6 +3,7 @@ import { openLibraryCanonicalBookLanguage } from "../lib/mediaConfig";
 import {
   dedupeLookupResults,
   getBookLookupLanguage,
+  getLookupQueryVariants,
   getLookupMessage,
   normalizeLookupQuery,
   rankLookupResults,
@@ -93,17 +94,20 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setAppliedLookupSourceLabel("");
 
     const runProviderSearches = async (activeProviders) => {
-      const searches = activeProviders.map((provider) => {
-        return fetchProviderResults(cleanedQuery, provider, {
+      const queryVariants = getLookupQueryVariants(cleanedQuery);
+      const searches = activeProviders.flatMap((provider) => queryVariants.map((queryVariant) => {
+        return fetchProviderResults(queryVariant, provider, {
           category: draft.category,
           language: draft.category === "books" ? getBookLookupLanguage(draft.subtype, bookLanguage) : bookLanguage,
           subtype: draft.subtype,
         });
-      });
+      }));
 
       const settledResults = await Promise.allSettled(searches);
       const providerResults = settledResults.flatMap((entry) => (entry.status === "fulfilled" ? entry.value.results : []));
-      const messages = settledResults.map(getLookupMessage).filter(Boolean);
+      const messages = providerResults.length
+        ? []
+        : settledResults.map(getLookupMessage).filter(Boolean);
 
       return { messages, providerResults };
     };

@@ -222,7 +222,7 @@ async function fetchMangaResults(searchText) {
 
 async function fetchMangadexResults(searchText) {
   try {
-    const url = new URL("https://api.mangadex.org/manga");
+    const url = new URL("/api/mangadex/manga", window.location.origin);
     url.searchParams.set("title", searchText);
     url.searchParams.set("limit", "14");
     url.searchParams.append("includes[]", "cover_art");
@@ -232,11 +232,7 @@ async function fetchMangadexResults(searchText) {
     url.searchParams.append("contentRating[]", "suggestive");
     url.searchParams.set("order[followedCount]", "desc");
 
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
-    });
+    const response = await fetch(url);
     const data = await response.json();
 
     if (!response.ok) {
@@ -520,6 +516,7 @@ function normalizeTmdbResult(result, mediaType) {
     posterPath: result.poster_path,
     releaseDate: mediaType === "movie" ? result.release_date : result.first_air_date,
     overview: result.overview,
+    popularity: result.popularity,
     voteAverage: result.vote_average,
   };
 }

@@ -331,10 +331,35 @@ export function normalizeSearchText(value) {
     .toLowerCase();
 }
 
+export function normalizeCompactSearchText(value) {
+  return normalizeSearchText(value).replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
 export function getSearchTokens(query) {
   return normalizeSearchText(query)
     .split(/[\s,;:()[\]{}"'`~!?.\\/|_-]+/)
     .filter(Boolean);
+}
+
+export function getLookupQueryVariants(query) {
+  const cleanedQuery = normalizeLookupQuery(query);
+  if (!cleanedQuery) return [];
+
+  const variants = [cleanedQuery];
+  const withoutPunctuation = cleanedQuery.replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim();
+  const compactQuery = normalizeCompactSearchText(cleanedQuery);
+  const aliases = getCommonLookupAliases(compactQuery);
+
+  variants.push(withoutPunctuation, compactQuery, ...aliases);
+
+  return [...new Set(variants.filter(Boolean))].slice(0, 5);
+}
+
+function getCommonLookupAliases(compactQuery) {
+  const aliases = {
+    spiderman: ["spider-man", "spider man"],
+  };
+  return aliases[compactQuery] || [];
 }
 
 function countTokenMatches(text, token) {
@@ -351,8 +376,27 @@ function countTokenMatches(text, token) {
 
 export function getKeywordMatchScore(text, tokens) {
   const normalizedText = normalizeSearchText(text);
-  if (!tokens.every((token) => normalizedText.includes(token))) return -1;
-  return tokens.reduce((score, token) => score + countTokenMatches(normalizedText, token), 0);
+  const compactText = normalizeCompactSearchText(text);
+  const compactTokens = tokens.map(normalizeCompactSearchText).filter(Boolean);
+  if (!compactTokens.length) return -1;
+
+  const hasEveryToken = tokens.every((token, index) => {
+    const compactToken = compactTokens[index];
+    return normalizedText.includes(token) || compactText.includes(compactToken);
+  });
+
+  if (!hasEveryToken) return -1;
+
+  const tokenScore = tokens.reduce((score, token, index) => {
+    const compactToken = compactTokens[index];
+    const normalizedMatches = countTokenMatches(normalizedText, token);
+    const compactMatches = compactToken === token ? 0 : countTokenMatches(compactText, compactToken);
+    return score + Math.max(normalizedMatches, compactMatches, 1);
+  }, 0);
+  const compactQuery = compactTokens.join("");
+  const compactPhraseBonus = compactQuery && compactText.includes(compactQuery) ? 40 : 0;
+
+  return tokenScore + compactPhraseBonus;
 }
 
 function getLookupSearchText(lookupResult) {
@@ -364,7 +408,7 @@ function getLookupSearchText(lookupResult) {
 }
 
 function getLookupDedupKey(lookupResult) {
-  const title = normalizeSearchText(getLookupResultTitle(lookupResult)).replace(/[^a-z0-9가-힣]+/g, "");
+  const title = normalizeCompactSearchText(getLookupResultTitle(lookupResult));
   const year = getLookupResultYear(lookupResult);
   return `${title}-${year}`;
 }
@@ -405,7 +449,7 @@ export function rankLookupResults(results, query) {
     .map((result, index) => ({
       result,
       index,
-      score: getKeywordMatchScore(getLookupSearchText(result), tokens),
+      score: getKeywordMatchScore(getLookupSearchText(result), tokens) + getLookupTitleMatchBonus(result, query),
       priority: getLookupResultPriority(result),
     }))
     .filter(({ score }) => score >= tokens.length)
@@ -413,8 +457,27 @@ export function rankLookupResults(results, query) {
     .map(({ result }) => result);
 }
 
+function getLookupTitleMatchBonus(lookupResult, query) {
+  const title = normalizeCompactSearchText(getLookupResultTitle(lookupResult));
+  const compactQuery = normalizeCompactSearchText(query);
+
+  if (!title || !compactQuery) return 0;
+  if (title === compactQuery) return 100;
+  if (title.startsWith(compactQuery)) return 60;
+  if (title.includes(compactQuery)) return 20;
+  return 0;
+}
+
 function getLookupResultPriority(lookupResult) {
-  if (lookupResult.source === "open-library" && hasOpenLibraryLanguage(lookupResult.result, "eng")) return 1;
+  if (lookupResult.source === "tmdb") {
+    return Number(lookupResult.result.popularity || 0) + Number(lookupResult.result.voteAverage || 0) * 2;
+  }
+  if (lookupResult.source === "open-library") {
+    return Number(lookupResult.result.editionCount || 0) + (hasOpenLibraryLanguage(lookupResult.result, "eng") ? 2 : 0);
+  }
+  if (lookupResult.source === "jikan" || lookupResult.source === "jikan-anime") {
+    return Number(lookupResult.result.score || 0);
+  }
   return 0;
 }
 

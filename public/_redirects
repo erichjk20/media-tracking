@@ -1,0 +1,3 @@
+/api/aladin/books /.netlify/functions/aladin-books 200
+/api/mangadex/manga /.netlify/functions/mangadex-manga 200
+/* /index.html 200

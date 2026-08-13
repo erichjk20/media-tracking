@@ -478,123 +478,125 @@ function App() {
   }
 
   return (
-    <main className={`app-screen bg-transparent ${activeView === "home" ? "" : "app-shell"}`}>
-      {activeView !== "home" && (
-        <AppHeader
-          addLabel={getAddLabel(activeCategory)}
-          onAddManualClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("manual") : undefined}
-          onAddSearchClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("search") : undefined}
-          onHomeClick={showHome}
-        />
-      )}
+    <>
+      <main className={`app-screen bg-transparent ${activeView === "home" ? "" : "app-shell"}`}>
+        {activeView !== "home" && (
+          <AppHeader
+            addLabel={getAddLabel(activeCategory)}
+            onAddManualClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("manual") : undefined}
+            onAddSearchClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("search") : undefined}
+            onHomeClick={showHome}
+          />
+        )}
 
-      {storageMessage && (
-        <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-200">
-            {storageMessage}
-          </p>
-        </div>
-      )}
+        {storageMessage && (
+          <div className="mx-auto mt-3 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-200">
+              {storageMessage}
+            </p>
+          </div>
+        )}
 
-      {activeView === "home" ? (
-        <HomeView
-          activeCategory={activeCategory}
-          onBrowseLibrary={showLibrary}
-          onCategoryChange={setActiveCategory}
-          onSearch={startHomeLookup}
-        />
-      ) : activeView === "profile" ? (
-        <ProfileView
-          metrics={libraryMetrics}
-          onOpenItem={openItemDetails}
-          onSaveDisplayName={handleSaveDisplayName}
-          onSignOut={handleSignOut}
-          onShowCategory={showCategory}
-          profile={profile}
-          user={user}
-        />
-      ) : (
-        <LibraryView
-          activeBookSubtype={activeBookSubtype}
-          activeCategory={activeCategory}
-          activeShelfCounts={activeShelfCounts}
-          activeStatus={activeStatus}
-          activeTvSubtype={activeTvSubtype}
-          bookSubtypeCounts={bookSubtypeCounts}
-          category={category}
-          onActiveBookSubtypeChange={setActiveBookSubtype}
-          onActiveStatusChange={setActiveStatus}
-          onActiveTvSubtypeChange={setActiveTvSubtype}
-          onCompleteItem={startCompleteItem}
-          onDeleteItem={requestDeleteItem}
-          onEditItem={editItem}
-          onOpenItem={openItemDetails}
-          onQueryChange={setQuery}
-          onShelfViewChange={setShelfView}
-          onSortOrderChange={setSortOrder}
-          query={query}
-          shelfView={shelfView}
-          sortOrder={sortOrder}
-          tvSubtypeCounts={tvSubtypeCounts}
-          visibleItems={visibleItems}
-        />
-      )}
+        {activeView === "home" ? (
+          <HomeView
+            activeCategory={activeCategory}
+            onBrowseLibrary={showLibrary}
+            onCategoryChange={setActiveCategory}
+            onSearch={startHomeLookup}
+          />
+        ) : activeView === "profile" ? (
+          <ProfileView
+            metrics={libraryMetrics}
+            onOpenItem={openItemDetails}
+            onSaveDisplayName={handleSaveDisplayName}
+            onSignOut={handleSignOut}
+            onShowCategory={showCategory}
+            profile={profile}
+            user={user}
+          />
+        ) : (
+          <LibraryView
+            activeBookSubtype={activeBookSubtype}
+            activeCategory={activeCategory}
+            activeShelfCounts={activeShelfCounts}
+            activeStatus={activeStatus}
+            activeTvSubtype={activeTvSubtype}
+            bookSubtypeCounts={bookSubtypeCounts}
+            category={category}
+            onActiveBookSubtypeChange={setActiveBookSubtype}
+            onActiveStatusChange={setActiveStatus}
+            onActiveTvSubtypeChange={setActiveTvSubtype}
+            onCompleteItem={startCompleteItem}
+            onDeleteItem={requestDeleteItem}
+            onEditItem={editItem}
+            onOpenItem={openItemDetails}
+            onQueryChange={setQuery}
+            onShelfViewChange={setShelfView}
+            onSortOrderChange={setSortOrder}
+            query={query}
+            shelfView={shelfView}
+            sortOrder={sortOrder}
+            tvSubtypeCounts={tvSubtypeCounts}
+            visibleItems={visibleItems}
+          />
+        )}
 
-      {selectedItem && (
-        <MediaDetailOverlay
-          item={selectedItem}
-          onClose={() => setSelectedItemId(null)}
-          onComplete={startCompleteItem}
-          onDelete={requestDeleteItem}
-          onEdit={editItem}
-        />
-      )}
+        {selectedItem && (
+          <MediaDetailOverlay
+            item={selectedItem}
+            onClose={() => setSelectedItemId(null)}
+            onComplete={startCompleteItem}
+            onDelete={requestDeleteItem}
+            onEdit={editItem}
+          />
+        )}
 
-      {completingItem && (
-        <CompleteItemDialog
-          item={completingItem}
-          onClose={closeCompleteDialog}
-          onConfirm={completeItem}
-          onRatingChange={setCompletionRating}
-          rating={completionRating}
-        />
-      )}
+        {completingItem && (
+          <CompleteItemDialog
+            item={completingItem}
+            onClose={closeCompleteDialog}
+            onConfirm={completeItem}
+            onRatingChange={setCompletionRating}
+            rating={completionRating}
+          />
+        )}
 
-      {deletingItem && (
-        <DeleteItemDialog
-          item={deletingItem}
-          onClose={closeDeleteDialog}
-          onConfirm={confirmDeleteItem}
-        />
-      )}
+        {deletingItem && (
+          <DeleteItemDialog
+            item={deletingItem}
+            onClose={closeDeleteDialog}
+            onConfirm={confirmDeleteItem}
+          />
+        )}
 
-      {isEditorOpen && (
-        <EditorSheet
-          activeStatus={activeStatus}
-          appliedLookupSourceLabel={appliedLookupSourceLabel}
-          bookLanguage={bookLanguage}
-          canUseBookLookup={canUseBookLookup}
-          category={category}
-          draft={draft}
-          editingId={editingId}
-          editorMessage={editorMessage}
-          editorMode={editorMode}
-          onClose={closeEditor}
-          onLookupQueryChange={setLookupQuery}
-          onApplyLookupResult={applyLookupResult}
-          onSubmit={handleSubmit}
-          onUpdateDraft={updateDraft}
-          onBookLanguageChange={setBookLanguage}
-          onSearchDetails={searchDetails}
-          lookupMessage={lookupMessage}
-          lookupProviders={lookupProviders}
-          lookupQuery={lookupQuery}
-          lookupResults={lookupResults}
-          lookupStatus={lookupStatus}
-          setActiveCategory={setActiveCategory}
-          setActiveStatus={setActiveStatus}
-        />
-      )}
+        {isEditorOpen && (
+          <EditorSheet
+            activeStatus={activeStatus}
+            appliedLookupSourceLabel={appliedLookupSourceLabel}
+            bookLanguage={bookLanguage}
+            canUseBookLookup={canUseBookLookup}
+            category={category}
+            draft={draft}
+            editingId={editingId}
+            editorMessage={editorMessage}
+            editorMode={editorMode}
+            onClose={closeEditor}
+            onLookupQueryChange={setLookupQuery}
+            onApplyLookupResult={applyLookupResult}
+            onSubmit={handleSubmit}
+            onUpdateDraft={updateDraft}
+            onBookLanguageChange={setBookLanguage}
+            onSearchDetails={searchDetails}
+            lookupMessage={lookupMessage}
+            lookupProviders={lookupProviders}
+            lookupQuery={lookupQuery}
+            lookupResults={lookupResults}
+            lookupStatus={lookupStatus}
+            setActiveCategory={setActiveCategory}
+            setActiveStatus={setActiveStatus}
+          />
+        )}
+      </main>
 
       {activeView !== "home" && (
         <BottomNav
@@ -604,7 +606,7 @@ function App() {
           onShowProfile={showProfile}
         />
       )}
-    </main>
+    </>
   );
 
 }

@@ -58,7 +58,7 @@ ALADIN_TTB_KEY=your-aladin-ttb-key
 6. If the Supabase schema has not been created yet, run `supabase/schema.sql` in the Supabase SQL editor.
 7. Deploy from Netlify.
 
-Netlify reads `netlify.toml`, builds the Vite app into `dist`, serves it as a single-page app, and routes `/api/aladin/books` to the production function.
+Netlify reads `netlify.toml`, builds the Vite app into `dist`, serves it as a single-page app, and routes `/api/aladin/books`, `/api/lookup/books`, and `/api/lookup/manga` to production functions.
 
 ## Free Local Auth Testing
 

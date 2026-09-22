@@ -47,7 +47,7 @@ The main app supports:
 - Add, edit, and delete media items
 - Delete confirmation before removing media items
 - Search across title, creator, synopsis, and notes
-- A unified add/edit lookup search that queries the relevant APIs for the selected category
+- A unified add/edit lookup search that queries the relevant APIs or internal lookup endpoints for the selected category
 - Homepage search prefill that opens the add sheet and runs the same unified lookup flow
 - Synopsis population from supported lookup providers
 - A user-facing add/edit sheet with a primary Completed/Want segmented shelf control
@@ -56,7 +56,7 @@ The main app supports:
 - OMDb lookup behind the unified search for Movies and TV Shows
 - TMDb lookup behind the unified search for Movies and TV Shows
 - Open Library and Aladin lookup behind the unified search for Books
-- Jikan lookup behind the unified search for Manga
+- MangaDex lookup behind the unified search for Manga, with Jikan fallback for missing cover art
 - Per-category counts
 - A Profile view with library stats and recently added items
 - Per-shelf recently added sorting based on when an item entered its current Done/Want shelf
@@ -76,7 +76,8 @@ The main app supports:
 - OMDb API for movie and TV Shows lookup
 - Open Library API for book lookup
 - Aladin API for Korean book lookup
-- Jikan API for manga lookup
+- MangaDex API for primary manga lookup
+- Jikan API for manga cover fallback and Anime TV lookup
 - Supabase for hosted Postgres persistence
 
 ## Project Structure
@@ -96,7 +97,10 @@ Tracked/source files:
 ├── eslint.config.js
 ├── netlify
 │   └── functions
-│       └── aladin-books.js
+│       ├── aladin-books.js
+│       ├── lookup-books.js
+│       ├── lookup-manga.js
+│       └── mangadex-manga.js
 ├── public
 │   ├── app-icon.png
 │   ├── app-icon.svg
@@ -180,9 +184,21 @@ Both are ignored by Git.
 
 `src/lib/mediaLookup.js`
 
-- Owns external lookup provider selection, API requests, result normalization, and item patch creation for OMDb, TMDb, Open Library, Aladin, and Jikan.
+- Owns lookup provider selection, browser-side API requests for OMDb/TMDb/Aladin/Jikan fallback paths, calls to internal Books/Manga lookup endpoints, and item patch creation.
 - Routes Movies and TV Shows, including Anime TV format entries, through TMDb.
 - Counts TV seasons from released, non-special TMDb seasons instead of raw `number_of_seasons`, so renewed/upcoming seasons do not inflate saved season totals.
+
+`netlify/functions/lookup-books.js`
+
+- Owns the internal `/api/lookup/books` endpoint for Open Library-powered book search.
+- Searches Open Library works, fetches preferred editions for top results, prefers newest matching-language edition covers, and returns normalized lookup results.
+- Adds lightweight in-memory TTL caching and source metadata such as Open Library work id, edition id, cover source, and cover preference.
+
+`netlify/functions/lookup-manga.js`
+
+- Owns the internal `/api/lookup/manga` endpoint for MangaDex-powered manga search.
+- Searches MangaDex, fetches MangaDex cover records, prefers volume 1 cover art when available, and falls back through MangaDex main cover and Jikan cover matching when needed.
+- Adds lightweight in-memory TTL caching and source metadata such as MangaDex id, MAL id, cover source, cover volume, cover locale, and fallback status.
 
 `src/lib/mediaUtils.js`
 
@@ -263,7 +279,7 @@ Run lint checks:
 npm run lint
 ```
 
-The production build and lint checks were last verified successfully after the React/Vite/CSS cleanup.
+The production build and lint checks were last verified successfully after adding the cached Books/Manga lookup endpoints and source metadata.
 
 ## Supabase Persistence
 
@@ -368,19 +384,41 @@ VITE_OMDB_API_KEY
 
 Because this is a frontend-only app, any Vite environment variable used by the browser is included in the built client bundle. Treat the current setup as appropriate for a personal/local app, not a private production secret.
 
-## Open Library Lookup
+## Internal Lookup Endpoints
 
-Books include Open Library-powered results in the unified add/edit lookup.
+Books and Manga use internal Netlify/Vite endpoints as a small backend aggregation layer:
+
+- `/api/lookup/books`
+- `/api/lookup/manga`
+
+In local development, `vite.config.js` mounts the Netlify function handlers directly so the same paths work under `npm run dev`. In production, `netlify.toml` and `public/_redirects` route those paths to Netlify Functions.
+
+Both endpoints:
+
+- Return normalized lookup result objects for the React add/edit flow.
+- Include lightweight in-memory caching with a 6 hour TTL and a 100-entry cap per warm function instance.
+- Return cache metadata in the response body and `X-Lookup-Cache` response header.
+- Include source metadata for debugging provider decisions, especially cover art selection.
+
+The source metadata currently travels with lookup results but is not persisted into Supabase.
+
+## Open Library Book Lookup
+
+Books include Open Library-powered results in the unified add/edit lookup through `/api/lookup/books`.
 
 The lookup:
 
 - Accepts English or Korean search text.
 - Can search all languages, Korean-only results, or English-only results.
 - Uses Open Library search via `https://openlibrary.org/search.json`.
+- Fetches Open Library edition data for top results via each work's `editions.json` endpoint.
+- Prefers newest matching-language edition cover art when available.
+- Keeps the displayed title as the Open Library work title while using selected edition metadata for cover/publisher/page details.
+- Returns source metadata including work id, edition id, cover source, cover preference, and preferred language match status.
 - Does not require a local API key.
-- Fills title, author, cover image URL, and notes with Open Library metadata.
+- Fills title, author, cover image URL, publisher, page count, and synopsis fields when available.
 - Automatically marks Korean-language book results as `korean-book`.
-- Saves titles and authors exactly as returned by the API.
+- Saves titles and authors exactly as normalized from the lookup response.
 
 ## Aladin Korean Book Lookup
 
@@ -390,6 +428,7 @@ The lookup:
 
 - Accepts Korean title or author search text.
 - Uses a local Vite `/api/aladin/books` route that calls Aladin `ItemSearch.aspx` with `SearchTarget=Book`.
+- Uses the Netlify Function at `/api/aladin/books` in production.
 - Fills Korean title, author, cover image URL, and notes with Aladin metadata.
 - Automatically marks selected results as `korean-book`.
 - Saves Korean titles and authors exactly as returned by the API.
@@ -400,17 +439,23 @@ The local Aladin key is read server-side by the Vite route from:
 VITE_ALADIN_TTB_KEY
 ```
 
-## Jikan Manga Lookup
+## MangaDex Manga Lookup
 
-Manga include a Jikan-powered lookup panel in the add/edit form.
+Manga include a MangaDex-powered lookup panel in the add/edit form through `/api/lookup/manga`.
 
 The lookup:
 
-- Searches manga by title via `https://api.jikan.moe/v4/manga`.
+- Searches manga by title via `https://api.mangadex.org/manga`.
+- Requests `cover_art`, `author`, and `artist` relationships from MangaDex.
+- Fetches cover records from `https://api.mangadex.org/cover` for returned manga ids.
+- Prefers volume 1 cover art when MangaDex has it.
+- Falls back to the MangaDex main cover from the manga search response.
+- Uses Jikan as a targeted cover fallback when MangaDex has no usable cover, matching by MAL id when available or by title/alternate title.
 - Does not require a local API key.
-- Fills title, author/artist, cover image URL, synopsis, and available volume/chapter fields from Jikan.
+- Fills title, author/artist, cover image URL, synopsis, and available volume/chapter fields from MangaDex/Jikan-normalized metadata.
 - Uses safe-for-work search results.
-- Saves title and author/artist exactly as normalized from the API response.
+- Returns source metadata including MangaDex id, MAL id, cover source, cover volume, cover locale, and whether a fallback was used.
+- Saves title and author/artist exactly as normalized from the lookup response.
 
 ## UX And Product Notes
 
@@ -434,17 +479,12 @@ The lookup:
   - Movies and TV Shows use "Want to Watch"
 - The stored status value remains the exact shared value: `Want to Watch/Read`.
 
-## Current Git State Notes
-
-At the time this context file was created, the app files are newly added and may still be uncommitted.
-
-`node_modules/` and `dist/` may exist locally because dependencies were installed and the build was run, but they should not be committed.
-
 ## Possible Next Steps
 
 - Add import/export JSON for backups.
 - Add sorting controls, such as rating, title, or recently added.
 - Add validation or image preview error handling for broken cover URLs.
+- Persist external source ids/source metadata in Supabase if refresh-metadata workflows become important.
 - Keep extracting focused hooks/components from `src/App.jsx` as new workflows grow.
 - Add tests with Vitest and React Testing Library.
 - Add email/password login as an optional Supabase Auth method if users need a more conventional sign-in path.

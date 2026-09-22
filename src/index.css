@@ -22,7 +22,7 @@
   }
 
   .bottom-nav-shell {
-    bottom: max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
+    bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
   }
 
   .auth-frame {

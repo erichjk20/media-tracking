@@ -105,19 +105,20 @@ export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) 
         {creatorLabel && <p className="mt-1 h-4 truncate text-[11px] text-stone-600 dark:text-stone-400" title={creatorLabel}>{creatorLabel}</p>}
         <p className={`${creatorLabel ? "" : "mt-1"} h-4 truncate text-[11px] font-medium text-stone-500 dark:text-stone-400`} title={factLabel}>{factLabel}</p>
         <div className="mt-2 h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
-        <div className={`mt-auto grid gap-2 pt-3 ${canComplete ? "grid-cols-[1fr_32px_32px]" : "grid-cols-[1fr_32px]"}`}>
+        <div className={`mt-auto grid gap-2 pt-3 ${canComplete ? "grid-cols-3" : "grid-cols-[1fr_32px]"}`}>
           {canComplete ? (
             <>
               <button
-                className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-shelf-accent/20 text-xs font-medium text-shelf-accent-soft transition hover:bg-shelf-accent-deep/15"
+                className="inline-flex h-8 min-w-0 items-center justify-center rounded-md border border-shelf-accent/20 text-shelf-accent-soft transition hover:bg-shelf-accent-deep/15"
                 onClick={() => onComplete(item)}
                 type="button"
+                aria-label={`Mark ${item.title} done`}
+                title={`Mark ${item.title} done`}
               >
                 <Check size={13} />
-                Done
               </button>
               <button
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
+                className="inline-flex h-8 min-w-0 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
                 onClick={() => onEdit(item)}
                 type="button"
                 aria-label={`Edit ${item.title}`}
@@ -136,7 +137,7 @@ export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) 
             </button>
           )}
           <button
-            className="inline-flex h-8 items-center justify-center rounded-md border border-red-300 text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/25 dark:text-red-300 dark:hover:border-red-400/40 dark:hover:bg-red-950/30"
+            className="inline-flex h-8 min-w-0 items-center justify-center rounded-md border border-red-300 text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/25 dark:text-red-300 dark:hover:border-red-400/40 dark:hover:bg-red-950/30"
             onClick={() => onDelete(item.id)}
             type="button"
             aria-label={`Delete ${item.title}`}

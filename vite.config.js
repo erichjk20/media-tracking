@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { handler as lookupBooksHandler } from "./netlify/functions/lookup-books.js";
+import { handler as lookupMangaHandler } from "./netlify/functions/lookup-manga.js";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -7,6 +9,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      netlifyFunctionPlugin("/api/lookup/books", lookupBooksHandler),
+      netlifyFunctionPlugin("/api/lookup/manga", lookupMangaHandler),
       aladinApiPlugin(env.ALADIN_TTB_KEY || env.VITE_ALADIN_TTB_KEY),
       mangadexApiPlugin(),
     ],
@@ -37,6 +41,36 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
+function netlifyFunctionPlugin(route, handler) {
+  const handleRequest = async (request, response) => {
+    const result = await handler(createNetlifyEvent(request));
+    response.statusCode = result.statusCode;
+    for (const [key, value] of Object.entries(result.headers || {})) {
+      response.setHeader(key, value);
+    }
+    response.end(result.body || "");
+  };
+
+  return {
+    name: `${route.replaceAll("/", "-").slice(1)}-api`,
+    configureServer(server) {
+      server.middlewares.use(route, handleRequest);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(route, handleRequest);
+    },
+  };
+}
+
+function createNetlifyEvent(request) {
+  const requestUrl = new URL(request.url || "", "http://localhost");
+  return {
+    httpMethod: request.method || "GET",
+    rawQuery: requestUrl.searchParams.toString(),
+    queryStringParameters: Object.fromEntries(requestUrl.searchParams),
+  };
+}
 
 function aladinApiPlugin(aladinTtbKey) {
   const handleAladinBooks = async (request, response) => {

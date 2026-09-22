@@ -19,6 +19,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/lookup/books"
+  to = "/.netlify/functions/lookup-books"
+  status = 200
+
+[[redirects]]
+  from = "/api/lookup/manga"
+  to = "/.netlify/functions/lookup-manga"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

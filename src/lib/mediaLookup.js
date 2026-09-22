@@ -8,9 +8,7 @@ import {
   cleanTmdbValue,
   createLookupResult,
   getDefaultSubtype,
-  getOpenLibraryCoverUrl,
   getTmdbImageUrl,
-  normalizeCompactSearchText,
   normalizeOpenLibraryList,
   parseOmdbRuntime,
   parseReleaseYear,
@@ -132,31 +130,21 @@ async function fetchTmdbResults(searchText, context = {}) {
 
 async function fetchOpenLibraryResults(searchText, language = openLibraryCanonicalBookLanguage) {
   try {
-    const url = new URL("https://openlibrary.org/search.json");
-    url.searchParams.set("q", buildOpenLibraryQuery(searchText, language));
-    url.searchParams.set(
-      "fields",
-      "key,title,author_name,first_publish_year,cover_i,language,publisher,subject,edition_count,number_of_pages_median",
-    );
-    url.searchParams.set("limit", "14");
-    if (language !== "all") {
-      url.searchParams.set("lang", language);
-    }
+    const url = new URL("/api/lookup/books", window.location.origin);
+    url.searchParams.set("query", searchText);
+    url.searchParams.set("language", language);
 
     const response = await fetch(url);
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Open Library lookup failed.");
+      throw new Error(data.message || "Open Library lookup failed.");
     }
 
-    const results = (data.docs || [])
-      .map(normalizeOpenLibraryBookResult)
-      .filter((result) => result.title || result.authors)
-      .slice(0, 14);
+    const results = (data.results || []).slice(0, 14);
 
     if (!results.length) {
-      return { results: [], message: "No Open Library results found." };
+      return { results: [], message: data.message || "No Open Library results found." };
     }
 
     return { results: results.map((result) => createLookupResult("open-library", result)), message: "" };
@@ -223,37 +211,25 @@ async function fetchMangaResults(searchText) {
 
 async function fetchMangadexResults(searchText) {
   try {
-    const url = new URL("/api/mangadex/manga", window.location.origin);
-    url.searchParams.set("title", searchText);
-    url.searchParams.set("limit", "14");
-    url.searchParams.append("includes[]", "cover_art");
-    url.searchParams.append("includes[]", "author");
-    url.searchParams.append("includes[]", "artist");
-    url.searchParams.append("contentRating[]", "safe");
-    url.searchParams.append("contentRating[]", "suggestive");
-    url.searchParams.set("order[followedCount]", "desc");
+    const url = new URL("/api/lookup/manga", window.location.origin);
+    url.searchParams.set("query", searchText);
 
     const response = await fetch(url);
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.errors?.[0]?.detail || data.message || "MangaDex lookup failed.");
+      throw new Error(data.message || "MangaDex lookup failed.");
     }
 
-    const results = (data.data || [])
-      .map(normalizeMangadexMangaResult)
-      .filter((result) => result.title || result.authors)
-      .slice(0, 14);
+    const results = (data.results || []).slice(0, 14);
 
     if (!results.length) {
-      return { results: [], message: "No MangaDex manga results found." };
+      return { results: [], message: data.message || "No MangaDex manga results found." };
     }
 
-    const resultsWithCovers = await fillMissingMangadexCoverImages(results, searchText);
-
-    return { results: resultsWithCovers.map((result) => createLookupResult("mangadex", result)), message: "" };
-  } catch {
-    return { results: [], message: "MangaDex lookup failed." };
+    return { results: results.map((result) => createLookupResult("mangadex", result)), message: "" };
+  } catch (error) {
+    return { results: [], message: error.message || "MangaDex lookup failed." };
   }
 }
 
@@ -547,26 +523,6 @@ function getFirstRuntime(values) {
   return normalizeOpenLibraryList(values).find(Boolean) || "";
 }
 
-function buildOpenLibraryQuery(query, language) {
-  const languageFilter = language === "ko" ? "language:kor" : language === "en" ? "language:eng" : "";
-  return [query, languageFilter].filter(Boolean).join(" ");
-}
-
-function normalizeOpenLibraryBookResult(doc) {
-  return {
-    id: doc.key,
-    title: doc.title || "",
-    authors: normalizeOpenLibraryList(doc.author_name).join(", "),
-    firstPublishYear: doc.first_publish_year || "",
-    editionCount: doc.edition_count || "",
-    pageCount: doc.number_of_pages_median || "",
-    languages: normalizeOpenLibraryList(doc.language),
-    publishers: normalizeOpenLibraryList(doc.publisher).slice(0, 3).join(", "),
-    subjects: normalizeOpenLibraryList(doc.subject).slice(0, 5).join(", "),
-    imageUrl: getOpenLibraryCoverUrl(doc.cover_i),
-  };
-}
-
 function normalizeJikanMangaResult(result) {
   return {
     id: result.mal_id,
@@ -586,123 +542,6 @@ function normalizeJikanMangaResult(result) {
     synopsis: result.synopsis || "",
     imageUrl: result.images?.jpg?.large_image_url || result.images?.jpg?.image_url || "",
   };
-}
-
-function normalizeMangadexMangaResult(result) {
-  const attributes = result.attributes || {};
-  const relationships = normalizeOpenLibraryList(result.relationships);
-  const authors = getMangadexRelationshipNames(relationships, "author");
-  const artists = getMangadexRelationshipNames(relationships, "artist");
-  const coverFileName = relationships.find((relationship) => relationship.type === "cover_art")?.attributes?.fileName;
-  const alternateTitles = normalizeOpenLibraryList(attributes.altTitles).flatMap((entry) => Object.values(entry || {}));
-
-  return {
-    id: result.id,
-    title: getMangadexTitle(attributes),
-    originalTitle: getLocalizedText(attributes.title, ["ja-ro", "ja", "ko", "zh", "zh-hk"]) || "",
-    alternateTitles,
-    malId: attributes.links?.mal || "",
-    authors: authors.join(", "),
-    artists: artists.join(", "),
-    genres: getMangadexTagNames(attributes.tags, "genre").join(", "),
-    themes: getMangadexTagNames(attributes.tags, "theme").join(", "),
-    demographics: attributes.publicationDemographic || "",
-    published: attributes.year ? String(attributes.year) : "",
-    status: attributes.status || "",
-    chapters: attributes.lastChapter || "",
-    volumes: attributes.lastVolume || "",
-    score: "",
-    synopsis: getLocalizedText(attributes.description, ["en", "ja-ro", "ja", "ko"]) || "",
-    imageUrl: coverFileName ? `https://uploads.mangadex.org/covers/${result.id}/${coverFileName}` : "",
-  };
-}
-
-async function fillMissingMangadexCoverImages(results, searchText) {
-  const missingCoverResults = results.filter((result) => !result.imageUrl);
-  if (!missingCoverResults.length) return results;
-
-  const coverByMalId = await fetchJikanCoversByMalId(missingCoverResults);
-  const unresolvedResults = missingCoverResults.filter((result) => !coverByMalId.get(String(result.malId || "")));
-  const coverByTitle = unresolvedResults.length ? await fetchJikanCoversByTitle(searchText, unresolvedResults) : new Map();
-
-  return results.map((result) => {
-    if (result.imageUrl) return result;
-
-    const imageUrl = coverByMalId.get(String(result.malId || "")) || coverByTitle.get(result.id) || "";
-    return imageUrl ? { ...result, imageUrl } : result;
-  });
-}
-
-async function fetchJikanCoversByMalId(results) {
-  const malIds = [...new Set(results.map((result) => String(result.malId || "")).filter(Boolean))].slice(0, 3);
-  if (!malIds.length) return new Map();
-
-  const settledCovers = await Promise.allSettled(malIds.map(fetchJikanMangaCoverById));
-  return settledCovers.reduce((coverByMalId, entry, index) => {
-    if (entry.status === "fulfilled" && entry.value) {
-      coverByMalId.set(malIds[index], entry.value);
-    }
-    return coverByMalId;
-  }, new Map());
-}
-
-async function fetchJikanMangaCoverById(malId) {
-  const url = new URL(`https://api.jikan.moe/v4/manga/${malId}`);
-  const response = await fetch(url);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Jikan cover lookup failed.");
-  }
-
-  return getJikanImageUrl(data.data);
-}
-
-async function fetchJikanCoversByTitle(searchText, mangadexResults) {
-  const url = new URL("https://api.jikan.moe/v4/manga");
-  url.searchParams.set("q", searchText);
-  url.searchParams.set("limit", "10");
-  url.searchParams.set("sfw", "true");
-
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Jikan cover lookup failed.");
-    }
-
-    const jikanResults = normalizeOpenLibraryList(data.data).map(normalizeJikanMangaResult);
-    return matchJikanCoversByTitle(mangadexResults, jikanResults);
-  } catch {
-    return new Map();
-  }
-}
-
-function matchJikanCoversByTitle(mangadexResults, jikanResults) {
-  return mangadexResults.reduce((coverByMangadexId, mangadexResult) => {
-    const mangadexTitleKeys = getMangaTitleKeys(mangadexResult);
-    const match = jikanResults.find((jikanResult) => {
-      const jikanTitleKeys = getMangaTitleKeys(jikanResult);
-      return jikanResult.imageUrl && mangadexTitleKeys.some((key) => jikanTitleKeys.includes(key));
-    });
-
-    if (match?.imageUrl) {
-      coverByMangadexId.set(mangadexResult.id, match.imageUrl);
-    }
-
-    return coverByMangadexId;
-  }, new Map());
-}
-
-function getMangaTitleKeys(result) {
-  return [
-    result.title,
-    result.originalTitle,
-    ...normalizeOpenLibraryList(result.alternateTitles),
-  ]
-    .map(normalizeCompactSearchText)
-    .filter(Boolean);
 }
 
 function normalizeJikanAnimeResult(result) {
@@ -738,37 +577,6 @@ function normalizeJikanNamedList(value) {
 
 function normalizeJikanTitles(value) {
   return normalizeOpenLibraryList(value).map((entry) => entry.title).filter(Boolean);
-}
-
-function getJikanImageUrl(result) {
-  return result?.images?.jpg?.large_image_url || result?.images?.jpg?.image_url || "";
-}
-
-function getMangadexTitle(attributes) {
-  const altTitles = normalizeOpenLibraryList(attributes.altTitles).flatMap((entry) => Object.values(entry || {}));
-  return getLocalizedText(attributes.title, ["en", "ja-ro", "ja", "ko", "zh", "zh-hk"]) || altTitles.find(Boolean) || "";
-}
-
-function getLocalizedText(value, preferredLocales) {
-  if (!value || typeof value !== "object") return "";
-  const preferredValue = preferredLocales.map((locale) => value[locale]).find(Boolean);
-  return preferredValue || Object.values(value).find(Boolean) || "";
-}
-
-function getMangadexRelationshipNames(relationships, type) {
-  const names = relationships
-    .filter((relationship) => relationship.type === type)
-    .map((relationship) => relationship.attributes?.name)
-    .filter(Boolean);
-
-  return [...new Set(names)];
-}
-
-function getMangadexTagNames(tags, group) {
-  return normalizeOpenLibraryList(tags)
-    .filter((tag) => tag.attributes?.group === group)
-    .map((tag) => getLocalizedText(tag.attributes?.name, ["en"]))
-    .filter(Boolean);
 }
 
 function normalizeAladinBookResult(item) {

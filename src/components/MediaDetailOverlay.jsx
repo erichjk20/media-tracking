@@ -169,10 +169,15 @@ function SeasonBreakdown({ seasons }) {
   );
 }
 
-function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes, seasons, subtypeLabel, synopsis }) {
+function BackCover({ category, CategoryIcon, detailRows, headerMeta, isVisible, item, notes, seasons, subtypeLabel, synopsis }) {
   return (
-    <div className="media-detail-back h-full w-full overflow-hidden bg-[#fbfaf7] p-5 text-stone-950 dark:bg-[#181715] dark:text-stone-100 sm:p-6">
-      <div className="flex h-full min-h-0 flex-col">
+    <div
+      className="media-detail-back media-back-scroll h-full w-full overflow-y-auto bg-[#fbfaf7] p-5 text-stone-950 dark:bg-[#181715] dark:text-stone-100 sm:p-6"
+      role="region"
+      tabIndex={isVisible ? 0 : -1}
+      aria-label={`${item.title} details`}
+    >
+      <div className="flex min-h-full flex-col">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="inline-flex h-6 items-center gap-1 rounded-full bg-shelf-accent-deep px-2 text-[10px] font-semibold text-white">
             <CategoryIcon size={11} />
@@ -208,7 +213,7 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, item, notes
           </div>
         )}
 
-        <div className="media-back-scroll mt-4 min-h-0 flex-1 overflow-y-auto border-t border-stone-300/80 pt-3 pr-1 dark:border-white/10">
+        <div className="mt-4 border-t border-stone-300/80 pt-3 dark:border-white/10">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-500 dark:text-stone-400">Synopsis</h3>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-stone-800 dark:text-stone-200">
             {synopsis || "No synopsis saved yet."}
@@ -256,13 +261,6 @@ function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
     setIsFlipped(false);
   }, [item.id]);
 
-  function handleBackCoverKeyDown(event) {
-    if (event.key !== "Enter" && event.key !== " ") return;
-
-    event.preventDefault();
-    setIsFlipped(false);
-  }
-
   function handleOverlayClick(event) {
     const clickedElement = event.target instanceof Element ? event.target : null;
     if (clickedElement?.closest("[data-media-detail-content]")) return;
@@ -308,19 +306,13 @@ function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
                   </button>
                 </div>
                 <div className="media-flip-face media-flip-back">
-                  <div
-                    className="h-full w-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/45"
-                    onClick={() => setIsFlipped(false)}
-                    onKeyDown={handleBackCoverKeyDown}
-                    role="button"
-                    tabIndex={isFlipped ? 0 : -1}
-                    aria-label={`Flip ${item.title} to cover`}
-                  >
+                  <div className="h-full w-full">
                     <BackCover
                       category={category}
                       CategoryIcon={CategoryIcon}
                       detailRows={detailRows}
                       headerMeta={headerMeta}
+                      isVisible={isFlipped}
                       item={item}
                       notes={notes}
                       seasons={seasons}

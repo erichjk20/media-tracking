@@ -205,8 +205,11 @@ body,
 }
 
 .media-back-scroll {
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(120, 113, 108, 0.55) transparent;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .media-back-scroll::-webkit-scrollbar {

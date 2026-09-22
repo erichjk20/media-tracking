@@ -33,7 +33,7 @@ Each media item contains:
 
 ## Current Implementation
 
-This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email/password signup and login identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`. Lightweight UI location and library filter state is persisted in `localStorage` under `media-shelf-ui-state` so refreshing returns to the current screen instead of resetting to Home.
+This is a client-only React app. It stores signed-in private library data in Supabase when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. Supabase Auth email/password signup and login identify each user, and row-level security scopes library rows to the signed-in user. If Supabase is not configured, the app runs as a local development/demo tracker using `localStorage` under the key `media-shelf-items`. Lightweight library filter state is persisted in `localStorage` under `media-shelf-ui-state`, while each fresh app load starts on the Home quick-log screen.
 
 The main app supports:
 
@@ -159,7 +159,7 @@ Both are ignored by Git.
 
 - Coordinates top-level app state, auth/session loading, storage mode, view switching, item CRUD behavior, and add/edit form handling.
 - Loads and saves signed-in media items through Supabase, or uses localStorage only when Supabase is not configured.
-- Persists lightweight UI navigation and library filter state to `media-shelf-ui-state` so page refresh restores the current screen without reopening transient overlays or edit dialogs.
+- Persists lightweight library filter state to `media-shelf-ui-state`, but starts each fresh app load on Home without reopening transient overlays or edit dialogs.
 
 `src/hooks/useMediaLookup.js`
 

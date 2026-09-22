@@ -40,7 +40,7 @@ function getStoredUiState() {
     const parsedState = stored ? JSON.parse(stored) : {};
 
     return {
-      activeView: getAllowedValue(parsedState.activeView, allowedUiValues.activeView, defaultUiState.activeView),
+      activeView: defaultUiState.activeView,
       activeCategory: getAllowedValue(parsedState.activeCategory, allowedUiValues.activeCategory, defaultUiState.activeCategory),
       activeStatus: getAllowedValue(parsedState.activeStatus, allowedUiValues.activeStatus, defaultUiState.activeStatus),
       activeBookSubtype: getAllowedValue(parsedState.activeBookSubtype, allowedUiValues.activeBookSubtype, defaultUiState.activeBookSubtype),

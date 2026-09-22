@@ -8,6 +8,7 @@ import {
 } from "../lib/mediaConfig";
 
 const uiStateStorageKey = "media-shelf-ui-state";
+const recentUiRestoreWindowMs = 30 * 60 * 1000;
 
 const defaultUiState = {
   activeView: "home",
@@ -34,13 +35,23 @@ function getAllowedValue(value, allowedValues, fallback) {
   return allowedValues.includes(value) ? value : fallback;
 }
 
+function isRecentUiState(timestamp) {
+  const savedAt = Number(timestamp);
+  const ageMs = Date.now() - savedAt;
+
+  return Number.isFinite(savedAt) && ageMs >= 0 && ageMs < recentUiRestoreWindowMs;
+}
+
 function getStoredUiState() {
   try {
     const stored = window.localStorage.getItem(uiStateStorageKey);
     const parsedState = stored ? JSON.parse(stored) : {};
+    const shouldRestoreActiveView = isRecentUiState(parsedState.lastActiveAt);
 
     return {
-      activeView: defaultUiState.activeView,
+      activeView: shouldRestoreActiveView
+        ? getAllowedValue(parsedState.activeView, allowedUiValues.activeView, defaultUiState.activeView)
+        : defaultUiState.activeView,
       activeCategory: getAllowedValue(parsedState.activeCategory, allowedUiValues.activeCategory, defaultUiState.activeCategory),
       activeStatus: getAllowedValue(parsedState.activeStatus, allowedUiValues.activeStatus, defaultUiState.activeStatus),
       activeBookSubtype: getAllowedValue(parsedState.activeBookSubtype, allowedUiValues.activeBookSubtype, defaultUiState.activeBookSubtype),
@@ -75,6 +86,7 @@ export function usePersistentUiState() {
       shelfView,
       sortOrder,
       query,
+      lastActiveAt: Date.now(),
     };
 
     window.localStorage.setItem(uiStateStorageKey, JSON.stringify(nextUiState));

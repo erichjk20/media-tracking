@@ -77,13 +77,13 @@ export function MediaItemCard({ item, onComplete, onDelete, onEdit, onOpen }) {
   );
 }
 
-export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) {
+export function MediaPosterCard({ item, onComplete, onOpen }) {
   const creatorLabel = getCardCreatorLabel(item);
   const factLabel = getItemTileMeta(item);
   const canComplete = item.status === "Want to Watch/Read";
 
   return (
-    <article className="grid min-w-0 grid-rows-[auto_minmax(132px,auto)]">
+    <article className="grid min-w-0 grid-rows-[auto_auto]">
       <button
         className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
         onClick={() => onOpen(item)}
@@ -104,48 +104,21 @@ export function MediaPosterCard({ item, onComplete, onDelete, onEdit, onOpen }) 
         <h3 className="truncate text-xs font-semibold leading-4 text-stone-950 dark:text-[#eee9df] sm:text-sm" title={item.title}>{item.title}</h3>
         {creatorLabel && <p className="mt-1 h-4 truncate text-[11px] text-stone-600 dark:text-stone-400" title={creatorLabel}>{creatorLabel}</p>}
         <p className={`${creatorLabel ? "" : "mt-1"} h-4 truncate text-[11px] font-medium text-stone-500 dark:text-stone-400`} title={factLabel}>{factLabel}</p>
-        <div className="mt-2 h-5">{item.status === "Completed" && <Rating value={item.rating} readOnly compact />}</div>
-        <div className={`mt-auto grid gap-2 pt-3 ${canComplete ? "grid-cols-3" : "grid-cols-[1fr_32px]"}`}>
-          {canComplete ? (
-            <>
-              <button
-                className="inline-flex h-8 min-w-0 items-center justify-center rounded-md border border-shelf-accent/20 text-shelf-accent-soft transition hover:bg-shelf-accent-deep/15"
-                onClick={() => onComplete(item)}
-                type="button"
-                aria-label={`Mark ${item.title} done`}
-                title={`Mark ${item.title} done`}
-              >
-                <Check size={13} />
-              </button>
-              <button
-                className="inline-flex h-8 min-w-0 items-center justify-center rounded-md border border-stone-300 text-stone-700 transition hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
-                onClick={() => onEdit(item)}
-                type="button"
-                aria-label={`Edit ${item.title}`}
-                title={`Edit ${item.title}`}
-              >
-                <Edit3 size={14} />
-              </button>
-            </>
-          ) : (
+        {item.status === "Completed" && <div className="mt-1.5 h-5"><Rating value={item.rating} readOnly compact /></div>}
+        {canComplete && (
+          <div className="mt-2 grid">
             <button
-              className="inline-flex h-8 items-center justify-center rounded-md border border-stone-300 text-xs font-medium text-stone-700 transition hover:bg-stone-100 dark:border-white/10 dark:text-stone-300 dark:hover:bg-white/5"
-              onClick={() => onEdit(item)}
+              className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-shelf-accent/20 text-xs font-medium text-shelf-accent-soft transition hover:bg-shelf-accent-deep/15"
+              onClick={() => onComplete(item)}
               type="button"
+              aria-label={`Mark ${item.title} done`}
+              title={`Mark ${item.title} done`}
             >
-              Edit
+              <Check size={13} />
+              Done
             </button>
-          )}
-          <button
-            className="inline-flex h-8 min-w-0 items-center justify-center rounded-md border border-red-300 text-red-700 transition hover:border-red-400 hover:bg-red-50 dark:border-red-500/25 dark:text-red-300 dark:hover:border-red-400/40 dark:hover:bg-red-950/30"
-            onClick={() => onDelete(item.id)}
-            type="button"
-            aria-label={`Delete ${item.title}`}
-            title={`Delete ${item.title}`}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </article>
   );

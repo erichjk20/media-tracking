@@ -8,6 +8,7 @@ import {
   getLookupResultTitle,
   getPrimaryCreator,
   getSearchTokens,
+  normalizeCompactSearchText,
   rankLookupResults,
 } from "../lib/mediaUtils";
 import { statusLabels } from "../lib/mediaConfig";
@@ -38,6 +39,18 @@ function getShelfMatches(items, query) {
     .map(({ item }) => item);
 }
 
+function getSavedItemKey(title) {
+  return normalizeCompactSearchText(title);
+}
+
+function getSavedItemByTitle(items) {
+  return items.reduce((savedItems, item) => {
+    const key = getSavedItemKey(item.title);
+    if (key && !savedItems.has(key)) savedItems.set(key, item);
+    return savedItems;
+  }, new Map());
+}
+
 function DetailsLookup({
   bookLanguage,
   categoryLabel,
@@ -57,6 +70,7 @@ function DetailsLookup({
 }) {
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
   const shelfMatches = useMemo(() => getShelfMatches(existingItems, query), [existingItems, query]);
+  const savedItemByTitle = useMemo(() => getSavedItemByTitle(existingItems), [existingItems]);
   const isLoading = status === "loading";
 
   return (
@@ -156,11 +170,17 @@ function DetailsLookup({
           {visibleResults.map((lookupResult) => {
             const imageUrl = getLookupResultImage(lookupResult);
             const title = getLookupResultTitle(lookupResult);
+            const savedItem = savedItemByTitle.get(getSavedItemKey(title));
+            const savedShelfLabel = savedItem ? statusLabels[savedItem.status] || savedItem.status : "";
             return (
               <li key={lookupResult.id}>
                 <button
-                  className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-stone-200 bg-white p-2 text-left transition hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
-                  onClick={() => onApply(lookupResult)}
+                  className={`grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border p-2 text-left transition ${
+                    savedItem
+                      ? "border-shelf-accent/25 bg-shelf-accent-deep/10 hover:border-shelf-accent/60 dark:border-shelf-accent/30 dark:bg-shelf-accent-deep/15"
+                      : "border-stone-200 bg-white hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
+                  }`}
+                  onClick={() => (savedItem ? onOpenExisting?.(savedItem) : onApply(lookupResult))}
                   type="button"
                 >
                   <MediaCover
@@ -172,6 +192,11 @@ function DetailsLookup({
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-stone-950 dark:text-[#eee9df]">{title}</span>
                     <span className="mt-1 block truncate text-xs text-stone-600 dark:text-stone-400">{getLookupResultMeta(lookupResult)}</span>
+                    {savedShelfLabel && (
+                      <span className="mt-1 inline-flex rounded bg-shelf-accent-deep px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                        Already in {savedShelfLabel}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>

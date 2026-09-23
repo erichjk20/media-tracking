@@ -26,6 +26,7 @@ function EditorSheet({
   editingId,
   editorMessage,
   editorMode = "search",
+  existingItems = [],
   lookupMessage,
   lookupProviders,
   lookupQuery,
@@ -35,6 +36,7 @@ function EditorSheet({
   onBookLanguageChange,
   onClose,
   onLookupQueryChange,
+  onOpenExistingItem,
   onSearchDetails,
   onSubmit,
   onUpdateDraft,
@@ -93,10 +95,12 @@ function EditorSheet({
               bookLanguage={bookLanguage}
               categoryLabel={lookupCategoryLabel}
               canUseBookLookup={canUseBookLookup}
+              existingItems={existingItems}
               lookupProviders={lookupProviders}
               message={hasSelectedLookup ? "" : lookupMessage}
               onApply={onApplyLookupResult}
               onBookLanguageChange={onBookLanguageChange}
+              onOpenExisting={onOpenExistingItem}
               onQueryChange={onLookupQueryChange}
               prompt={lookupPrompt}
               onSearch={onSearchDetails}

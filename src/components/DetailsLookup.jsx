@@ -1,20 +1,52 @@
 import { useMemo } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import {
+  getItemTileMeta,
+  getKeywordMatchScore,
   getLookupResultImage,
   getLookupResultMeta,
   getLookupResultTitle,
+  getPrimaryCreator,
+  getSearchTokens,
   rankLookupResults,
 } from "../lib/mediaUtils";
+import { statusLabels } from "../lib/mediaConfig";
 import MediaCover from "./MediaCover";
+
+function getShelfMatchSearchText(item) {
+  return [
+    item.title,
+    getPrimaryCreator(item),
+    getItemTileMeta(item),
+    statusLabels[item.status],
+  ].join(" ");
+}
+
+function getShelfMatches(items, query) {
+  const tokens = getSearchTokens(query);
+  if (!tokens.length) return [];
+
+  return items
+    .map((item, index) => ({
+      item,
+      index,
+      score: getKeywordMatchScore(getShelfMatchSearchText(item), tokens),
+    }))
+    .filter(({ score }) => score >= tokens.length)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, 4)
+    .map(({ item }) => item);
+}
 
 function DetailsLookup({
   bookLanguage,
   categoryLabel,
   canUseBookLookup,
+  existingItems = [],
   message,
   onApply,
   onBookLanguageChange,
+  onOpenExisting,
   onQueryChange,
   onSearch,
   prompt,
@@ -24,6 +56,7 @@ function DetailsLookup({
   title = "Find details",
 }) {
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
+  const shelfMatches = useMemo(() => getShelfMatches(existingItems, query), [existingItems, query]);
   const isLoading = status === "loading";
 
   return (
@@ -73,10 +106,49 @@ function DetailsLookup({
         </div>
       )}
 
-      {message && (
+      {message && !shelfMatches.length && (
         <p className={`mt-2 text-sm leading-5 ${status === "error" ? "text-red-700 dark:text-red-300" : "text-shelf-accent-soft"}`}>
           {message}
         </p>
+      )}
+
+      {shelfMatches.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">In your shelf</p>
+          <ul className="mt-2 space-y-2">
+            {shelfMatches.map((item) => {
+              const creator = getPrimaryCreator(item);
+              const meta = getItemTileMeta(item);
+              const shelfLabel = statusLabels[item.status] || item.status;
+
+              return (
+                <li key={item.id}>
+                  <button
+                    className="grid w-full grid-cols-[42px_minmax(0,1fr)] gap-3 rounded-md border border-shelf-accent/25 bg-shelf-accent-deep/10 p-2 text-left transition hover:border-shelf-accent/60 dark:border-shelf-accent/30 dark:bg-shelf-accent-deep/15"
+                    onClick={() => onOpenExisting?.(item)}
+                    type="button"
+                  >
+                    <MediaCover
+                      className="h-14 w-10 rounded"
+                      imageClassName="h-14 w-10 rounded object-cover"
+                      src={item.imageUrl}
+                      title={item.title}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-stone-950 dark:text-[#eee9df]">{item.title}</span>
+                      <span className="mt-1 block truncate text-xs text-stone-600 dark:text-stone-400">
+                        {[creator, meta].filter(Boolean).join(" / ")}
+                      </span>
+                      <span className="mt-1 inline-flex rounded bg-shelf-accent-deep px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                        {shelfLabel}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       {visibleResults.length > 0 && (

@@ -123,6 +123,10 @@ function App() {
     () => items.find((item) => item.id === selectedItemId) || null,
     [items, selectedItemId],
   );
+  const lookupExistingItems = useMemo(
+    () => items.filter((item) => item.category === draft.category && item.id !== editingId),
+    [draft.category, editingId, items],
+  );
   const completingItem = useMemo(
     () => items.find((item) => item.id === completingItemId) || null,
     [completingItemId, items],
@@ -285,6 +289,10 @@ function App() {
     setEditorMessage("");
     resetLookupState();
     setIsEditorOpen(true);
+  }
+
+  function openExistingItemFromLookup(item) {
+    startEdit(item);
   }
 
   function openItemDetails(item) {
@@ -580,8 +588,10 @@ function App() {
             editingId={editingId}
             editorMessage={editorMessage}
             editorMode={editorMode}
+            existingItems={lookupExistingItems}
             onClose={closeEditor}
             onLookupQueryChange={setLookupQuery}
+            onOpenExistingItem={openExistingItemFromLookup}
             onApplyLookupResult={applyLookupResult}
             onSubmit={handleSubmit}
             onUpdateDraft={updateDraft}

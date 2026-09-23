@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openLibraryCanonicalBookLanguage } from "../lib/mediaConfig";
 import {
   dedupeLookupResults,
@@ -53,6 +53,27 @@ function applyPatch(setDraft, patch) {
   }));
 }
 
+const lookupSuggestionDelayMs = 350;
+const minLookupSuggestionLength = 2;
+const lookupCacheMaxEntries = 40;
+
+function getLookupCacheKey({ bookLanguage, category, query, subtype }) {
+  return JSON.stringify({
+    bookLanguage,
+    category,
+    query: query.toLowerCase(),
+    subtype,
+  });
+}
+
+function rememberLookup(cache, key, value) {
+  if (cache.size >= lookupCacheMaxEntries && !cache.has(key)) {
+    cache.delete(cache.keys().next().value);
+  }
+
+  cache.set(key, value);
+}
+
 export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResults, setLookupResults] = useState([]);
@@ -62,6 +83,9 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   const [pendingLookup, setPendingLookup] = useState(null);
   const [shouldRunLookup, setShouldRunLookup] = useState(false);
   const [appliedLookupSourceLabel, setAppliedLookupSourceLabel] = useState("");
+  const lookupCacheRef = useRef(new Map());
+  const lookupRequestIdRef = useRef(0);
+  const lookupInFlightKeysRef = useRef(new Set());
 
   const lookupProviders = useMemo(
     () => getLookupProviders(draft.category, draft.subtype),
@@ -77,14 +101,36 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setAppliedLookupSourceLabel("");
   }, []);
 
-  const searchDetails = useCallback(async (event) => {
-    event?.preventDefault();
-    const cleanedQuery = normalizeLookupQuery(lookupQuery);
+  const runLookup = useCallback(async (cleanedQuery, mode = "manual") => {
     const providers = getLookupProviders(draft.category, draft.subtype);
+    const isManualLookup = mode === "manual";
 
     if (!cleanedQuery || !providers.length) {
-      setLookupStatus("error");
-      setLookupMessage("Enter a title to search.");
+      if (isManualLookup) {
+        setLookupStatus("error");
+        setLookupMessage("Enter a title to search.");
+      }
+      return;
+    }
+
+    const cacheKey = getLookupCacheKey({
+      bookLanguage: draft.category === "books" ? getBookLookupLanguage(draft.subtype, bookLanguage) : bookLanguage,
+      category: draft.category,
+      query: cleanedQuery,
+      subtype: draft.subtype,
+    });
+
+    if (lookupInFlightKeysRef.current.has(cacheKey)) return;
+
+    const requestId = lookupRequestIdRef.current + 1;
+    lookupRequestIdRef.current = requestId;
+
+    const cachedLookup = lookupCacheRef.current.get(cacheKey);
+    if (cachedLookup) {
+      setLookupResults(cachedLookup.results);
+      setLookupStatus(cachedLookup.results.length ? "success" : isManualLookup ? "error" : "idle");
+      setLookupMessage(isManualLookup ? cachedLookup.message : "");
+      setAppliedLookupSourceLabel("");
       return;
     }
 
@@ -92,6 +138,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setLookupMessage("");
     setLookupResults([]);
     setAppliedLookupSourceLabel("");
+    lookupInFlightKeysRef.current.add(cacheKey);
 
     const runProviderSearches = async (activeProviders) => {
       const queryVariants = getLookupQueryVariants(cleanedQuery);
@@ -112,33 +159,49 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       return { messages, providerResults };
     };
 
-    const preferredProvider = providers[0]?.id;
-    let { messages, providerResults } = await runProviderSearches(providers);
-    const fallbackProviders = getFallbackLookupProviders(draft.category, draft.subtype, providers.map((provider) => provider.id));
+    try {
+      const preferredProvider = providers[0]?.id;
+      let { messages, providerResults } = await runProviderSearches(providers);
+      const fallbackProviders = getFallbackLookupProviders(draft.category, draft.subtype, providers.map((provider) => provider.id));
 
-    if (!providerResults.length && fallbackProviders.length) {
-      const fallbackSearch = await runProviderSearches(fallbackProviders);
-      providerResults = fallbackSearch.providerResults;
-      messages = fallbackSearch.providerResults.length
-        ? fallbackSearch.messages
-        : fallbackSearch.messages.length
+      if (!providerResults.length && fallbackProviders.length) {
+        const fallbackSearch = await runProviderSearches(fallbackProviders);
+        providerResults = fallbackSearch.providerResults;
+        messages = fallbackSearch.providerResults.length
           ? fallbackSearch.messages
-          : messages;
+          : fallbackSearch.messages.length
+            ? fallbackSearch.messages
+            : messages;
+      }
+
+      if (lookupRequestIdRef.current !== requestId) return;
+
+      const dedupedResults = dedupeLookupResults(providerResults, preferredProvider);
+      const results = rankLookupResults(dedupedResults, cleanedQuery);
+      const message = messages[0] || "No matching results found.";
+
+      rememberLookup(lookupCacheRef.current, cacheKey, { message, results });
+
+      if (!results.length) {
+        setLookupResults([]);
+        setLookupStatus(isManualLookup ? "error" : "idle");
+        setLookupMessage(isManualLookup ? message : "");
+        return;
+      }
+
+      setLookupResults(results);
+      setLookupStatus("success");
+      setLookupMessage(isManualLookup && messages.length ? messages.join(" ") : "");
+    } finally {
+      lookupInFlightKeysRef.current.delete(cacheKey);
     }
+  }, [bookLanguage, draft.category, draft.subtype]);
 
-    const dedupedResults = dedupeLookupResults(providerResults, preferredProvider);
-    const results = rankLookupResults(dedupedResults, cleanedQuery);
-
-    if (!results.length) {
-      setLookupStatus("error");
-      setLookupMessage(messages[0] || "No matching results found.");
-      return;
-    }
-
-    setLookupResults(results);
-    setLookupStatus("success");
-    setLookupMessage(messages.length ? messages.join(" ") : "");
-  }, [bookLanguage, draft.category, draft.subtype, lookupQuery]);
+  const searchDetails = useCallback(async (event) => {
+    event?.preventDefault();
+    const cleanedQuery = normalizeLookupQuery(lookupQuery);
+    await runLookup(cleanedQuery, "manual");
+  }, [lookupQuery, runLookup]);
 
   const applyLookupResult = useCallback(async (lookupResult) => {
     setLookupStatus("loading");
@@ -205,6 +268,25 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     setShouldRunLookup(false);
     searchDetails();
   }, [isEditorOpen, lookupQuery, searchDetails, shouldRunLookup]);
+
+  useEffect(() => {
+    if (!isEditorOpen || shouldRunLookup) return;
+
+    const cleanedQuery = normalizeLookupQuery(lookupQuery);
+    if (cleanedQuery.length < minLookupSuggestionLength) {
+      lookupRequestIdRef.current += 1;
+      setLookupResults([]);
+      setLookupStatus("idle");
+      setLookupMessage("");
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      runLookup(cleanedQuery, "suggestion");
+    }, lookupSuggestionDelayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isEditorOpen, lookupQuery, runLookup, shouldRunLookup]);
 
   return {
     appliedLookupSourceLabel,

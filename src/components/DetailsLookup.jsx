@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search } from "lucide-react";
+import { LoaderCircle, Search } from "lucide-react";
 import {
   getLookupResultImage,
   getLookupResultMeta,
@@ -24,6 +24,7 @@ function DetailsLookup({
   title = "Find details",
 }) {
   const visibleResults = useMemo(() => rankLookupResults(results, query), [query, results]);
+  const isLoading = status === "loading";
 
   return (
     <div className="rounded-lg border border-shelf-accent/20 bg-shelf-accent-deep/10 p-3">
@@ -49,13 +50,13 @@ function DetailsLookup({
         </label>
         <button
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-shelf-accent-deep text-white transition hover:bg-shelf-accent disabled:cursor-not-allowed disabled:bg-white/10"
-          disabled={status === "loading"}
+          disabled={isLoading}
           onClick={onSearch}
           type="button"
           aria-label="Find title details"
           title="Find title details"
         >
-          <Search size={17} />
+          {isLoading ? <LoaderCircle className="animate-spin" size={17} /> : <Search size={17} />}
         </button>
       </div>
 

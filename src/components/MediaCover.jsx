@@ -1,22 +1,5 @@
 import { useEffect, useState } from "react";
 
-function shouldProxyImage(src) {
-  if (!src || typeof window === "undefined") return false;
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") return false;
-
-  try {
-    const url = new URL(src);
-    return url.hostname === "uploads.mangadex.org";
-  } catch {
-    return false;
-  }
-}
-
-function getCoverImageSrc(src) {
-  if (!shouldProxyImage(src)) return src;
-  return `/api/proxy-image?url=${encodeURIComponent(src)}`;
-}
-
 function MediaCover({
   alt,
   className = "",
@@ -26,18 +9,18 @@ function MediaCover({
   title,
 }) {
   const [hasImageError, setHasImageError] = useState(false);
-  const imageSrc = getCoverImageSrc(src);
 
   useEffect(() => {
     setHasImageError(false);
-  }, [imageSrc]);
+  }, [src]);
 
-  if (imageSrc && !hasImageError) {
+  if (src && !hasImageError) {
     return (
       <img
         className={imageClassName || className}
-        src={imageSrc}
+        src={src}
         alt={alt || `${title} cover`}
+        referrerPolicy="no-referrer"
         onError={() => setHasImageError(true)}
       />
     );

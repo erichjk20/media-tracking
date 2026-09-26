@@ -14,7 +14,7 @@
   }
 
   .app-shell {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7.25rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6.35rem);
   }
 
   .app-header {
@@ -39,7 +39,7 @@
 
   @media (min-width: 640px) {
     .app-shell {
-      padding-bottom: 7rem;
+      padding-bottom: 6.15rem;
     }
 
     .app-header {

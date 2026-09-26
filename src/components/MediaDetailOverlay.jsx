@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   Calendar,
@@ -238,6 +238,7 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, isVisible, 
 
 function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const backPointerStartRef = useRef(null);
   const category = categories.find((entry) => entry.id === item.category);
   const CategoryIcon = category?.icon || Library;
   const subtypeLabel = getSubtypeLabel(item);
@@ -266,6 +267,32 @@ function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
     if (clickedElement?.closest("[data-media-detail-content]")) return;
 
     onClose();
+  }
+
+  function handleBackPointerDown(event) {
+    backPointerStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+  }
+
+  function handleBackClick(event) {
+    const start = backPointerStartRef.current;
+    backPointerStartRef.current = null;
+
+    if (start) {
+      const movedX = Math.abs(event.clientX - start.x);
+      const movedY = Math.abs(event.clientY - start.y);
+      if (movedX > 8 || movedY > 8) return;
+    }
+
+    setIsFlipped(false);
+  }
+
+  function handleBackKeyDown(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    setIsFlipped(false);
   }
 
   return (
@@ -306,7 +333,15 @@ function MediaDetailOverlay({ item, onClose, onComplete, onDelete, onEdit }) {
                   </button>
                 </div>
                 <div className="media-flip-face media-flip-back">
-                  <div className="h-full w-full">
+                  <div
+                    className="h-full w-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/45"
+                    onClick={handleBackClick}
+                    onKeyDown={handleBackKeyDown}
+                    onPointerDown={handleBackPointerDown}
+                    role="button"
+                    tabIndex={isFlipped ? 0 : -1}
+                    aria-label={`Flip ${item.title} back to cover`}
+                  >
                     <BackCover
                       category={category}
                       CategoryIcon={CategoryIcon}

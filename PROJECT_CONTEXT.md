@@ -77,7 +77,7 @@ The main app supports:
 - Open Library API for book lookup
 - Aladin API for Korean book lookup
 - MangaDex API for primary manga lookup
-- Jikan API for manga cover fallback and Anime TV lookup
+- AniList and Jikan APIs for manga fallback lookup/cover enrichment, and Jikan for Anime TV lookup
 - Supabase for hosted Postgres persistence
 
 ## Project Structure
@@ -451,8 +451,9 @@ The lookup:
 - Prefers volume 1 cover art when MangaDex has it.
 - Falls back to the MangaDex main cover from the manga search response.
 - Uses Jikan as a targeted cover fallback when MangaDex has no usable cover, matching by MAL id when available or by title/alternate title.
+- Falls back to AniList and Jikan searches when MangaDex cannot return usable search results.
 - Does not require a local API key.
-- Fills title, author/artist, cover image URL, synopsis, and available volume/chapter fields from MangaDex/Jikan-normalized metadata.
+- Fills title, author/artist, cover image URL, synopsis, and available volume/chapter fields from MangaDex/AniList/Jikan-normalized metadata.
 - Uses safe-for-work search results.
 - Returns source metadata including MangaDex id, MAL id, cover source, cover volume, cover locale, and whether a fallback was used.
 - Saves title and author/artist exactly as normalized from the lookup response.

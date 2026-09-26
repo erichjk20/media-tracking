@@ -74,6 +74,10 @@ function rememberLookup(cache, key, value) {
   cache.set(key, value);
 }
 
+function dedupeMessages(messages) {
+  return [...new Set(messages.filter(Boolean))];
+}
+
 export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResults, setLookupResults] = useState([]);
@@ -165,13 +169,12 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
       const fallbackProviders = getFallbackLookupProviders(draft.category, draft.subtype, providers.map((provider) => provider.id));
 
       if (!providerResults.length && fallbackProviders.length) {
+        const primaryMessages = messages;
         const fallbackSearch = await runProviderSearches(fallbackProviders);
         providerResults = fallbackSearch.providerResults;
         messages = fallbackSearch.providerResults.length
           ? fallbackSearch.messages
-          : fallbackSearch.messages.length
-            ? fallbackSearch.messages
-            : messages;
+          : dedupeMessages([...primaryMessages, ...fallbackSearch.messages]);
       }
 
       if (lookupRequestIdRef.current !== requestId) return;

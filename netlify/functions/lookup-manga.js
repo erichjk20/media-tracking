@@ -5,6 +5,9 @@ const jsonHeaders = {
 const lookupCache = new Map();
 const lookupCacheTtlMs = 6 * 60 * 60 * 1000;
 const lookupCacheMaxEntries = 100;
+const mangadexLookupTimeoutMs = 12000;
+const mangadexCoverTimeoutMs = 8000;
+const jikanLookupTimeoutMs = 6000;
 
 export async function handler(event) {
   if (event.httpMethod === "OPTIONS") {
@@ -81,12 +84,11 @@ async function fetchMangadexSearch(query) {
   url.searchParams.append("contentRating[]", "suggestive");
   url.searchParams.set("order[followedCount]", "desc");
 
-  const response = await fetch(url, {
+  const { data, response } = await fetchJsonWithTimeout(url, {
     headers: {
       Accept: "application/json",
     },
-  });
-  const data = await response.json();
+  }, mangadexLookupTimeoutMs, "MangaDex lookup timed out.", "MangaDex lookup failed.");
 
   if (!response.ok) {
     throw new Error(data.errors?.[0]?.detail || data.message || "MangaDex lookup failed.");
@@ -105,12 +107,11 @@ async function fetchFirstVolumeCovers(mangaIds) {
   url.searchParams.set("order[volume]", "asc");
 
   try {
-    const response = await fetch(url, {
+    const { data, response } = await fetchJsonWithTimeout(url, {
       headers: {
         Accept: "application/json",
       },
-    });
-    const data = await response.json();
+    }, mangadexCoverTimeoutMs, "MangaDex cover lookup timed out.", "MangaDex cover lookup failed.");
     if (!response.ok) return new Map();
 
     return chooseFirstVolumeCovers(data.data);
@@ -239,8 +240,13 @@ async function fetchJikanCoversByMalId(results) {
 
 async function fetchJikanMangaCoverById(malId) {
   const url = new URL(`https://api.jikan.moe/v4/manga/${malId}`);
-  const response = await fetch(url);
-  const data = await response.json();
+  const { data, response } = await fetchJsonWithTimeout(
+    url,
+    {},
+    jikanLookupTimeoutMs,
+    "Jikan cover lookup timed out.",
+    "Jikan cover lookup failed.",
+  );
 
   if (!response.ok) {
     throw new Error(data.message || "Jikan cover lookup failed.");
@@ -256,8 +262,13 @@ async function fetchJikanCoversByTitle(searchText, mangadexResults) {
   url.searchParams.set("sfw", "true");
 
   try {
-    const response = await fetch(url);
-    const data = await response.json();
+    const { data, response } = await fetchJsonWithTimeout(
+      url,
+      {},
+      jikanLookupTimeoutMs,
+      "Jikan cover lookup timed out.",
+      "Jikan cover lookup failed.",
+    );
 
     if (!response.ok) {
       throw new Error(data.message || "Jikan cover lookup failed.");
@@ -364,6 +375,27 @@ function normalizeCompactSearchText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs, timeoutMessage, failureMessage) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    return { data, response };
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(timeoutMessage, { cause: error });
+    }
+    throw new Error(failureMessage || error.message, { cause: error });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function normalizeList(value) {

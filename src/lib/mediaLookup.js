@@ -17,6 +17,8 @@ import {
 const omdbApiKey = import.meta.env.VITE_OMDB_API_KEY;
 const tmdbApiKey = import.meta.env.VITE_TMDB_API_KEY;
 const tmdbAccessToken = import.meta.env.VITE_TMDB_ACCESS_TOKEN;
+const mangaLookupTimeoutMs = 12000;
+const jikanLookupTimeoutMs = 7000;
 
 export function getLookupProviders(category, subtype = "") {
   if (category === "books") {
@@ -38,8 +40,11 @@ export function getFallbackLookupProviders(category, subtype = "", attemptedProv
   if (category === "tv" && !attemptedProviderIds.includes("omdb")) {
     return [{ id: "omdb", label: "OMDb" }];
   }
-  if (category === "manga" && !attemptedProviderIds.includes("jikan")) {
-    return [{ id: "jikan", label: "Jikan" }];
+  if (category === "manga") {
+    return [
+      !attemptedProviderIds.includes("anilist") ? { id: "anilist", label: "AniList" } : null,
+      !attemptedProviderIds.includes("jikan") ? { id: "jikan", label: "Jikan" } : null,
+    ].filter(Boolean);
   }
   return [];
 }
@@ -51,6 +56,7 @@ export function fetchProviderResults(searchText, provider, context = {}) {
   if (provider.id === "aladin") return fetchAladinResults(searchText);
   if (provider.id === "jikan-anime") return fetchAnimeResults(searchText);
   if (provider.id === "mangadex") return fetchMangadexResults(searchText);
+  if (provider.id === "anilist") return fetchAniListMangaResults(searchText);
   return fetchMangaResults(searchText);
 }
 
@@ -187,8 +193,13 @@ async function fetchMangaResults(searchText) {
     url.searchParams.set("limit", "14");
     url.searchParams.set("sfw", "true");
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const { data, response } = await fetchJsonWithTimeout(
+      url,
+      {},
+      jikanLookupTimeoutMs,
+      "Jikan lookup timed out.",
+      "Jikan lookup failed.",
+    );
 
     if (!response.ok) {
       throw new Error(data.message || "Jikan lookup failed.");
@@ -204,8 +215,8 @@ async function fetchMangaResults(searchText) {
     }
 
     return { results: results.map((result) => createLookupResult("jikan", result)), message: "" };
-  } catch {
-    return { results: [], message: "Jikan lookup failed." };
+  } catch (error) {
+    return { results: [], message: error.message || "Jikan lookup failed." };
   }
 }
 
@@ -214,8 +225,13 @@ async function fetchMangadexResults(searchText) {
     const url = new URL("/api/lookup/manga", window.location.origin);
     url.searchParams.set("query", searchText);
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const { data, response } = await fetchJsonWithTimeout(
+      url,
+      {},
+      mangaLookupTimeoutMs,
+      "MangaDex lookup timed out.",
+      "MangaDex lookup failed.",
+    );
 
     if (!response.ok) {
       throw new Error(data.message || "MangaDex lookup failed.");
@@ -233,6 +249,82 @@ async function fetchMangadexResults(searchText) {
   }
 }
 
+async function fetchAniListMangaResults(searchText) {
+  try {
+    const { data, response } = await fetchJsonWithTimeout(
+      "https://graphql.anilist.co",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          query: `
+            query MangaSearch($search: String) {
+              Page(page: 1, perPage: 14) {
+                media(search: $search, type: MANGA, sort: POPULARITY_DESC) {
+                  id
+                  title {
+                    romaji
+                    english
+                    native
+                  }
+                  coverImage {
+                    extraLarge
+                    large
+                  }
+                  chapters
+                  volumes
+                  description(asHtml: false)
+                  startDate {
+                    year
+                  }
+                  status
+                  genres
+                  averageScore
+                  popularity
+                  staff(sort: RELEVANCE, perPage: 8) {
+                    nodes {
+                      name {
+                        full
+                      }
+                      primaryOccupations
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          variables: {
+            search: searchText,
+          },
+        }),
+      },
+      mangaLookupTimeoutMs,
+      "AniList lookup timed out.",
+      "AniList lookup failed.",
+    );
+
+    if (!response.ok || data.errors?.length) {
+      throw new Error(data.errors?.[0]?.message || "AniList lookup failed.");
+    }
+
+    const results = (data.data?.Page?.media || [])
+      .map(normalizeAniListMangaResult)
+      .filter((result) => result.title || result.authors)
+      .slice(0, 14);
+
+    if (!results.length) {
+      return { results: [], message: "No AniList manga results found." };
+    }
+
+    return { results: results.map((result) => createLookupResult("anilist", result)), message: "" };
+  } catch (error) {
+    return { results: [], message: error.message || "AniList lookup failed." };
+  }
+}
+
 async function fetchAnimeResults(searchText) {
   try {
     const url = new URL("https://api.jikan.moe/v4/anime");
@@ -240,8 +332,13 @@ async function fetchAnimeResults(searchText) {
     url.searchParams.set("limit", "14");
     url.searchParams.set("sfw", "true");
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const { data, response } = await fetchJsonWithTimeout(
+      url,
+      {},
+      jikanLookupTimeoutMs,
+      "Jikan anime lookup timed out.",
+      "Jikan anime lookup failed.",
+    );
 
     if (!response.ok) {
       throw new Error(data.message || "Jikan anime lookup failed.");
@@ -257,8 +354,29 @@ async function fetchAnimeResults(searchText) {
     }
 
     return { results: results.map((result) => createLookupResult("jikan-anime", result)), message: "" };
-  } catch {
-    return { results: [], message: "Jikan anime lookup failed." };
+  } catch (error) {
+    return { results: [], message: error.message || "Jikan anime lookup failed." };
+  }
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs, timeoutMessage, failureMessage) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    return { data, response };
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(timeoutMessage, { cause: error });
+    }
+    throw new Error(failureMessage || error.message, { cause: error });
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -565,6 +683,56 @@ function normalizeJikanAnimeResult(result) {
     synopsis: result.synopsis || "",
     imageUrl: result.images?.jpg?.large_image_url || result.images?.jpg?.image_url || "",
   };
+}
+
+function normalizeAniListMangaResult(result) {
+  const creators = getAniListMangaCreators(result.staff?.nodes);
+
+  return {
+    id: result.id,
+    title: result.title?.english || result.title?.romaji || result.title?.native || "",
+    originalTitle: result.title?.native || "",
+    alternateTitles: [result.title?.romaji, result.title?.english, result.title?.native].filter(Boolean),
+    authors: creators.join(", "),
+    artists: "",
+    genres: normalizeOpenLibraryList(result.genres).join(", "),
+    themes: "",
+    demographics: "",
+    published: result.startDate?.year ? String(result.startDate.year) : "",
+    status: result.status || "",
+    chapters: result.chapters || "",
+    volumes: result.volumes || "",
+    score: result.averageScore ? Number(result.averageScore) / 10 : "",
+    popularity: result.popularity || "",
+    synopsis: cleanAniListDescription(result.description),
+    imageUrl: result.coverImage?.extraLarge || result.coverImage?.large || "",
+  };
+}
+
+function getAniListMangaCreators(nodes) {
+  const staff = normalizeOpenLibraryList(nodes);
+  const creators = staff
+    .filter((person) => {
+      const occupations = normalizeOpenLibraryList(person.primaryOccupations).join(" ").toLowerCase();
+      return occupations.includes("mangaka") || occupations.includes("story") || occupations.includes("art");
+    })
+    .map((person) => person.name?.full)
+    .filter(Boolean);
+  const fallbackCreators = staff
+    .filter((person) => !normalizeOpenLibraryList(person.primaryOccupations).join(" ").toLowerCase().includes("translator"))
+    .map((person) => person.name?.full)
+    .filter(Boolean);
+
+  return [...new Set(creators.length ? creators : fallbackCreators)].slice(0, 3);
+}
+
+function cleanAniListDescription(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function normalizeJikanPeople(value) {

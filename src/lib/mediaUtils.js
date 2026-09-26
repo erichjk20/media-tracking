@@ -233,6 +233,7 @@ export function getLookupSourceLabel(source) {
     jikan: "Jikan",
     "jikan-anime": "Jikan",
     mangadex: "MangaDex",
+    anilist: "AniList",
   };
   return labels[source] || source;
 }
@@ -240,7 +241,7 @@ export function getLookupSourceLabel(source) {
 function getLookupResultId(source, result) {
   if (source === "omdb") return result.imdbID;
   if (source === "tmdb") return `${result.mediaType}-${result.id}`;
-  if (source === "open-library" || source === "jikan" || source === "jikan-anime" || source === "aladin" || source === "mangadex") return result.id;
+  if (source === "open-library" || source === "jikan" || source === "jikan-anime" || source === "aladin" || source === "mangadex" || source === "anilist") return result.id;
   return result.title || result.Title || source;
 }
 
@@ -477,6 +478,9 @@ function getLookupResultPriority(lookupResult) {
   }
   if (lookupResult.source === "jikan" || lookupResult.source === "jikan-anime") {
     return Number(lookupResult.result.score || 0);
+  }
+  if (lookupResult.source === "anilist") {
+    return Number(lookupResult.result.popularity || 0) + Number(lookupResult.result.score || 0) * 100;
   }
   return 0;
 }

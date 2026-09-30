@@ -1,24 +1,30 @@
+import { useState } from "react";
 import { ArrowRight, Library, Search } from "lucide-react";
-import { useEffect, useState } from "react";
 import { categories } from "../lib/mediaConfig";
 import BrandWordmark from "./BrandWordmark";
+import HomeSearchSuggestions from "./HomeSearchSuggestions";
 
 function HomeView({
   activeCategory,
+  lookupMessage = "",
+  lookupResults = [],
+  lookupStatus = "idle",
   onBrowseLibrary,
   onCategoryChange,
+  onQueryChange,
   onSearch,
+  onSuggestionSelect,
+  query,
 }) {
-  const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(activeCategory);
-  const canSearch = Boolean(query.trim());
-
-  useEffect(() => {
-    setSelectedCategory(activeCategory);
-  }, [activeCategory]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const cleanedQuery = query.trim();
+  const canSearch = Boolean(cleanedQuery);
+  const canShowSuggestions = cleanedQuery.length >= 2;
+  const isLoadingSuggestions = lookupStatus === "loading" && canShowSuggestions;
+  const visibleResults = lookupResults.slice(0, 5);
+  const showSuggestions = canShowSuggestions && isSearchFocused;
 
   function selectCategory(categoryId) {
-    setSelectedCategory(categoryId);
     onCategoryChange(categoryId);
   }
 
@@ -26,8 +32,8 @@ function HomeView({
     event.preventDefault();
     if (!canSearch) return;
     onSearch({
-      categoryId: selectedCategory,
-      query: query.trim(),
+      categoryId: activeCategory,
+      query: cleanedQuery,
     });
   }
 
@@ -42,7 +48,7 @@ function HomeView({
           <div className="mx-auto grid max-w-md grid-cols-4 gap-1 rounded-lg border border-white/10 bg-[#171512]/75 p-1 shadow-[0_14px_44px_rgba(0,0,0,0.22)] backdrop-blur">
             {categories.map((entry) => {
               const Icon = entry.icon;
-              const isActive = selectedCategory === entry.id;
+              const isActive = activeCategory === entry.id;
               const label = entry.id === "tv" ? "TV" : entry.label;
 
               return (
@@ -64,25 +70,41 @@ function HomeView({
             })}
           </div>
 
-          <label className="relative mt-4 block">
-            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 sm:left-5" size={20} />
-            <input
-              className="h-14 w-full rounded-full border border-white/10 bg-[#f8f5ee] pl-12 pr-14 text-base font-medium text-stone-950 shadow-[0_18px_56px_rgba(0,0,0,0.28)] outline-none transition placeholder:text-stone-500 focus:border-shelf-accent-bright focus:ring-4 focus:ring-shelf-accent-deep/35 sm:h-16 sm:pl-14 sm:pr-16"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search a title"
-              autoComplete="off"
-            />
-            <button
-              className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-shelf-accent-deep text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-400 disabled:text-stone-100 sm:h-11 sm:w-11"
-              disabled={!canSearch}
-              type="submit"
-              aria-label="Search title"
-              title="Search title"
-            >
-              <ArrowRight size={20} />
-            </button>
-          </label>
+          <div className="relative mt-4">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 sm:left-5" size={20} />
+              <input
+                className="h-14 w-full rounded-full border border-white/10 bg-[#f8f5ee] pl-12 pr-14 text-base font-medium text-stone-950 shadow-[0_18px_56px_rgba(0,0,0,0.28)] outline-none transition placeholder:text-stone-500 focus:border-shelf-accent-bright focus:ring-4 focus:ring-shelf-accent-deep/35 sm:h-16 sm:pl-14 sm:pr-16"
+                value={query}
+                onBlur={() => setIsSearchFocused(false)}
+                onChange={(event) => onQueryChange(event.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                placeholder="Search a title"
+                autoComplete="off"
+              />
+              <button
+                className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-shelf-accent-deep text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-400 disabled:text-stone-100 sm:h-11 sm:w-11"
+                disabled={!canSearch}
+                type="submit"
+                aria-label="Search title"
+                title="Search title"
+              >
+                <ArrowRight size={20} />
+              </button>
+            </label>
+
+            {showSuggestions && (
+              <HomeSearchSuggestions
+                activeCategory={activeCategory}
+                isLoading={isLoadingSuggestions}
+                lookupMessage={lookupMessage}
+                onSearch={onSearch}
+                onSuggestionSelect={onSuggestionSelect}
+                query={query}
+                results={visibleResults}
+              />
+            )}
+          </div>
         </form>
 
         <button

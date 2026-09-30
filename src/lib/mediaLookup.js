@@ -4,12 +4,15 @@ import {
   tmdbCanonicalMediaLanguage,
 } from "./mediaConfig";
 import {
+  createLookupResult,
+  getTmdbImageUrl,
+  getTmdbCanonicalTitle,
+  normalizeOpenLibraryList,
+} from "./lookupResultUtils";
+import {
   cleanOmdbValue,
   cleanTmdbValue,
-  createLookupResult,
   getDefaultSubtype,
-  getTmdbImageUrl,
-  normalizeOpenLibraryList,
   parseOmdbRuntime,
   parseReleaseYear,
 } from "./mediaUtils";
@@ -19,6 +22,7 @@ const tmdbApiKey = import.meta.env.VITE_TMDB_API_KEY;
 const tmdbAccessToken = import.meta.env.VITE_TMDB_ACCESS_TOKEN;
 const mangaLookupTimeoutMs = 12000;
 const jikanLookupTimeoutMs = 7000;
+const tmdbMovieCollectionCache = new Map();
 
 export function getLookupProviders(category, subtype = "") {
   if (category === "books") {
@@ -121,10 +125,14 @@ async function fetchTmdbResults(searchText, context = {}) {
   const failedSearches = settledSearches.filter((entry) => entry.status === "rejected");
   const rawResults = settledSearches.flatMap((entry) => (entry.status === "fulfilled" ? entry.value : []));
 
-  const results = dedupeTmdbResults(rawResults)
+  let results = dedupeTmdbResults(rawResults)
     .filter((result) => result.poster_path || result.title || result.name || result.original_title || result.original_name)
     .slice(0, 14)
     .map((result) => normalizeTmdbResult(result, mediaType));
+
+  if (mediaType === "movie") {
+    results = await hydrateTmdbMovieCollections(results);
+  }
 
   if (!results.length) {
     const error = failedSearches[0]?.reason;
@@ -432,7 +440,11 @@ export async function getTmdbItemPatch(result, currentItem) {
 
   const title =
     result.mediaType === "movie" || result.mediaType === "tv"
-      ? cleanTmdbValue(detail.title || detail.name) || cleanTmdbValue(result.title)
+      ? getTmdbCanonicalTitle({
+        ...result,
+        collectionName: detail.belongs_to_collection?.name || result.collectionName,
+        title: cleanTmdbValue(detail.title || detail.name) || cleanTmdbValue(result.title),
+      })
       : cleanTmdbValue(result.title) || cleanTmdbValue(detail.title || detail.name);
   const creator = result.mediaType === "movie" ? getTmdbDirector(detail) : getTmdbTvDirector(detail) || getTmdbTvCreator(detail);
   const genres = detail.genres?.map((genre) => genre.name).join(", ") || "";
@@ -610,12 +622,39 @@ function normalizeTmdbResult(result, mediaType) {
     mediaType,
     title: mediaType === "movie" ? result.title : result.name,
     originalTitle: mediaType === "movie" ? result.original_title : result.original_name,
+    collectionName: result.belongs_to_collection?.name || "",
     posterPath: result.poster_path,
     releaseDate: mediaType === "movie" ? result.release_date : result.first_air_date,
     overview: result.overview,
     popularity: result.popularity,
     voteAverage: result.vote_average,
   };
+}
+
+async function hydrateTmdbMovieCollections(results) {
+  const settledDetails = await Promise.allSettled(results.map(fetchTmdbMovieCollectionName));
+
+  return results.map((result, index) => ({
+    ...result,
+    collectionName: settledDetails[index].status === "fulfilled"
+      ? settledDetails[index].value || result.collectionName
+      : result.collectionName,
+  }));
+}
+
+async function fetchTmdbMovieCollectionName(result) {
+  if (!result.id) return "";
+  if (tmdbMovieCollectionCache.has(result.id)) return tmdbMovieCollectionCache.get(result.id);
+
+  const url = new URL(`https://api.themoviedb.org/3/movie/${result.id}`);
+  applyTmdbAuth(url);
+  url.searchParams.set("language", tmdbCanonicalMediaLanguage);
+
+  const response = await fetch(url, getTmdbRequestOptions());
+  const data = await response.json();
+  const collectionName = response.ok ? data.belongs_to_collection?.name || "" : "";
+  tmdbMovieCollectionCache.set(result.id, collectionName);
+  return collectionName;
 }
 
 function getTmdbDirector(detail) {

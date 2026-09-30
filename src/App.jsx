@@ -85,6 +85,7 @@ function App() {
   const [completingItemId, setCompletingItemId] = useState(null);
   const [completionRating, setCompletionRating] = useState(3);
   const [deletingItemId, setDeletingItemId] = useState(null);
+  const [pendingLookupResult, setPendingLookupResult] = useState(null);
   const user = session?.user || null;
   const shouldUseSupabase = Boolean(isSupabaseConfigured && user);
   const libraryMetrics = useLibraryMetrics(items);
@@ -108,6 +109,7 @@ function App() {
     applyLookupResult,
     bookLanguage,
     canUseBookLookup,
+    clearLookupResults,
     lookupMessage,
     lookupProviders,
     lookupQuery,
@@ -118,7 +120,12 @@ function App() {
     searchDetails,
     setBookLanguage,
     setLookupQuery,
-  } = useMediaLookup({ draft, isEditorOpen, setDraft });
+  } = useMediaLookup({
+    draft,
+    isEditorOpen,
+    isLookupActive: isEditorOpen || activeView === "home",
+    setDraft,
+  });
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) || null,
     [items, selectedItemId],
@@ -227,6 +234,16 @@ function App() {
     if (isSupabaseConfigured || storageMode === "loading" || storageMode === "supabase") return;
     window.localStorage.setItem(localMediaItemsStorageKey, JSON.stringify(items));
   }, [items, storageMode]);
+
+  useEffect(() => {
+    if (!pendingLookupResult || !isEditorOpen) return;
+    if (draft.category !== pendingLookupResult.categoryId) return;
+    if (pendingLookupResult.subtype && draft.subtype !== pendingLookupResult.subtype) return;
+
+    const lookupResult = pendingLookupResult.lookupResult;
+    setPendingLookupResult(null);
+    applyLookupResult(lookupResult);
+  }, [applyLookupResult, draft.category, draft.subtype, isEditorOpen, pendingLookupResult]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -468,6 +485,50 @@ function App() {
     setIsEditorOpen(true);
   }
 
+  function updateHomeLookupQuery(homeQuery) {
+    const subtype = getDefaultSubtype(activeCategory);
+
+    setLookupQuery(homeQuery);
+    setDraft(createMediaDraft({
+      category: activeCategory,
+      subtype,
+      status: activeStatus,
+      title: homeQuery,
+    }));
+  }
+
+  function changeHomeCategory(categoryId) {
+    const subtype = getDefaultSubtype(categoryId);
+
+    setActiveCategory(categoryId);
+    setDraft(createMediaDraft({
+      category: categoryId,
+      subtype,
+      status: activeStatus,
+      title: lookupQuery,
+    }));
+    clearLookupResults();
+  }
+
+  function startHomeLookupFromSuggestion({ categoryId, lookupResult, query: homeQuery }) {
+    const subtype = getDefaultSubtype(categoryId);
+
+    setActiveCategory(categoryId);
+    setDraft(createMediaDraft({
+      category: categoryId,
+      subtype,
+      status: activeStatus,
+      title: homeQuery,
+    }));
+    setEditingId(null);
+    setEditorOrigin("home");
+    setEditorMode("search");
+    setEditorMessage("");
+    resetLookupState();
+    setPendingLookupResult({ categoryId, lookupResult, subtype });
+    setIsEditorOpen(true);
+  }
+
   if (isSupabaseConfigured && authStatus === "loading") {
     return (
       <main className="app-screen flex items-center justify-center bg-[#0f0e0d] px-4 text-stone-100">
@@ -508,9 +569,15 @@ function App() {
         {activeView === "home" ? (
           <HomeView
             activeCategory={activeCategory}
+            lookupMessage={lookupMessage}
+            lookupResults={lookupResults}
+            lookupStatus={lookupStatus}
             onBrowseLibrary={showLibrary}
-            onCategoryChange={setActiveCategory}
+            onCategoryChange={changeHomeCategory}
+            onQueryChange={updateHomeLookupQuery}
             onSearch={startHomeLookup}
+            onSuggestionSelect={startHomeLookupFromSuggestion}
+            query={lookupQuery}
           />
         ) : activeView === "profile" ? (
           <ProfileView

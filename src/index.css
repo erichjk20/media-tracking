@@ -82,6 +82,37 @@ select {
   font: inherit;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 108, 0.64) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 2rem;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(120, 113, 108, 0.58);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.78);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 html,
 body,
 #root {

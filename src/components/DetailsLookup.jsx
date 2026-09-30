@@ -2,15 +2,19 @@ import { useMemo } from "react";
 import { LoaderCircle, Search } from "lucide-react";
 import {
   getItemTileMeta,
-  getKeywordMatchScore,
+  getPrimaryCreator,
+} from "../lib/mediaUtils";
+import {
   getLookupResultImage,
   getLookupResultMeta,
   getLookupResultTitle,
-  getPrimaryCreator,
+  rankLookupResults,
+} from "../lib/lookupResultUtils";
+import {
+  getKeywordMatchScore,
   getSearchTokens,
   normalizeCompactSearchText,
-  rankLookupResults,
-} from "../lib/mediaUtils";
+} from "../lib/searchUtils";
 import { statusLabels } from "../lib/mediaConfig";
 import MediaCover from "./MediaCover";
 

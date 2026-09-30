@@ -5,9 +5,9 @@ import {
   getBookLookupLanguage,
   getLookupQueryVariants,
   getLookupMessage,
-  normalizeLookupQuery,
   rankLookupResults,
-} from "../lib/mediaUtils";
+} from "../lib/lookupResultUtils";
+import { normalizeLookupQuery } from "../lib/searchUtils";
 import {
   fetchProviderResults,
   getAladinItemPatch,
@@ -78,7 +78,7 @@ function dedupeMessages(messages) {
   return [...new Set(messages.filter(Boolean))];
 }
 
-export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
+export function useMediaLookup({ draft, isEditorOpen, isLookupActive = isEditorOpen, setDraft }) {
   const [lookupQuery, setLookupQuery] = useState("");
   const [lookupResults, setLookupResults] = useState([]);
   const [lookupStatus, setLookupStatus] = useState("idle");
@@ -99,6 +99,14 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
 
   const resetLookupState = useCallback(() => {
     setLookupQuery("");
+    setLookupResults([]);
+    setLookupStatus("idle");
+    setLookupMessage("");
+    setAppliedLookupSourceLabel("");
+  }, []);
+
+  const clearLookupResults = useCallback(() => {
+    lookupRequestIdRef.current += 1;
     setLookupResults([]);
     setLookupStatus("idle");
     setLookupMessage("");
@@ -273,7 +281,7 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
   }, [isEditorOpen, lookupQuery, searchDetails, shouldRunLookup]);
 
   useEffect(() => {
-    if (!isEditorOpen || shouldRunLookup) return;
+    if (!isLookupActive || shouldRunLookup) return;
 
     const cleanedQuery = normalizeLookupQuery(lookupQuery);
     if (cleanedQuery.length < minLookupSuggestionLength) {
@@ -289,12 +297,13 @@ export function useMediaLookup({ draft, isEditorOpen, setDraft }) {
     }, lookupSuggestionDelayMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isEditorOpen, lookupQuery, runLookup, shouldRunLookup]);
+  }, [isLookupActive, lookupQuery, runLookup, shouldRunLookup]);
 
   return {
     appliedLookupSourceLabel,
     bookLanguage,
     canUseBookLookup,
+    clearLookupResults,
     lookupMessage,
     lookupProviders,
     lookupQuery,

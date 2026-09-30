@@ -7,9 +7,11 @@ import {
 } from "../lib/mediaConfig";
 import {
   compareShelfItems,
+} from "../lib/mediaUtils";
+import {
   getKeywordMatchScore,
   getSearchTokens,
-} from "../lib/mediaUtils";
+} from "../lib/searchUtils";
 
 function getSubtypeCounts(items, activeStatus, options, defaultSubtype) {
   const subtypeCounts = Object.fromEntries(options.map((option) => [option.value, 0]));

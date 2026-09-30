@@ -17,7 +17,7 @@ function BrandWordmark({ animateBook = false, onClick }) {
   const className = "relative inline-flex items-end pb-1 text-[2.1rem] font-semibold leading-none tracking-normal text-[#eee9df] transition sm:text-5xl";
 
   return (
-    <h1>
+    <h1 className="m-0">
       {onClick ? (
         <button
           aria-label="Go home"

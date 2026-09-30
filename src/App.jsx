@@ -551,10 +551,9 @@ function App() {
       <main className={`app-screen bg-transparent ${activeView === "home" ? "" : "app-shell"}`}>
         {activeView !== "home" && (
           <AppHeader
-            addLabel={getAddLabel(activeCategory)}
-            onAddManualClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("manual") : undefined}
-            onAddSearchClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("search") : undefined}
+            activeView={activeView}
             onHomeClick={showHome}
+            onShowProfile={showProfile}
           />
         )}
 
@@ -679,8 +678,10 @@ function App() {
         <BottomNav
           activeCategory={activeCategory}
           activeView={activeView}
+          addLabel={getAddLabel(activeCategory)}
+          onAddManualClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("manual") : undefined}
+          onAddSearchClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("search") : undefined}
           onShowCategory={showCategory}
-          onShowProfile={showProfile}
         />
       )}
     </>

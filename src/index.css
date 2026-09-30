@@ -17,8 +17,13 @@
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6.35rem);
   }
 
+  .safe-screen-y {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+  }
+
   .app-header {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   }
 
   .bottom-nav-shell {
@@ -44,6 +49,11 @@
 
     .app-header {
       padding-top: 0;
+    }
+
+    .safe-screen-y {
+      padding-top: 2rem;
+      padding-bottom: 2rem;
     }
 
   }

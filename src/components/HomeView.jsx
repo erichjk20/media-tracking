@@ -23,6 +23,13 @@ function HomeView({
   const isLoadingSuggestions = lookupStatus === "loading" && canShowSuggestions;
   const visibleResults = lookupResults.slice(0, 5);
   const showSuggestions = canShowSuggestions && isSearchFocused;
+  const categoriesById = Object.fromEntries(categories.map((category) => [category.id, category]));
+  const orderedCategories = [
+    categoriesById.books,
+    categoriesById.manga,
+    categoriesById.movies,
+    categoriesById.tv,
+  ];
 
   function selectCategory(categoryId) {
     onCategoryChange(categoryId);
@@ -38,7 +45,7 @@ function HomeView({
   }
 
   return (
-    <section className="flex min-h-svh w-full flex-col items-center justify-center px-4 py-8 text-center sm:px-6">
+    <section className="safe-screen-y flex min-h-svh w-full flex-col items-center justify-center px-4 text-center sm:px-6">
       <div className="w-full max-w-xl">
         <div className="flex justify-center">
           <BrandWordmark animateBook />
@@ -46,7 +53,7 @@ function HomeView({
 
         <form className="mt-8" onSubmit={handleSubmit}>
           <div className="mx-auto grid max-w-md grid-cols-4 gap-1 rounded-lg border border-white/10 bg-[#171512]/75 p-1 shadow-[0_14px_44px_rgba(0,0,0,0.22)] backdrop-blur">
-            {categories.map((entry) => {
+            {orderedCategories.map((entry) => {
               const Icon = entry.icon;
               const isActive = activeCategory === entry.id;
               const label = entry.id === "tv" ? "TV" : entry.label;

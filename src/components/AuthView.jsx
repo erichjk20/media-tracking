@@ -213,7 +213,7 @@ function AuthView({ isPasswordRecovery = false, onPasswordUpdated = () => {} }) 
   }
 
   return (
-    <main className="app-screen bg-transparent px-5 py-8 text-stone-100 sm:px-6">
+    <main className="app-screen safe-screen-y bg-transparent px-5 text-stone-100 sm:px-6">
       <section className="auth-frame mx-auto flex w-full max-w-sm flex-col justify-center">
         <div className="mb-6 px-1">
           <BrandWordmark animateBook />

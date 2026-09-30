@@ -173,7 +173,9 @@ Both are ignored by Git.
 
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
 - `AuthView.jsx` owns email/password signup, login, and password reset flows.
-- `HomeView.jsx` owns homepage command state and lookup handoff.
+- `HomeView.jsx` owns homepage command state and lookup handoff. Its category selector follows the same reading/watching grouping as the bottom nav: Books, Manga, Movies, TV.
+- `BottomNav.jsx` owns the mobile fixed pill navigation. The current order is Books, Manga, center Add, Movies, TV; Profile lives in the top-right header action instead of the pill.
+- `AppHeader.jsx` owns the compact app header, brand-home action, and top-right Profile action.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
 - `DetailsLookup.jsx` owns user-facing lookup search and result selection without exposing provider/debug details.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view and released-season breakdown display for TV Shows.
@@ -228,6 +230,7 @@ Both are ignored by Git.
 
 - Imports Tailwind layers.
 - Defines the reusable `.input` component class.
+- Defines app shell, header, bottom navigation, and safe-area spacing helpers for iOS `viewport-fit=cover` layouts.
 - Sets global page background/text rendering.
 - Defines `.cover-fallback` styling.
 
@@ -279,7 +282,7 @@ Run lint checks:
 npm run lint
 ```
 
-The production build and lint checks were last verified successfully after adding the cached Books/Manga lookup endpoints and source metadata.
+The production build and lint checks were last verified successfully after the mobile bottom-nav/profile/header/safe-area updates.
 
 ## Supabase Persistence
 
@@ -466,8 +469,12 @@ The lookup:
 - Shelf browsing supports a list view and a poster grid view.
 - Poster grid view keeps at least three columns on narrow screens.
 - Mobile category switching uses a fixed bottom navigation bar.
-- Desktop and tablet show a compact top header with search and a category grid below it.
-- Signed-in users can sign out from the header.
+- The mobile bottom navigation is a sleek pill ordered as Books, Manga, Add, Movies, TV. Books/Manga are grouped as reading media, Movies/TV as watching media, and Movies stays adjacent to Add because it is expected to be the most common input.
+- The center Add action is a slightly elevated circular button with a dark outline/socket treatment and opens Search title / Manual entry actions from the pill.
+- Profile access lives in the top-right app header, not in the bottom pill.
+- The Home category selector mirrors the bottom nav grouping without the Add action: Books, Manga, Movies, TV.
+- Home/auth wordmark screens reserve iOS safe-area space so the `shelvd` mark stays below the translucent status-bar blur on devices using `viewport-fit=cover`.
+- Desktop and tablet show a compact top header with the brand action and profile action above the main content.
 - The previous "All completed" route/control has been removed for now.
 - The active shelf is controlled with a two-option segmented control.
 - The add/edit form opens as a modal sheet instead of living as a permanent sidebar.

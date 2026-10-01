@@ -23,6 +23,7 @@ const tmdbAccessToken = import.meta.env.VITE_TMDB_ACCESS_TOKEN;
 const mangaLookupTimeoutMs = 12000;
 const jikanLookupTimeoutMs = 7000;
 const tmdbMovieCollectionCache = new Map();
+export const bookLookupVersion = "book-cover-v3";
 
 export function getLookupProviders(category, subtype = "") {
   if (category === "books") {
@@ -34,10 +35,7 @@ export function getLookupProviders(category, subtype = "") {
   return [];
 }
 
-export function getFallbackLookupProviders(category, subtype = "", attemptedProviderIds = []) {
-  if (category === "books" && subtype === "korean-book" && !attemptedProviderIds.includes("open-library")) {
-    return [{ id: "open-library", label: "Open Library" }];
-  }
+export function getFallbackLookupProviders(category, _subtype = "", attemptedProviderIds = []) {
   if (category === "movies" && !attemptedProviderIds.includes("omdb")) {
     return [{ id: "omdb", label: "OMDb" }];
   }
@@ -147,6 +145,7 @@ async function fetchOpenLibraryResults(searchText, language = openLibraryCanonic
     const url = new URL("/api/lookup/books", window.location.origin);
     url.searchParams.set("query", searchText);
     url.searchParams.set("language", language);
+    url.searchParams.set("version", bookLookupVersion);
 
     const response = await fetch(url);
     const data = await response.json();
@@ -517,6 +516,7 @@ export function getOpenLibraryItemPatch(result, currentItem) {
     imageUrl: result.imageUrl,
     pageCount: result.pageCount,
     publisher: result.publishers,
+    isbn: result.isbn13 || result.isbn10 || "",
     synopsis: result.description || "",
   };
 }

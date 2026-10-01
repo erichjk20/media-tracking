@@ -10,6 +10,7 @@ import {
 import { normalizeLookupQuery } from "../lib/searchUtils";
 import {
   fetchProviderResults,
+  bookLookupVersion,
   getAladinItemPatch,
   getAnimeItemPatch,
   getFallbackLookupProviders,
@@ -63,6 +64,7 @@ function getLookupCacheKey({ bookLanguage, category, query, subtype }) {
     category,
     query: query.toLowerCase(),
     subtype,
+    version: category === "books" ? bookLookupVersion : "",
   });
 }
 
@@ -95,7 +97,7 @@ export function useMediaLookup({ draft, isEditorOpen, isLookupActive = isEditorO
     () => getLookupProviders(draft.category, draft.subtype),
     [draft.category, draft.subtype],
   );
-  const canUseBookLookup = draft.category === "books";
+  const canUseBookLookup = false;
 
   const resetLookupState = useCallback(() => {
     setLookupQuery("");

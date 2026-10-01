@@ -193,7 +193,7 @@ Both are ignored by Git.
 `netlify/functions/lookup-books.js`
 
 - Owns the internal `/api/lookup/books` endpoint for Open Library-powered book search.
-- Searches Open Library works, fetches preferred editions for top results, prefers newest matching-language edition covers, and returns normalized lookup results.
+- Searches Open Library works, privately scores English edition cover candidates for top results, and returns normalized work-level lookup results.
 - Adds lightweight in-memory TTL caching and source metadata such as Open Library work id, edition id, cover source, and cover preference.
 
 `netlify/functions/lookup-manga.js`
@@ -414,10 +414,11 @@ The lookup:
 - Accepts English or Korean search text.
 - Can search all languages, Korean-only results, or English-only results.
 - Uses Open Library search via `https://openlibrary.org/search.json`.
-- Fetches Open Library edition data for top results via each work's `editions.json` endpoint.
-- Prefers newest matching-language edition cover art when available.
+- Fetches Open Library edition data for top results via each work's `editions.json` endpoint, but only as hidden cover candidates.
+- Fetches Open Library work detail JSON for top results so work descriptions can populate the saved synopsis.
+- Prefers English edition cover art for English books when available, scoring cover id quality, title fit, normal print format, common US trade publishers, proximity to first publication, metadata completeness, and noisy edition terms.
 - Keeps the displayed title as the Open Library work title while using selected edition metadata for cover/publisher/page details.
-- Returns source metadata including work id, edition id, cover source, cover preference, and preferred language match status.
+- Returns source metadata including work id, hidden edition id, cover source, cover preference, edition score, and preferred language match status.
 - Does not require a local API key.
 - Fills title, author, cover image URL, publisher, page count, and synopsis fields when available.
 - Automatically marks Korean-language book results as `korean-book`.

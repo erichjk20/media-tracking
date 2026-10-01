@@ -50,7 +50,7 @@ export async function handler(event) {
 async function searchManga(query) {
   const data = await fetchMangadexSearch(query);
   const results = normalizeList(data.data)
-    .map(normalizeMangadexMangaResult)
+    .map((result, index) => normalizeMangadexMangaResult(result, index))
     .filter((result) => result.title || result.authors)
     .slice(0, 14);
 
@@ -63,6 +63,7 @@ async function searchManga(query) {
       ? applyCoverMetadata(result, {
         imageUrl: firstVolumeCover.imageUrl,
         coverSource: "mangadex-volume-cover",
+        coverPreference: firstVolumeCover.coverPreference,
         coverVolume: firstVolumeCover.volume,
         coverLocale: firstVolumeCover.locale,
         fallbackUsed: false,
@@ -131,6 +132,7 @@ function chooseFirstVolumeCovers(covers) {
       coverByMangaId.set(mangaId, {
         volume: cover.attributes?.volume || "",
         locale: cover.attributes?.locale || "",
+        coverPreference: getCoverPreference(cover),
         imageUrl: `https://uploads.mangadex.org/covers/${mangaId}/${cover.attributes.fileName}`,
       });
       return coverByMangaId;
@@ -138,14 +140,26 @@ function chooseFirstVolumeCovers(covers) {
 }
 
 function compareMangadexCovers(a, b) {
-  return getCoverVolumeSortValue(a) - getCoverVolumeSortValue(b)
+  return getCoverVolumeGroup(a) - getCoverVolumeGroup(b)
+    || getCoverVolumeSortValue(a) - getCoverVolumeSortValue(b)
     || getLocalePriority(a) - getLocalePriority(b)
     || String(a.attributes?.createdAt || "").localeCompare(String(b.attributes?.createdAt || ""));
+}
+
+function getCoverVolumeGroup(cover) {
+  const volume = Number.parseFloat(cover.attributes?.volume);
+  if (volume === 1) return 0;
+  if (Number.isFinite(volume) && volume > 0) return 1;
+  return 2;
 }
 
 function getCoverVolumeSortValue(cover) {
   const volume = Number.parseFloat(cover.attributes?.volume);
   return Number.isFinite(volume) ? volume : Number.MAX_SAFE_INTEGER;
+}
+
+function getCoverPreference(cover) {
+  return Number.parseFloat(cover.attributes?.volume) === 1 ? "volume-1" : "earliest-volume";
 }
 
 function getLocalePriority(cover) {
@@ -155,7 +169,7 @@ function getLocalePriority(cover) {
   return 2;
 }
 
-function normalizeMangadexMangaResult(result) {
+function normalizeMangadexMangaResult(result, index = 0) {
   const attributes = result.attributes || {};
   const relationships = normalizeList(result.relationships);
   const authors = getMangadexRelationshipNames(relationships, "author");
@@ -163,11 +177,12 @@ function normalizeMangadexMangaResult(result) {
   const coverFileName = relationships.find((relationship) => relationship.type === "cover_art")?.attributes?.fileName;
   const alternateTitles = normalizeList(attributes.altTitles).flatMap((entry) => Object.values(entry || {}));
 
-  return {
+  const mangaResult = {
     id: result.id,
     source: "mangadex",
     sourceId: result.id,
     mangadexId: result.id,
+    searchRank: index + 1,
     title: getMangadexTitle(attributes),
     originalTitle: getLocalizedText(attributes.title, ["ja-ro", "ja", "ko", "zh", "zh-hk"]) || "",
     alternateTitles,
@@ -185,6 +200,7 @@ function normalizeMangadexMangaResult(result) {
     synopsis: getLocalizedText(attributes.description, ["en", "ja-ro", "ja", "ko"]) || "",
     imageUrl: coverFileName ? `https://uploads.mangadex.org/covers/${result.id}/${coverFileName}` : "",
     coverSource: coverFileName ? "mangadex-main-cover" : "",
+    coverPreference: coverFileName ? "main-cover" : "no-cover",
     coverVolume: "",
     coverLocale: "",
     fallbackUsed: false,
@@ -192,11 +208,19 @@ function normalizeMangadexMangaResult(result) {
       provider: "mangadex",
       mangaId: result.id,
       malId: attributes.links?.mal || "",
+      searchRank: index + 1,
       coverSource: coverFileName ? "mangadex-main-cover" : "",
+      coverPreference: coverFileName ? "main-cover" : "no-cover",
       coverVolume: "",
       coverLocale: "",
       fallbackUsed: false,
     },
+  };
+
+  return {
+    ...mangaResult,
+    metadataCompletenessScore: getMetadataCompletenessScore(mangaResult),
+    variantPenalty: getMangaVariantPenalty(mangaResult),
   };
 }
 
@@ -219,6 +243,7 @@ async function fillMissingMangadexCoverImages(results, searchText) {
       ? applyCoverMetadata(result, {
         imageUrl,
         coverSource: malCover ? "jikan-mal-id-cover" : "jikan-title-match-cover",
+        coverPreference: "jikan-fallback",
         fallbackUsed: true,
       })
       : result;
@@ -325,6 +350,7 @@ function applyCoverMetadata(result, metadata) {
   const sourceMetadata = {
     ...result.sourceMetadata,
     coverSource: metadata.coverSource,
+    coverPreference: metadata.coverPreference ?? result.coverPreference ?? "no-cover",
     coverVolume: metadata.coverVolume ?? result.coverVolume ?? "",
     coverLocale: metadata.coverLocale ?? result.coverLocale ?? "",
     fallbackUsed: Boolean(metadata.fallbackUsed),
@@ -334,11 +360,69 @@ function applyCoverMetadata(result, metadata) {
     ...result,
     imageUrl: metadata.imageUrl || result.imageUrl,
     coverSource: sourceMetadata.coverSource,
+    coverPreference: sourceMetadata.coverPreference,
     coverVolume: sourceMetadata.coverVolume,
     coverLocale: sourceMetadata.coverLocale,
     fallbackUsed: sourceMetadata.fallbackUsed,
     sourceMetadata,
   };
+}
+
+function getMetadataCompletenessScore(result) {
+  return [
+    result.title,
+    result.authors,
+    result.artists,
+    result.published,
+    result.status,
+    result.volumes,
+    result.chapters,
+    result.genres,
+    result.synopsis,
+    result.malId,
+  ].filter(Boolean).length;
+}
+
+function getMangaVariantPenalty(result) {
+  const text = [
+    result.title,
+    result.originalTitle,
+    ...normalizeList(result.alternateTitles),
+    result.genres,
+    result.themes,
+  ].join(" ");
+
+  return getMangaVariantTerms(text).length * 25;
+}
+
+function getMangaVariantTerms(value) {
+  const normalizedText = normalizeSearchText(value);
+  const compactText = normalizeCompactSearchText(value);
+  const terms = [
+    { id: "color", compact: "colored", patterns: ["colored"] },
+    { id: "color", compact: "color", patterns: ["color"] },
+    { id: "color", compact: "fullcolor", patterns: ["full color", "fullcolor"] },
+    { id: "oneshot", compact: "oneshot", patterns: ["one shot", "one-shot", "oneshot"] },
+    { id: "anthology", compact: "anthology", patterns: ["anthology"] },
+    { id: "sidestory", compact: "sidestory", patterns: ["side story", "side-story"] },
+    { id: "spinoff", compact: "spinoff", patterns: ["spin off", "spin-off", "spinoff"] },
+    { id: "special", compact: "special", patterns: ["special"] },
+    { id: "doujinshi", compact: "doujinshi", patterns: ["doujinshi"] },
+    { id: "novel", compact: "novel", patterns: ["novel"] },
+  ];
+
+  return [...new Set(terms
+    .filter((term) => term.patterns.some((pattern) => normalizedText.includes(pattern)) || compactText.includes(term.compact))
+    .map((term) => term.id))];
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212]/g, "-");
 }
 
 function getMangadexTitle(attributes) {

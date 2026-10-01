@@ -449,17 +449,18 @@ Manga include a MangaDex-powered lookup panel in the add/edit form through `/api
 
 The lookup:
 
-- Searches manga by title via `https://api.mangadex.org/manga`.
+- Searches manga by title via `https://api.mangadex.org/manga` and queries AniList alongside MangaDex so popular canonical series can outrank MangaDex variants or side entries.
 - Requests `cover_art`, `author`, and `artist` relationships from MangaDex.
 - Fetches cover records from `https://api.mangadex.org/cover` for returned manga ids.
-- Prefers volume 1 cover art when MangaDex has it.
+- Prefers English reader-facing cover art when available, using Open Library as a hidden cover enrichment source for English manga editions.
+- Falls back to volume 1 MangaDex cover art when no English cover candidate is available.
 - Falls back to the MangaDex main cover from the manga search response.
 - Uses Jikan as a targeted cover fallback when MangaDex has no usable cover, matching by MAL id when available or by title/alternate title.
-- Falls back to AniList and Jikan searches when MangaDex cannot return usable search results.
+- Uses Jikan as a fallback when MangaDex/AniList cannot return usable search results.
 - Does not require a local API key.
 - Fills title, author/artist, cover image URL, synopsis, and available volume/chapter fields from MangaDex/AniList/Jikan-normalized metadata.
 - Uses safe-for-work search results.
-- Returns source metadata including MangaDex id, MAL id, cover source, cover volume, cover locale, and whether a fallback was used.
+- Returns source metadata including MangaDex id, MAL id, Open Library cover metadata when used, cover source, cover volume, cover locale, and whether a fallback was used.
 - Saves title and author/artist exactly as normalized from the lookup response.
 
 ## UX And Product Notes

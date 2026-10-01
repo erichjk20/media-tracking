@@ -214,8 +214,10 @@ export function rankLookupResults(results, query) {
       collectionBrowseRank: getTmdbCollectionBrowseRank(result, query),
       releaseSortValue: getLookupReleaseSortValue(result),
       priority: getLookupResultPriority(result),
+      isUnrequestedMangaVariant: isUnrequestedMangaVariant(result, query),
     }))
     .filter(({ score }) => score >= tokens.length)
+    .filter(({ isUnrequestedMangaVariant, score }) => !isUnrequestedMangaVariant || score >= 180)
     .sort((a, b) => {
       const collectionBrowseSort = compareTmdbCollectionBrowse(a, b);
       return b.score - a.score || collectionBrowseSort || b.priority - a.priority || a.index - b.index;
@@ -288,10 +290,10 @@ function getMangaCanonicalMatchScore(lookupResult, query) {
 
   const { result, source } = lookupResult;
   const titleBonus = getMangaTitleMatchBonus(result, query);
-  const popularityBonus = source === "mangadex" ? getMangadexSearchRankBonus(result.searchRank) : 0;
+  const popularityBonus = source === "mangadex" ? getMangadexSearchRankBonus(result.searchRank) : getMangaExternalPopularityBonus(result);
   const coverBonus = getMangaCoverPreferenceBonus(result);
   const completenessBonus = Math.min(Number(result.metadataCompletenessScore || 0) * 3, 24);
-  const sourceBonus = source === "mangadex" ? 30 : 0;
+  const sourceBonus = source === "mangadex" ? 24 : source === "anilist" ? 18 : 0;
   const primaryTitleBonus = hasMangaVariantTerm(getMangaVariantSearchText(result)) ? 0 : 18;
   const variantPenalty = getMangaVariantPenalty(result, query);
 
@@ -325,6 +327,12 @@ function getMangadexSearchRankBonus(searchRank) {
   return Math.max(0, 80 - (rank - 1) * 6);
 }
 
+function getMangaExternalPopularityBonus(result) {
+  const popularity = Number(result.popularity || 0);
+  const score = Number(result.score || 0);
+  return Math.min(popularity / 1800, 70) + Math.min(score * 4, 40);
+}
+
 function getMangaCoverPreferenceBonus(result) {
   if (result.coverPreference === "volume-1") return 30;
   if (result.coverPreference === "earliest-volume") return 18;
@@ -340,7 +348,15 @@ function getMangaVariantPenalty(result, query) {
   const queryTerms = getMangaVariantTerms(query);
   const unrequestedTerms = resultTerms.filter((term) => !queryTerms.includes(term));
   const providerPenalty = Number(result.variantPenalty || 0);
-  return unrequestedTerms.length ? Math.max(providerPenalty, unrequestedTerms.length * 45) : 0;
+  return unrequestedTerms.length ? Math.max(providerPenalty, unrequestedTerms.length * 120) : 0;
+}
+
+function isUnrequestedMangaVariant(lookupResult, query) {
+  if (!isMangaLookupResult(lookupResult)) return false;
+  const resultTerms = getMangaVariantTerms(getMangaVariantSearchText(lookupResult.result));
+  if (!resultTerms.length) return false;
+  const queryTerms = getMangaVariantTerms(query);
+  return resultTerms.some((term) => !queryTerms.includes(term));
 }
 
 function getMangaVariantSearchText(result) {

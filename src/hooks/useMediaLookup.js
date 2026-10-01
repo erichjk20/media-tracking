@@ -11,6 +11,7 @@ import { normalizeLookupQuery } from "../lib/searchUtils";
 import {
   fetchProviderResults,
   bookLookupVersion,
+  mangaLookupVersion,
   getAladinItemPatch,
   getAnimeItemPatch,
   getFallbackLookupProviders,
@@ -64,7 +65,7 @@ function getLookupCacheKey({ bookLanguage, category, query, subtype }) {
     category,
     query: query.toLowerCase(),
     subtype,
-    version: category === "books" ? bookLookupVersion : "",
+    version: category === "books" ? bookLookupVersion : category === "manga" ? mangaLookupVersion : "",
   });
 }
 

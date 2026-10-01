@@ -8,6 +8,8 @@ const lookupCacheMaxEntries = 100;
 const mangadexLookupTimeoutMs = 12000;
 const mangadexCoverTimeoutMs = 8000;
 const jikanLookupTimeoutMs = 6000;
+const openLibraryLookupTimeoutMs = 7000;
+const mangaLookupVersion = "manga-canonical-rank-v3";
 
 export async function handler(event) {
   if (event.httpMethod === "OPTIONS") {
@@ -29,7 +31,8 @@ export async function handler(event) {
   }
 
   try {
-    const cacheKey = getLookupCacheKey(query);
+    const cacheVersion = event.queryStringParameters?.version || mangaLookupVersion;
+    const cacheKey = getLookupCacheKey(query, cacheVersion);
     const cachedLookup = getCachedLookup(cacheKey);
     if (cachedLookup) {
       return sendJson(200, { ...cachedLookup, cache: getCacheInfo(true) }, cacheHeaders("HIT"));
@@ -71,7 +74,8 @@ async function searchManga(query) {
       : result;
   });
 
-  return fillMissingMangadexCoverImages(withPreferredCovers, query);
+  const withEnglishCovers = await applyEnglishMangaCoverImages(withPreferredCovers);
+  return fillMissingMangadexCoverImages(withEnglishCovers, query);
 }
 
 async function fetchMangadexSearch(query) {
@@ -224,6 +228,193 @@ function normalizeMangadexMangaResult(result, index = 0) {
   };
 }
 
+async function applyEnglishMangaCoverImages(results) {
+  const coverCandidates = await fetchOpenLibraryEnglishCovers(results.slice(0, 6));
+  if (!coverCandidates.size) return results;
+
+  return results.map((result) => {
+    const candidate = coverCandidates.get(result.id);
+    if (!candidate?.imageUrl || result.coverLocale === "en") return result;
+
+    return applyCoverMetadata(result, {
+      imageUrl: candidate.imageUrl,
+      coverSource: "open-library-english-cover",
+      coverPreference: "english-reader-cover",
+      coverVolume: candidate.volume || result.coverVolume,
+      coverLocale: "en",
+      fallbackUsed: false,
+      extraMetadata: {
+        openLibraryWorkId: candidate.workId,
+        openLibraryCoverId: candidate.coverId,
+        openLibraryCoverTitle: candidate.title,
+        openLibraryCoverPublisher: candidate.publisher,
+        englishCoverScore: candidate.score,
+      },
+    });
+  });
+}
+
+async function fetchOpenLibraryEnglishCovers(results) {
+  const settledCovers = await Promise.allSettled(
+    results.map(fetchOpenLibraryEnglishCover),
+  );
+
+  return settledCovers.reduce((coverByMangaId, entry, index) => {
+    if (entry.status === "fulfilled" && entry.value?.imageUrl) {
+      coverByMangaId.set(results[index].id, entry.value);
+    }
+    return coverByMangaId;
+  }, new Map());
+}
+
+async function fetchOpenLibraryEnglishCover(result) {
+  const queries = getOpenLibraryMangaCoverQueries(result);
+  if (!queries.length) return null;
+
+  const settledSearches = await Promise.allSettled(
+    queries.map((query) => fetchOpenLibraryMangaCoverCandidates(query)),
+  );
+  const candidates = settledSearches.flatMap((entry) => (entry.status === "fulfilled" ? entry.value : []));
+  const scoredCandidates = candidates
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreOpenLibraryMangaCover(candidate, result),
+    }))
+    .filter((candidate) => candidate.score >= 60 && candidate.coverId)
+    .sort((a, b) => b.score - a.score || getOpenLibraryMangaCoverVolume(a) - getOpenLibraryMangaCoverVolume(b));
+
+  return scoredCandidates[0] || null;
+}
+
+function getOpenLibraryMangaCoverQueries(result) {
+  const title = result.title || result.originalTitle || normalizeList(result.alternateTitles).find(Boolean) || "";
+  const creator = getPrimaryMangaCreator(result);
+  return [
+    [title, "Vol 1", creator].filter(Boolean).join(" "),
+    [title, "Volume 1", creator].filter(Boolean).join(" "),
+    [title, "Book One", creator].filter(Boolean).join(" "),
+    [title, creator].filter(Boolean).join(" "),
+  ]
+    .map((query) => query.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter((query, index, queries) => queries.indexOf(query) === index);
+}
+
+function getPrimaryMangaCreator(result) {
+  return String(result.authors || result.artists || "")
+    .split(",")
+    .map((value) => value.trim())
+    .find(Boolean) || "";
+}
+
+async function fetchOpenLibraryMangaCoverCandidates(query) {
+  const url = new URL("https://openlibrary.org/search.json");
+  url.searchParams.set("q", query);
+  url.searchParams.set(
+    "fields",
+    [
+      "key",
+      "title",
+      "author_name",
+      "first_publish_year",
+      "cover_i",
+      "language",
+      "publisher",
+      "edition_count",
+    ].join(","),
+  );
+  url.searchParams.set("limit", "8");
+  url.searchParams.set("lang", "en");
+
+  const { data, response } = await fetchJsonWithTimeout(
+    url,
+    {},
+    openLibraryLookupTimeoutMs,
+    "Open Library manga cover lookup timed out.",
+    "Open Library manga cover lookup failed.",
+  );
+
+  if (!response.ok) return [];
+
+  return normalizeList(data.docs)
+    .filter((doc) => doc.cover_i && normalizeList(doc.language).includes("eng"))
+    .map((doc) => ({
+      workId: doc.key || "",
+      title: doc.title || "",
+      authors: normalizeList(doc.author_name).join(", "),
+      publisher: normalizeList(doc.publisher).find(Boolean) || "",
+      publishers: normalizeList(doc.publisher),
+      firstPublishYear: doc.first_publish_year || "",
+      editionCount: doc.edition_count || "",
+      coverId: doc.cover_i,
+      imageUrl: getOpenLibraryCoverUrl(doc.cover_i, "L"),
+    }));
+}
+
+function scoreOpenLibraryMangaCover(candidate, result) {
+  const candidateTitle = normalizeCompactSearchText(candidate.title);
+  const mangaTitleKeys = getMangaTitleKeys(result);
+  const publisherText = normalizeSearchText(candidate.publishers.join(" "));
+  const authorText = normalizeCompactSearchText(candidate.authors);
+  const creatorKey = normalizeCompactSearchText(getPrimaryMangaCreator(result));
+  let score = 0;
+
+  if (mangaTitleKeys.some((title) => candidateTitle.includes(title) || title.includes(candidateTitle))) score += 55;
+  if (candidate.coverId) score += 30;
+  if (creatorKey && authorText.includes(creatorKey)) score += 20;
+  score += getOpenLibraryMangaVolumeScore(candidate.title);
+  score += getOpenLibraryMangaPublisherScore(publisherText);
+  score -= getOpenLibraryMangaNoisePenalty(candidate.title, publisherText);
+
+  return score;
+}
+
+function getOpenLibraryMangaVolumeScore(title) {
+  const normalizedTitle = normalizeSearchText(title);
+  const compactTitle = normalizeCompactSearchText(title);
+  const volume = getOpenLibraryMangaCoverVolume({ title });
+
+  if (/\b(book|vol(?:ume)?\.?)\s*one\b/i.test(normalizedTitle)) return 40;
+  if (/(^|[^\d])1\s*[-‐-]\s*2($|[^\d])/.test(normalizedTitle)) return 38;
+  if (/\b(vol(?:ume)?\.?|book)\s*1\b/i.test(normalizedTitle)) return 36;
+  if (/(^|[^\d])1($|[^\d])/.test(normalizedTitle) || compactTitle.endsWith("1")) return 32;
+  if (volume > 0 && volume <= 4) return Math.max(0, 24 - (volume - 1) * 6);
+  if (volume > 4) return -30;
+  return 0;
+}
+
+function getOpenLibraryMangaCoverVolume(candidate) {
+  const match = String(candidate.title || "").match(/\b(?:vol(?:ume)?\.?|book)?\s*(\d{1,3})(?:\s*[-‐-]\s*\d{1,3})?\b/i);
+  return match ? Number(match[1]) || Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+}
+
+function getOpenLibraryMangaPublisherScore(publisherText) {
+  if (!publisherText) return 0;
+  if (publisherText.includes("kodansha")) return 26;
+  if (publisherText.includes("viz")) return 24;
+  if (publisherText.includes("dark horse")) return 22;
+  if (publisherText.includes("yen press")) return 22;
+  if (publisherText.includes("seven seas")) return 20;
+  if (publisherText.includes("vertical")) return 18;
+  return 0;
+}
+
+function getOpenLibraryMangaNoisePenalty(title, publisherText) {
+  const text = `${normalizeSearchText(title)} ${publisherText}`;
+  const compactText = normalizeCompactSearchText(text);
+  const terms = [
+    { penalty: 80, patterns: ["novel", "light novel", "summary", "study guide"] },
+    { penalty: 45, patterns: ["deluxe", "collector", "box set", "omnibus"] },
+    { penalty: 35, patterns: ["calendar", "art book", "artbook"] },
+  ];
+
+  return terms.reduce((penalty, term) => (
+    term.patterns.some((pattern) => text.includes(pattern) || compactText.includes(normalizeCompactSearchText(pattern)))
+      ? penalty + term.penalty
+      : penalty
+  ), 0);
+}
+
 async function fillMissingMangadexCoverImages(results, searchText) {
   const missingCoverResults = results.filter((result) => !result.imageUrl);
   if (!missingCoverResults.length) return results;
@@ -349,6 +540,7 @@ function getJikanImageUrl(result) {
 function applyCoverMetadata(result, metadata) {
   const sourceMetadata = {
     ...result.sourceMetadata,
+    ...metadata.extraMetadata,
     coverSource: metadata.coverSource,
     coverPreference: metadata.coverPreference ?? result.coverPreference ?? "no-cover",
     coverVolume: metadata.coverVolume ?? result.coverVolume ?? "",
@@ -392,7 +584,7 @@ function getMangaVariantPenalty(result) {
     result.themes,
   ].join(" ");
 
-  return getMangaVariantTerms(text).length * 25;
+  return getMangaVariantTerms(text).length * 80;
 }
 
 function getMangaVariantTerms(value) {
@@ -461,6 +653,10 @@ function normalizeCompactSearchText(value) {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
+function getOpenLibraryCoverUrl(coverId, size = "M") {
+  return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : "";
+}
+
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs, timeoutMessage, failureMessage) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -486,9 +682,10 @@ function normalizeList(value) {
   return Array.isArray(value) ? value : value ? [value] : [];
 }
 
-function getLookupCacheKey(query) {
+function getLookupCacheKey(query, version = mangaLookupVersion) {
   return JSON.stringify({
     query: query.trim().toLowerCase(),
+    version,
   });
 }
 

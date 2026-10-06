@@ -29,7 +29,7 @@ const jikanLookupTimeoutMs = 7000;
 const openLibraryMangaCoverTimeoutMs = 7000;
 const tmdbMovieCollectionCache = new Map();
 export const bookLookupVersion = "book-cover-v3";
-export const mangaLookupVersion = "manga-canonical-rank-v3";
+export const mangaLookupVersion = "manga-canonical-rank-v4";
 
 export function getLookupProviders(category, subtype = "") {
   if (category === "books") {
@@ -356,6 +356,7 @@ async function enrichMangaResultsWithEnglishCovers(results) {
     const entry = settledCovers[index];
     const candidate = entry.status === "fulfilled" ? entry.value : null;
     if (!candidate?.imageUrl) return result;
+    if (shouldKeepExistingMangaCover(result, candidate)) return result;
 
     return {
       ...result,
@@ -397,6 +398,15 @@ async function fetchOpenLibraryEnglishMangaCover(result) {
     .sort((a, b) => b.score - a.score || getOpenLibraryMangaCoverVolume(a) - getOpenLibraryMangaCoverVolume(b));
 
   return scoredCandidates[0] || null;
+}
+
+function shouldKeepExistingMangaCover(result, candidate) {
+  const existingVolume = Number(result.coverVolume);
+  const hasExistingFirstVolumeCover = result.imageUrl && (
+    result.coverPreference === "volume-1" || existingVolume === 1
+  );
+
+  return hasExistingFirstVolumeCover && isCollectedMangaEdition(candidate.title, candidate.publishers.join(" "));
 }
 
 function getOpenLibraryMangaCoverQueries(result) {
@@ -497,8 +507,8 @@ function getOpenLibraryMangaVolumeScore(title) {
   const compactTitle = normalizeCompactSearchText(title);
   const volume = getOpenLibraryMangaCoverVolume({ title });
 
+  if (isCollectedMangaEdition(title)) return -120;
   if (/\b(book|vol(?:ume)?\.?)\s*one\b/i.test(normalizedTitle)) return 40;
-  if (/(^|[^\d])1\s*[-‐-]\s*2($|[^\d])/.test(normalizedTitle)) return 38;
   if (/\b(vol(?:ume)?\.?|book)\s*1\b/i.test(normalizedTitle)) return 36;
   if (/(^|[^\d])1($|[^\d])/.test(normalizedTitle) || compactTitle.endsWith("1")) return 32;
   if (volume > 0 && volume <= 4) return Math.max(0, 24 - (volume - 1) * 6);
@@ -527,7 +537,8 @@ function getOpenLibraryMangaNoisePenalty(title, publisherText) {
   const compactText = normalizeCompactSearchText(text);
   const terms = [
     { penalty: 80, patterns: ["novel", "light novel", "summary", "study guide"] },
-    { penalty: 45, patterns: ["deluxe", "collector", "box set", "omnibus"] },
+    { penalty: 140, patterns: ["vizbig", "viz big", "3 in 1", "3-in-1", "three in one", "three-in-one", "omnibus"] },
+    { penalty: 70, patterns: ["deluxe", "collector", "box set", "complete collection"] },
     { penalty: 35, patterns: ["calendar", "art book", "artbook"] },
   ];
 
@@ -536,6 +547,23 @@ function getOpenLibraryMangaNoisePenalty(title, publisherText) {
       ? penalty + term.penalty
       : penalty
   ), 0);
+}
+
+function isCollectedMangaEdition(title, publisherText = "") {
+  const text = `${normalizeSearchText(title)} ${normalizeSearchText(publisherText)}`;
+  const compactText = normalizeCompactSearchText(text);
+  const collectedPatterns = [
+    /\b\d+\s*[-‐-]\s*\d+\b/,
+    /\b\d+\s*(?:in|-in-)\s*\d+\b/,
+    /\bthree\s*(?:in|-in-)\s*one\b/,
+  ];
+
+  return (
+    collectedPatterns.some((pattern) => pattern.test(text))
+    || ["vizbig", "viz big", "omnibus", "completecollection"].some((pattern) => (
+      text.includes(pattern) || compactText.includes(normalizeCompactSearchText(pattern))
+    ))
+  );
 }
 
 function getOpenLibraryMangaCoverUrl(coverId, size = "M") {

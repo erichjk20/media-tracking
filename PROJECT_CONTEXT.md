@@ -452,8 +452,8 @@ The lookup:
 - Searches manga by title via `https://api.mangadex.org/manga` and queries AniList alongside MangaDex so popular canonical series can outrank MangaDex variants or side entries.
 - Requests `cover_art`, `author`, and `artist` relationships from MangaDex.
 - Fetches cover records from `https://api.mangadex.org/cover` for returned manga ids.
-- Prefers English reader-facing cover art when available, using Open Library as a hidden cover enrichment source for English manga editions.
-- Falls back to volume 1 MangaDex cover art when no English cover candidate is available.
+- Prefers true volume 1 cover art over collected or omnibus English editions when available.
+- Uses Open Library as a hidden English cover enrichment source, but penalizes VIZBIG/3-in-1/omnibus-style editions so they do not replace faithful first-volume covers.
 - Falls back to the MangaDex main cover from the manga search response.
 - Uses Jikan as a targeted cover fallback when MangaDex has no usable cover, matching by MAL id when available or by title/alternate title.
 - Uses Jikan as a fallback when MangaDex/AniList cannot return usable search results.

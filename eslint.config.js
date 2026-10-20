@@ -35,6 +35,7 @@ export default [
       "tailwind.config.js",
       "vite.config.js",
       "netlify/functions/*.js",
+      "tests/*.js",
     ],
     languageOptions: {
       globals: {

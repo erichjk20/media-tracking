@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { normalizeSeasonBreakdown } from "./mediaUtils";
+import { getFinishedDateError, isValidDateOnly, isValidMonthOnly } from "./mediaDates";
 
 const tableName = "library_items";
 
@@ -44,6 +45,8 @@ export async function fetchMediaItems(userId) {
 }
 
 export async function saveMediaItem(item, userId) {
+  const dateError = item.status === "Completed" ? getFinishedDateError(item.finishedOn) : "";
+  if (dateError) throw new Error(dateError);
   if (!supabase) return item;
   if (!userId) throw new Error("Sign in before saving to your library.");
 
@@ -55,6 +58,7 @@ export async function saveMediaItem(item, userId) {
     subtype: item.category === "anime" ? "anime" : item.subtype,
   };
   const row = mediaItemToDbRow(itemToSave, userId);
+  let compatibleRow = row;
 
   let { data, error } = await supabase
     .from(tableName)
@@ -66,6 +70,7 @@ export async function saveMediaItem(item, userId) {
     const rowWithCompatibleColumns = { ...row };
     if (isMissingColumnError(error, "synopsis")) delete rowWithCompatibleColumns.synopsis;
     if (isMissingColumnError(error, "status_changed_at")) delete rowWithCompatibleColumns.status_changed_at;
+    compatibleRow = rowWithCompatibleColumns;
     const retry = await supabase
       .from(tableName)
       .upsert(rowWithCompatibleColumns)
@@ -75,6 +80,26 @@ export async function saveMediaItem(item, userId) {
     error = retry.error;
   }
 
+  if (isMissingColumnError(error, "finished_month") && row.finished_month === null) {
+    // Old databases can still save ordinary edits and exact dates. Confirm the
+    // column is physically absent before omitting it, so a stale API schema
+    // cannot silently preserve an existing month the user meant to clear.
+    const probe = await supabase.from(tableName).select("finished_month").eq("user_id", userId).limit(0);
+    if (probe.error?.code === "42703" && isMissingColumnError(probe.error, "finished_month")) {
+      compatibleRow = { ...compatibleRow };
+      delete compatibleRow.finished_month;
+      const retry = await supabase.from(tableName).upsert(compatibleRow).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
+  }
+
+  if (isMissingColumnError(error, "finished_month") && row.finished_month !== null) {
+    throw new Error("Month-only dates aren’t available for this library yet. Choose an exact date or Don’t remember, then save again.");
+  }
+  if (isMissingColumnError(error, "finished_on") || isMissingColumnError(error, "finished_month")) {
+    throw new Error("The library database needs an update before dates can be saved.");
+  }
   if (error) throw error;
 
   await saveMediaItemDetails(itemToSave);
@@ -132,6 +157,7 @@ function dbRowToMediaItem(row) {
     notes: row.notes || "",
     imageUrl: row.image_url || "",
     addedAt: row.added_at || "",
+    finishedOn: row.status === "completed" ? row.finished_on || row.finished_month || "" : "",
     statusChangedAt: row.status_changed_at || row.added_at || "",
     updatedAt: row.updated_at || "",
   };
@@ -155,6 +181,8 @@ function mediaItemToDbRow(item, userId) {
     notes: item.notes || null,
     image_url: item.imageUrl || null,
     added_at: item.addedAt || new Date().toISOString(),
+    finished_on: isCompleted && isValidDateOnly(item.finishedOn) ? item.finishedOn : null,
+    finished_month: isCompleted && isValidMonthOnly(item.finishedOn) ? item.finishedOn : null,
     status_changed_at: item.statusChangedAt || item.addedAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -293,6 +321,7 @@ function isMissingColumnError(error, columnName) {
     message.includes(`'${columnName}' column`)
     || message.includes(`column "${columnName}"`)
     || (error?.code === "PGRST204" && message.includes(columnName))
+    || (error?.code === "42703" && message.includes(columnName))
   );
 }
 

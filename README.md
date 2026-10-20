@@ -28,6 +28,16 @@ If you already have personal rows in `library_items`, sign in once with your ema
 
 If the Supabase variables are missing, the app runs as a local development/demo tracker using browser `localStorage`.
 
+### Date tracking update
+
+For an existing database, run `supabase/migrations/20261020010000_add_finished_month.sql` in the Supabase SQL editor before deploying the date tracking UI. It includes both date columns and preserves existing exact dates. New databases include the columns and validation in `supabase/schema.sql`.
+
+Items keep their original added timestamp and a separate optional finished date with exact-day or month precision. New entries added directly to Done default to an unknown finished date, including when switching shelves before saving a new item. Moving an existing Want item → Done defaults to today in the user's local time zone. The date controls offer Exact date, Month & year, Don't remember, and a Today shortcut. Month-only dates display as October 2024 and are stored in `finished_month` as `YYYY-MM`; exact dates use `finished_on`. No day is invented when a user knows only the month. Moving back to Want clears either finished date. Ordinary edits preserve dates and their precision; legacy completion dates remain unknown until supplied by the user.
+
+Shelf cards keep dates out of both list and grid layouts. Open an item's details to see Watched/Finished for Done items, with the original Logged date as secondary text, or Added for Want items. Unknown completion dates never fall back to the logged date. The separate finished date supports future monthly/yearly recaps; recap views are not implemented yet.
+
+Before the month-column migration is applied, ordinary edits with exact or unknown dates remain supported. Month-only saves require the migration and show an error beside Save if it is missing; failed saves preserve the form's edits.
+
 ## Free Production Deployment
 
 The app is configured for Netlify Free hosting with Supabase Free for auth and data.
@@ -101,5 +111,6 @@ VITE_SUPABASE_ANON_KEY=your-local-anon-key
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```

@@ -4,6 +4,7 @@ import {
   emptyDraft,
   tvSubtypeOptions,
 } from "./mediaConfig";
+import { getFinishedDateError, getFinishedDatePrecision, getLocalDate } from "./mediaDates";
 
 const localProfileStorageKey = "media-shelf-profile";
 export const localMediaItemsStorageKey = "media-shelf-items";
@@ -75,6 +76,8 @@ export function normalizeItems(items) {
       studio: item.studio || defaultItem.studio || "",
       synopsis: item.synopsis || defaultItem.synopsis || "",
       subtype: getDefaultSubtype(category, subtype),
+      // Legacy status timestamps may have been backfilled from addedAt.
+      finishedOn: item.status === "Completed" && getFinishedDatePrecision(item.finishedOn) !== "unknown" ? item.finishedOn : "",
       statusChangedAt: item.statusChangedAt || defaultItem.statusChangedAt || item.addedAt || defaultItem.addedAt || "",
     };
   });
@@ -124,20 +127,25 @@ export function createMediaDraft({
     status,
     title,
     rating: status === "Completed" ? 3 : 0,
+    finishedOn: "",
   };
 }
 
 export function prepareMediaItemForSave({ draft, editingId = "", originalItem = null, now = new Date().toISOString() }) {
-  const addedAt = editingId ? draft.addedAt || originalItem?.addedAt || now : now;
+  const addedAt = editingId ? originalItem?.addedAt || draft.addedAt || "" : now;
   const statusChangedAt =
     !editingId || draft.status !== originalItem?.status
       ? now
       : draft.statusChangedAt || originalItem?.statusChangedAt || addedAt;
+  const finishedOn = draft.status === "Completed" ? draft.finishedOn || "" : "";
+  const dateError = getFinishedDateError(finishedOn, getLocalDate(now));
+  if (dateError) throw new Error(dateError);
 
   return {
     ...draft,
     id: editingId || crypto.randomUUID(),
     addedAt,
+    finishedOn,
     statusChangedAt,
     title: draft.title.trim(),
     creator: draft.creator.trim(),

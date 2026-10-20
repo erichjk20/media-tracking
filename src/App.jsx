@@ -38,6 +38,7 @@ import { useLibraryMetrics } from "./hooks/useLibraryMetrics";
 import { useMediaLookup } from "./hooks/useMediaLookup";
 import { usePersistentUiState } from "./hooks/usePersistentUiState";
 import { useShelfData } from "./hooks/useShelfData";
+import { getFinishedDateError, getLocalDate } from "./lib/mediaDates";
 
 function getAddLabel(categoryId) {
   if (categoryId === "books") return "book";
@@ -84,6 +85,8 @@ function App() {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [completingItemId, setCompletingItemId] = useState(null);
   const [completionRating, setCompletionRating] = useState(3);
+  const [completionDate, setCompletionDate] = useState("");
+  const [completionError, setCompletionError] = useState("");
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [pendingLookupResult, setPendingLookupResult] = useState(null);
   const user = session?.user || null;
@@ -249,15 +252,19 @@ function App() {
     event.preventDefault();
     const cleanedTitle = draft.title.trim();
     if (!cleanedTitle) return;
-    const originalItem = editingId ? items.find((item) => item.id === editingId) : null;
-    const nextItem = prepareMediaItemForSave({ draft, editingId, originalItem });
-    const duplicateItem = findDuplicateMediaItem(items, nextItem, editingId);
-    if (duplicateItem) {
-      setEditorMessage(`"${nextItem.title}" is already in your ${category.label.toLowerCase()} shelf.`);
+    const dateError = draft.status === "Completed" ? getFinishedDateError(draft.finishedOn) : "";
+    if (dateError) {
+      setEditorMessage(dateError);
       return;
     }
-
+    const originalItem = editingId ? items.find((item) => item.id === editingId) : null;
     try {
+      const nextItem = prepareMediaItemForSave({ draft, editingId, originalItem });
+      const duplicateItem = findDuplicateMediaItem(items, nextItem, editingId);
+      if (duplicateItem) {
+        setEditorMessage(`"${nextItem.title}" is already in your ${category.label.toLowerCase()} shelf.`);
+        return;
+      }
       const savedItem = shouldUseSupabase ? await saveMediaItem(nextItem, user.id) : nextItem;
 
       setItems((current) =>
@@ -275,7 +282,7 @@ function App() {
       setEditorMode("search");
     } catch (error) {
       console.error("Supabase save failed", error);
-      setStorageMessage(`Could not save to your private library. ${error.message || ""}`.trim());
+      setEditorMessage(`Could not save to your private library. ${error.message || ""}`.trim());
     }
   }
 
@@ -323,21 +330,31 @@ function App() {
 
   function startCompleteItem(item) {
     setCompletionRating(Number(item.rating) || 3);
+    setCompletionDate(getLocalDate());
+    setCompletionError("");
     setCompletingItemId(item.id);
   }
 
   function closeCompleteDialog() {
     setCompletingItemId(null);
     setCompletionRating(3);
+    setCompletionDate("");
+    setCompletionError("");
   }
 
   async function completeItem() {
     if (!completingItem) return;
+    const dateError = getFinishedDateError(completionDate);
+    if (dateError) {
+      setCompletionError(dateError);
+      return;
+    }
 
     const completedItem = {
       ...completingItem,
       status: "Completed",
       statusChangedAt: new Date().toISOString(),
+      finishedOn: completionDate,
       rating: Number(completionRating) || 3,
     };
 
@@ -347,7 +364,7 @@ function App() {
       closeCompleteDialog();
     } catch (error) {
       console.error("Supabase completion save failed", error);
-      setStorageMessage(`Could not save to your private library. ${error.message || ""}`.trim());
+      setCompletionError(`Could not save to your private library. ${error.message || ""}`.trim());
     }
   }
 
@@ -434,8 +451,11 @@ function App() {
       ...current,
       [field]: value,
       ...(field === "category" ? { subtype: getDefaultSubtype(value, current.subtype) } : {}),
-      ...(field === "status" && value !== "Completed" ? { rating: 0 } : {}),
-      ...(field === "status" && value === "Completed" ? { rating: current.rating || 3 } : {}),
+      ...(field === "status" && value !== "Completed" ? { rating: 0, finishedOn: "" } : {}),
+      ...(field === "status" && value === "Completed" ? {
+        rating: current.rating || 3,
+        finishedOn: current.status === "Completed" ? current.finishedOn : editingId ? getLocalDate() : "",
+      } : {}),
     }));
     if (field === "category" || field === "subtype") resetLookupState();
   }
@@ -628,9 +648,15 @@ function App() {
         {completingItem && (
           <CompleteItemDialog
             item={completingItem}
+            errorMessage={completionError}
+            finishedOn={completionDate}
             onClose={closeCompleteDialog}
             onConfirm={completeItem}
             onRatingChange={setCompletionRating}
+            onFinishedOnChange={(value) => {
+              setCompletionDate(value);
+              setCompletionError("");
+            }}
             rating={completionRating}
           />
         )}

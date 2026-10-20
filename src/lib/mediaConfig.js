@@ -166,6 +166,7 @@ export const emptyDraft = {
   notes: "",
   imageUrl: "",
   addedAt: "",
+  finishedOn: "",
   statusChangedAt: "",
 };
 

@@ -42,7 +42,7 @@ function BottomNav({ activeCategory, activeView, addLabel = "item", onAddManualC
 
   return (
     <nav className="bottom-nav-shell fixed inset-x-0 z-30">
-      <div className="mx-auto grid h-16 w-[calc(100%-1rem)] max-w-[24rem] grid-cols-5 gap-1 overflow-visible rounded-full border border-white/[0.08] bg-[#14120f]/[0.9] px-1.5 py-1 shadow-[0_12px_34px_rgba(0,0,0,0.34)] backdrop-blur-xl min-[390px]:w-[calc(100%-1.5rem)]">
+      <div className="mx-auto grid h-16 w-[calc(100%-1rem)] max-w-[24rem] grid-cols-5 grid-rows-1 items-center gap-1 overflow-visible rounded-full border border-white/[0.08] bg-[#14120f]/[0.9] px-1.5 py-1 shadow-[0_12px_34px_rgba(0,0,0,0.34)] backdrop-blur-xl min-[390px]:w-[calc(100%-1.5rem)]">
         {navItems.map((entry) => {
           if (entry.isAdd) {
             return (

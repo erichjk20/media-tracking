@@ -64,6 +64,9 @@ The main app supports:
 - Fallback cover treatment when no image URL is provided
 - Star rating input for Completed items only
 - Quick completion flow that moves Want items to Completed with a rating
+- Added and watched/finished dates shown in item details, with unknown historical dates labeled explicitly
+- Shelf cards omit activity dates in both list and grid layouts. Item details show Watched/Finished for Done items and Added for Want items. Done details keep Logged as smaller secondary text below the content. Unknown finished dates never fall back to logged dates; future recap grouping should use `finishedOn`.
+- Optional finished date in the add/edit sheet and quick completion dialog: Exact date, Month & year, Don't remember, and a Today shortcut. New Done entries default to unknown; moving an existing Want item → Done defaults to local today. App `finishedOn` is `YYYY-MM-DD` for exact dates or `YYYY-MM` for month-only dates. Supabase stores these separately in `finished_on date` and `finished_month text`, with a constraint preventing both being populated. Month-only dates display as October 2024 with no invented day. Backdating is supported, ordinary edits preserve precision, and returning to Want clears both.
 - Starter sample data across the library
 
 ## Tech Stack
@@ -490,6 +493,8 @@ The lookup:
 - The stored status value remains the exact shared value: `Want to Watch/Read`.
 
 ## Possible Next Steps
+
+- Apply `supabase/migrations/20261020010000_add_finished_month.sql` to existing Supabase databases before deploying date tracking. It includes both date columns and preserves existing exact dates. No historical completion dates are inferred automatically from `status_changed_at` or `added_at`; the account-specific script in `supabase/scripts` is an explicitly authorized exception and skips existing month-only dates too.
 
 - Add import/export JSON for backups.
 - Add sorting controls, such as rating, title, or recently added.

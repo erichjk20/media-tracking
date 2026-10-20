@@ -26,6 +26,8 @@ import {
 } from "../lib/mediaUtils";
 import MediaCover from "./MediaCover";
 import Rating from "./Rating";
+import { formatMediaDate } from "../lib/mediaDates";
+import MediaActivityDate from "./MediaActivityDate";
 
 function getHeaderMeta(item) {
   if (item.category === "movies") {
@@ -203,6 +205,7 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, isVisible, 
               <Rating value={item.rating} readOnly compact />
             </div>
           )}
+          <MediaActivityDate item={item} className="mt-3 text-sm font-semibold leading-5 text-stone-900 dark:text-[#eee9df]" />
         </div>
 
         {detailRows.length > 0 && (
@@ -231,6 +234,14 @@ function BackCover({ category, CategoryIcon, detailRows, headerMeta, isVisible, 
             </div>
           )}
         </div>
+
+        {item.status === "Completed" && (
+          <p className="mt-5 text-[10px] leading-4 text-stone-500 dark:text-stone-400">
+            Logged {formatMediaDate(item.addedAt) ? (
+              <time dateTime={item.addedAt}>{formatMediaDate(item.addedAt)}</time>
+            ) : "date unknown"}
+          </p>
+        )}
       </div>
     </div>
   );

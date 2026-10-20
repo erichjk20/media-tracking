@@ -1,5 +1,5 @@
 import { Check, ImagePlus, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   bookSubtypeOptions,
   categories,
@@ -15,6 +15,7 @@ import {
 import DetailsLookup from "./DetailsLookup";
 import MediaCover from "./MediaCover";
 import Rating from "./Rating";
+import FinishedDateField from "./FinishedDateField";
 
 function EditorSheet({
   activeStatus,
@@ -125,12 +126,6 @@ function EditorSheet({
             </button>
           )}
 
-          {editorMessage && (
-            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-200">
-              {editorMessage}
-            </p>
-          )}
-
           <ShelfSelector
             activeStatus={draft.status}
             onChange={(status) => {
@@ -140,15 +135,22 @@ function EditorSheet({
           />
 
           {draft.status === "Completed" && (
-            <FieldGroup label="Rating">
-              <Rating value={Number(draft.rating)} onChange={(rating) => onUpdateDraft("rating", rating)} />
-            </FieldGroup>
+            <>
+              <FieldGroup label="Rating">
+                <Rating value={Number(draft.rating)} onChange={(rating) => onUpdateDraft("rating", rating)} />
+              </FieldGroup>
+              <FinishedDateField
+                category={draft.category}
+                value={draft.finishedOn}
+                onChange={(value) => onUpdateDraft("finishedOn", value)}
+              />
+            </>
           )}
 
           {hasSelectedLookup ? (
             <>
               <NotesField notes={draft.notes} onUpdateNotes={(value) => onUpdateDraft("notes", value)} />
-              <SubmitButton disabled={!canSubmit} editingId={editingId} label={primaryActionLabel} />
+              <SubmitButton disabled={!canSubmit} editingId={editingId} errorMessage={editorMessage} label={primaryActionLabel} />
               <details className="rounded-lg border border-stone-300 bg-stone-50 p-3 dark:border-white/10 dark:bg-[#12110f]/70">
                 <summary className="cursor-pointer text-sm font-semibold text-stone-700 marker:text-stone-500 dark:text-stone-200">
                   Edit details
@@ -177,7 +179,7 @@ function EditorSheet({
                 setActiveCategory={setActiveCategory}
               />
               <NotesField notes={draft.notes} onUpdateNotes={(value) => onUpdateDraft("notes", value)} />
-              <SubmitButton disabled={!canSubmit} editingId={editingId} label={primaryActionLabel} />
+              <SubmitButton disabled={!canSubmit} editingId={editingId} errorMessage={editorMessage} label={primaryActionLabel} />
             </>
           )}
         </form>
@@ -396,16 +398,34 @@ function NotesField({ notes, onUpdateNotes }) {
   );
 }
 
-function SubmitButton({ disabled, editingId, label }) {
+function SubmitButton({ disabled, editingId, errorMessage, label }) {
+  const errorRef = useRef(null);
+
+  useEffect(() => {
+    if (errorMessage) errorRef.current?.focus();
+  }, [errorMessage]);
+
   return (
-    <button
-      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-500"
-      disabled={disabled}
-      type="submit"
-    >
-      {editingId ? <Save size={17} /> : <Plus size={17} />}
-      {label}
-    </button>
+    <div className="space-y-3">
+      {errorMessage && (
+        <p
+          ref={errorRef}
+          role="alert"
+          tabIndex={-1}
+          className="scroll-mt-24 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 outline-none dark:border-amber-500/30 dark:bg-amber-950/25 dark:text-amber-200"
+        >
+          {errorMessage}
+        </p>
+      )}
+      <button
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-shelf-accent-deep px-4 text-sm font-semibold text-white transition hover:bg-shelf-accent focus:outline-none focus:ring-4 focus:ring-shelf-accent-deep/35 disabled:cursor-not-allowed disabled:bg-stone-500"
+        disabled={disabled}
+        type="submit"
+      >
+        {editingId ? <Save size={17} /> : <Plus size={17} />}
+        {label}
+      </button>
+    </div>
   );
 }
 

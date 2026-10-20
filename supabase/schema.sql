@@ -61,6 +61,8 @@ create table if not exists public.library_items (
   notes text,
   image_url text,
   added_at timestamptz not null default now(),
+  finished_on date,
+  finished_month text,
   updated_at timestamptz not null default now(),
   check (status = 'completed' or rating is null)
 );
@@ -76,6 +78,30 @@ add column if not exists duration_minutes integer;
 
 alter table public.library_items
 add column if not exists synopsis text;
+
+-- Completion is a user-chosen calendar date. Leave historical entries unknown:
+-- status_changed_at may have been backfilled from added_at.
+alter table public.library_items
+add column if not exists finished_on date;
+
+alter table public.library_items
+add column if not exists finished_month text;
+
+alter table public.library_items
+drop constraint if exists library_items_finished_month_check;
+
+alter table public.library_items
+add constraint library_items_finished_month_check check (
+  (finished_on is null or finished_month is null)
+  and (
+    finished_month is null
+    or (
+      status = 'completed'
+      and finished_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'
+      and left(finished_month, 4) <> '0000'
+    )
+  )
+);
 
 alter table public.library_items
 add column if not exists status_changed_at timestamptz;

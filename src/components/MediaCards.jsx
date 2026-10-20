@@ -83,7 +83,7 @@ export function MediaPosterCard({ item, onComplete, onOpen }) {
   const canComplete = item.status === "Want to Watch/Read";
 
   return (
-    <article className="grid min-w-0 grid-rows-[auto_auto]">
+    <article className="grid min-w-0 content-start grid-rows-[auto_auto]">
       <button
         className="group block w-full overflow-hidden rounded-md border border-stone-300 bg-white text-left shadow-sm transition hover:border-shelf-accent/50 dark:border-white/10 dark:bg-[#181715]"
         onClick={() => onOpen(item)}

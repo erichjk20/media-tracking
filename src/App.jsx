@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppHeader from "./components/AppHeader";
 import AuthView from "./components/AuthView";
 import BottomNav from "./components/BottomNav";
@@ -9,6 +9,7 @@ import HomeView from "./components/HomeView";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import ProfileView from "./components/ProfileView";
+import SettingsView from "./components/SettingsView";
 import {
   fetchMediaItems,
   removeMediaItem,
@@ -22,6 +23,7 @@ import {
   signOut,
   subscribeToAuthChanges,
   updateUserProfileDisplayName,
+  updateUserNavigationShelves,
 } from "./lib/supabase";
 import {
   createMediaDraft,
@@ -39,6 +41,8 @@ import { useMediaLookup } from "./hooks/useMediaLookup";
 import { usePersistentUiState } from "./hooks/usePersistentUiState";
 import { useShelfData } from "./hooks/useShelfData";
 import { getFinishedDateError, getLocalDate } from "./lib/mediaDates";
+import { categories } from "./lib/mediaConfig";
+import { getHomeNavigationCategory, normalizeNavigationShelves } from "./lib/navigationPreferences";
 
 function getAddLabel(categoryId) {
   if (categoryId === "books") return "book";
@@ -90,7 +94,14 @@ function App() {
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [pendingLookupResult, setPendingLookupResult] = useState(null);
   const user = session?.user || null;
+  const userId = user?.id || null;
+  const userEmail = user?.email || "";
+  const userDisplayName = user?.user_metadata?.display_name || user?.user_metadata?.full_name || "";
   const shouldUseSupabase = Boolean(isSupabaseConfigured && user);
+  const accountGenerationRef = useRef(0);
+  const currentProfile = shouldUseSupabase && profile?.id !== user.id ? null : profile;
+  const navigationShelves = useMemo(() => normalizeNavigationShelves(currentProfile?.navigation_shelves), [currentProfile?.navigation_shelves]);
+  const orderedCategories = useMemo(() => navigationShelves.map((id) => categories.find((entry) => entry.id === id)), [navigationShelves]);
   const libraryMetrics = useLibraryMetrics(items);
   const {
     activeShelfCounts,
@@ -146,6 +157,19 @@ function App() {
     [deletingItemId, items],
   );
 
+  useEffect(() => { accountGenerationRef.current += 1; }, [userId]);
+
+  // Only Home requires a selected shortcut. Hidden shelves remain valid library
+  // destinations when opened from Profile or restored after a recent reload.
+  useEffect(() => {
+    if (activeView !== "home" || isEditorOpen || (isSupabaseConfigured && !currentProfile)) return;
+    const categoryId = getHomeNavigationCategory(activeCategory, navigationShelves);
+    if (categoryId === activeCategory) return;
+    setActiveCategory(categoryId);
+    setDraft(createMediaDraft({ category: categoryId, status: activeStatus, title: lookupQuery }));
+    clearLookupResults();
+  }, [activeCategory, activeStatus, activeView, clearLookupResults, currentProfile, isEditorOpen, lookupQuery, navigationShelves, setActiveCategory]);
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -185,7 +209,7 @@ function App() {
     if (!isSupabaseConfigured) return;
     if (authStatus === "loading") return;
 
-    if (!user) {
+    if (!userId) {
       setItems([]);
       setProfile(null);
       setStorageMode("signed-out");
@@ -207,8 +231,8 @@ function App() {
 
       try {
         const [profileData, databaseItems] = await Promise.all([
-          ensureUserProfile(user),
-          fetchMediaItems(user.id),
+          ensureUserProfile({ id: userId, email: userEmail, user_metadata: { display_name: userDisplayName } }),
+          fetchMediaItems(userId),
         ]);
 
         if (!isCurrent) return;
@@ -231,7 +255,7 @@ function App() {
     return () => {
       isCurrent = false;
     };
-  }, [authStatus, user]);
+  }, [authStatus, userDisplayName, userEmail, userId]);
 
   useEffect(() => {
     if (isSupabaseConfigured || storageMode === "loading" || storageMode === "supabase") return;
@@ -418,11 +442,7 @@ function App() {
   }
 
   async function handleSignOut() {
-    try {
-      await signOut();
-    } catch (error) {
-      setStorageMessage(`Could not sign out. ${error.message || ""}`.trim());
-    }
+    await signOut();
   }
 
   async function handleSaveDisplayName(displayName) {
@@ -431,7 +451,7 @@ function App() {
 
     if (shouldUseSupabase) {
       const nextProfile = await updateUserProfileDisplayName(user.id, cleanedName);
-      setProfile(nextProfile);
+      setProfile((current) => current?.id === nextProfile.id ? nextProfile : current);
       return nextProfile;
     }
 
@@ -443,6 +463,23 @@ function App() {
     saveStoredProfile(nextProfile);
     setProfile(nextProfile);
     return nextProfile;
+  }
+
+  async function handleSaveNavigationShelves(shelves) {
+    const nextShelves = normalizeNavigationShelves(shelves);
+    const generation = accountGenerationRef.current;
+    const nextProfile = shouldUseSupabase
+      ? await updateUserNavigationShelves(user.id, nextShelves)
+      : { ...profile, navigation_shelves: nextShelves, updated_at: new Date().toISOString() };
+    if (generation !== accountGenerationRef.current) return;
+    if (!shouldUseSupabase) saveStoredProfile(nextProfile);
+    setProfile((current) => current?.id === nextProfile.id ? nextProfile : current);
+    const categoryId = getHomeNavigationCategory(activeCategory, nextShelves);
+    if (categoryId !== activeCategory) {
+      setActiveCategory(categoryId);
+      setDraft(createMediaDraft({ category: categoryId, status: activeStatus }));
+      clearLookupResults();
+    }
   }
 
   function updateDraft(field, value) {
@@ -469,6 +506,8 @@ function App() {
     setSelectedItemId(null);
     setCompletingItemId(null);
     setDeletingItemId(null);
+    const categoryId = getHomeNavigationCategory(activeCategory, navigationShelves);
+    if (categoryId !== activeCategory) changeHomeCategory(categoryId);
     setActiveView("home");
   }
 
@@ -549,7 +588,7 @@ function App() {
     setIsEditorOpen(true);
   }
 
-  if (isSupabaseConfigured && authStatus === "loading") {
+  if (isSupabaseConfigured && (authStatus === "loading" || (user && storageMode !== "error" && !currentProfile))) {
     return (
       <main className="app-screen flex items-center justify-center bg-[#0f0e0d] px-4 text-stone-100">
         <p className="text-sm font-semibold text-stone-400">Loading shelvd...</p>
@@ -587,6 +626,7 @@ function App() {
 
         {activeView === "home" ? (
           <HomeView
+            orderedCategories={orderedCategories}
             activeCategory={activeCategory}
             lookupMessage={lookupMessage}
             lookupResults={lookupResults}
@@ -600,12 +640,23 @@ function App() {
           />
         ) : activeView === "profile" ? (
           <ProfileView
+            key={user?.id || "local"}
             metrics={libraryMetrics}
             onOpenItem={openItemDetails}
-            onSaveDisplayName={handleSaveDisplayName}
-            onSignOut={handleSignOut}
+            onShowSettings={() => setActiveView("settings")}
             onShowCategory={showCategory}
-            profile={profile}
+            profile={currentProfile}
+            user={user}
+          />
+        ) : activeView === "settings" ? (
+          <SettingsView
+            key={user?.id || "local"}
+            onBack={showProfile}
+            onSaveDisplayName={handleSaveDisplayName}
+            onSaveNavigationShelves={handleSaveNavigationShelves}
+            navigationShelves={navigationShelves}
+            onSignOut={handleSignOut}
+            profile={currentProfile}
             user={user}
           />
         ) : (
@@ -702,6 +753,7 @@ function App() {
 
       {activeView !== "home" && (
         <BottomNav
+          orderedCategories={orderedCategories}
           activeCategory={activeCategory}
           activeView={activeView}
           addLabel={getAddLabel(activeCategory)}

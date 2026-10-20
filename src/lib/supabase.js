@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { normalizeNavigationShelves } from "./navigationPreferences";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -112,7 +113,27 @@ export async function ensureUserProfile(user) {
     || email.split("@")[0]
     || "";
 
-  const { data, error } = await supabase
+  // Read existing profiles first: an upsert can apply database defaults to omitted
+  // columns and must never reset a user's chosen shelves or display name.
+  const { data: existing, error: readError } = await supabase
+    .from("user_profiles")
+    .select()
+    .eq("id", user.id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (existing) {
+    if (existing.email === email) return existing;
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .update({ email, updated_at: new Date().toISOString() })
+      .eq("id", user.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { error } = await supabase
     .from("user_profiles")
     .upsert(
       {
@@ -121,12 +142,32 @@ export async function ensureUserProfile(user) {
         display_name: displayName,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "id" },
-    )
+      { onConflict: "id", ignoreDuplicates: true },
+    );
+
+  if (error) throw error;
+  const { data, error: fetchError } = await supabase.from("user_profiles").select().eq("id", user.id).single();
+  if (fetchError) throw fetchError;
+  return data;
+}
+
+export async function updateUserNavigationShelves(userId, shelves) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  if (!userId) throw new Error("Sign in before customizing your shelves.");
+
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .update({ navigation_shelves: normalizeNavigationShelves(shelves), updated_at: new Date().toISOString() })
+    .eq("id", userId)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (["42703", "PGRST204"].includes(error.code) && /navigation_shelves/i.test(error.message || "")) {
+      throw new Error("Shelf customization needs a database update. Apply the navigation shelves migration, then try Save again.");
+    }
+    throw error;
+  }
   return data;
 }
 

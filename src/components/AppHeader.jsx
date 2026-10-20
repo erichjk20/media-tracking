@@ -2,7 +2,7 @@ import { Library, UserRound } from "lucide-react";
 import BrandWordmark from "./BrandWordmark";
 
 function AppHeader({ activeView, onHomeClick, onShowProfile }) {
-  const isProfileActive = activeView === "profile";
+  const isProfileActive = activeView === "profile" || activeView === "settings";
 
   return (
     <section className="app-header sticky top-0 z-20 border-b border-white/10 bg-[#11100e]/[0.92] backdrop-blur sm:static sm:bg-[#11100e]/90">

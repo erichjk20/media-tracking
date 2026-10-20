@@ -40,7 +40,7 @@ The main app supports:
 - A command-style homepage for choosing media type, then quickly searching and logging new media through the add sheet
 - Email/password signup and sign-in when Supabase is configured
 - Private per-user libraries backed by Supabase Auth and row-level security
-- Home/Library view switching
+- Home/Library/Profile/Settings view switching
 - Refresh restoration for the last active view, category, shelf filters, sort, layout mode, and search query
 - Category switching
 - Shelf switching between Completed and Want to Watch/Read
@@ -58,7 +58,9 @@ The main app supports:
 - Open Library and Aladin lookup behind the unified search for Books
 - MangaDex lookup behind the unified search for Manga, with Jikan fallback for missing cover art
 - Per-category counts
-- A Profile view with library stats and recently added items
+- Profile → Settings → Library → Customize shelves: choose one to four shelves, reorder with touch dragging or Move up/down buttons, preview, Save/Cancel, and Reset to default. Home and bottom navigation share the saved selection/order. Hidden shelves retain their items and remain accessible from Profile; stats and editor category options still include all four media types.
+- Navigation preferences live in `user_profiles.navigation_shelves` for signed-in users and the existing local profile for demo mode. Apply `supabase/migrations/20261020020000_add_navigation_shelves.sql` to existing databases. Missing columns use default navigation for browsing and show an actionable error when customization is saved.
+- A compact Profile view with library stats and recently added items; a gear beside the name opens Settings. Settings groups shelf customization under Library and display-name editing, email, and Sign out under Account. Recent reloads restore Settings just like the other views.
 - Per-shelf recently added sorting based on when an item entered its current Done/Want shelf
 - Cover image display from an image URL
 - Fallback cover treatment when no image URL is provided
@@ -130,6 +132,7 @@ Tracked/source files:
     │   ├── MediaCards.jsx
     │   ├── MediaCover.jsx
     │   ├── MediaDetailOverlay.jsx
+    │   ├── SettingsView.jsx
     │   ├── ProfileView.jsx
     │   ├── Rating.jsx
     │   └── ShelfControls.jsx
@@ -177,8 +180,8 @@ Both are ignored by Git.
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
 - `AuthView.jsx` owns email/password signup, login, and password reset flows.
 - `HomeView.jsx` owns homepage command state and lookup handoff. Its category selector follows the same reading/watching grouping as the bottom nav: Books, Manga, Movies, TV.
-- `BottomNav.jsx` owns the mobile fixed pill navigation. The current order is Books, Manga, center Add, Movies, TV; Profile lives in the top-right header action instead of the pill.
-- `AppHeader.jsx` owns the compact app header, brand-home action, and top-right Profile action.
+- `BottomNav.jsx` owns the mobile fixed pill navigation. The default order is Books, Manga, center Add, Movies, TV; user-selected shelf order comes from Settings preferences. `ShelfNavigationPill.jsx` shares the responsive layout with the customization preview. Profile lives in the top-right header action instead of the pill.
+- `AppHeader.jsx` owns the compact app header, brand-home action, and top-right Profile action. The Profile action remains highlighted on Settings, which has an explicit Back to profile action.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
 - `DetailsLookup.jsx` owns user-facing lookup search and result selection without exposing provider/debug details.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view and released-season breakdown display for TV Shows.
@@ -474,10 +477,10 @@ The lookup:
 - Shelf browsing supports a list view and a poster grid view.
 - Poster grid view keeps at least three columns on narrow screens.
 - Mobile category switching uses a fixed bottom navigation bar.
-- The mobile bottom navigation is a sleek pill ordered as Books, Manga, Add, Movies, TV. Books/Manga are grouped as reading media, Movies/TV as watching media, and Movies stays adjacent to Add because it is expected to be the most common input.
+- The mobile bottom navigation defaults to Books, Manga, Add, Movies, TV. Users can choose/reorder one to four shelves through Profile → Settings → Library → Customize shelves. The pill shrinks with fewer shelves; Add stays centered with two to four shelves, while one shelf uses a compact shelf-and-Add pair. Three shelves use two left of Add and one right, in equal-width side groups.
 - The center Add action is a slightly elevated circular button with a dark outline/socket treatment and opens Search title / Manual entry actions from the pill.
 - Profile access lives in the top-right app header, not in the bottom pill.
-- The Home category selector mirrors the bottom nav grouping without the Add action: Books, Manga, Movies, TV.
+- The Home category selector mirrors the user's selected bottom-nav shelves and order without the Add action. Entering Home from a hidden shelf selects the first visible shelf. Hidden library destinations, including recent-page restores, remain valid.
 - Home/auth wordmark screens reserve iOS safe-area space so the `shelvd` mark stays below the translucent status-bar blur on devices using `viewport-fit=cover`.
 - Desktop and tablet show a compact top header with the brand action and profile action above the main content.
 - The previous "All completed" route/control has been removed for now.
@@ -493,6 +496,8 @@ The lookup:
 - The stored status value remains the exact shared value: `Want to Watch/Read`.
 
 ## Possible Next Steps
+
+- Apply `supabase/migrations/20261020020000_add_navigation_shelves.sql` to existing databases before using cloud shelf customization. Existing profiles receive the default four-shelf order; no library items change.
 
 - Apply `supabase/migrations/20261020010000_add_finished_month.sql` to existing Supabase databases before deploying date tracking. It includes both date columns and preserves existing exact dates. No historical completion dates are inferred automatically from `status_changed_at` or `added_at`; the account-specific script in `supabase/scripts` is an explicitly authorized exception and skips existing month-only dates too.
 

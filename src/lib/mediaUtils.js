@@ -5,6 +5,7 @@ import {
   tvSubtypeOptions,
 } from "./mediaConfig";
 import { getFinishedDateError, getFinishedDatePrecision, getLocalDate } from "./mediaDates";
+import { normalizeNavigationShelves } from "./navigationPreferences";
 
 const localProfileStorageKey = "media-shelf-profile";
 export const localMediaItemsStorageKey = "media-shelf-items";
@@ -17,12 +18,14 @@ export function getStoredProfile() {
       id: "local",
       email: "",
       display_name: profile.display_name || "",
+      navigation_shelves: normalizeNavigationShelves(profile.navigation_shelves),
     };
   } catch {
     return {
       id: "local",
       email: "",
       display_name: "",
+      navigation_shelves: normalizeNavigationShelves(),
     };
   }
 }

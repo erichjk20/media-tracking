@@ -51,6 +51,26 @@ Check these titles:
 - Existing Supabase databases must have the new migration applied before deployment.
 - On an older database without `finished_month`, edits with exact or unknown dates must still save. Month-only saves must give a visible error next to Save without discarding the selected month or other edits.
 
+## Profile and Settings
+
+- Profile shows a compact name/avatar header with a Settings gear; library stats appear directly below. Display-name inputs, email, shelf customization, and Sign out live in Settings.
+- Open Settings from the gear, return with Back to profile or the global Profile action, and verify the gear receives focus on return. Settings starts at the top with a focused heading.
+- Settings groups Library and Account, shows the selected shelf count/order, and opens the existing customization sheet. Save updates the summary; Cancel/Escape keeps it unchanged and returns focus to the row.
+- Edit and save the display name, then return to Profile and reload. Failures keep unsaved edits and show an error beside Save; blank names are rejected. Existing shelf preferences remain intact.
+- Signed-in accounts show a read-only email and Sign out below the account section. Sign-out failures are visible and retryable. Local demo mode omits email and Sign out.
+- Recent reloads restore Settings; cold opens still start on Home. Check 320px/375px phone layouts and desktop for wrapping, safe-area spacing, keyboard focus, and unobstructed bottom navigation.
+
+## Shelf Customization
+
+- Profile → Settings → Library → Customize shelves starts with Books, Manga, Movies, TV. Drag using touch/mouse and use Move up/down buttons; preview reflects the chosen left-to-right order. Only dragging the handles should suppress ordinary touch scrolling.
+- Hide shelves down to one. The final shelf stays selected with an explanation. Re-enable a hidden shelf and verify it appends; Reset changes only the preview until Save.
+- Cancel, Close, and Escape discard changes. Save applies both Home and bottom navigation. Failed saves keep the draft and current menu, with a visible error beside Save.
+- Check 320px/375px phone and desktop layouts: one shelf uses a compact shelf-and-Add pair; two use one shelf each side of Add; three use two left and one right of centered Add; four use two each side. Targets stay usable, with no horizontal overflow. Check iOS safe areas and reduced motion.
+- Keyboard focus starts inside the sheet, cycles with Tab/Shift+Tab, and returns to Customize shelves on dismissal. Reordering is announced by screen readers and move controls remain usable at list boundaries.
+- Hidden shelves still appear in Profile totals/recent items and the editor's category selector. Open a hidden shelf, reload, and verify it stays open without an active bottom tab. Contextual Add still works. Entering Home selects the first visible shelf and clears old-category lookup results.
+- Reload local demo mode and signed-in mode: selected shelves and order persist. Sign-in and display-name changes preserve customization. Another signed-in device loads the same order on sign-in/reload. Changing accounts must not display another account's preferences, including when a save was in flight.
+- Apply `supabase/migrations/20261020020000_add_navigation_shelves.sql` before cloud customization. Without it, browsing uses the default order and customization saves explain the required migration without dropping the draft.
+
 ## Local Checks
 
 Run these before committing or deploying:

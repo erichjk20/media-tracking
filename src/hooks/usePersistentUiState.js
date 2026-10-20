@@ -22,7 +22,7 @@ const defaultUiState = {
 };
 
 const allowedUiValues = {
-  activeView: ["home", "library", "profile"],
+  activeView: ["home", "library", "profile", "settings"],
   activeCategory: categories.map((category) => category.id),
   activeStatus: statuses,
   activeBookSubtype: bookSubtypeOptions.map((option) => option.value),

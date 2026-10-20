@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { ArrowRight, Library, Search } from "lucide-react";
-import { categories } from "../lib/mediaConfig";
 import BrandWordmark from "./BrandWordmark";
 import HomeSearchSuggestions from "./HomeSearchSuggestions";
 
 function HomeView({
+  orderedCategories,
   activeCategory,
   lookupMessage = "",
   lookupResults = [],
@@ -23,13 +23,6 @@ function HomeView({
   const isLoadingSuggestions = lookupStatus === "loading" && canShowSuggestions;
   const visibleResults = lookupResults.slice(0, 5);
   const showSuggestions = canShowSuggestions && isSearchFocused;
-  const categoriesById = Object.fromEntries(categories.map((category) => [category.id, category]));
-  const orderedCategories = [
-    categoriesById.books,
-    categoriesById.manga,
-    categoriesById.movies,
-    categoriesById.tv,
-  ];
 
   function selectCategory(categoryId) {
     onCategoryChange(categoryId);
@@ -52,7 +45,10 @@ function HomeView({
         </div>
 
         <form className="mt-8" onSubmit={handleSubmit}>
-          <div className="mx-auto grid max-w-md grid-cols-4 gap-1 rounded-lg border border-white/10 bg-[#171512]/75 p-1 shadow-[0_14px_44px_rgba(0,0,0,0.22)] backdrop-blur">
+          <div
+            style={{ gridTemplateColumns: `repeat(${orderedCategories.length}, minmax(0, 1fr))`, maxWidth: orderedCategories.length === 1 ? "10rem" : undefined }}
+            className="mx-auto grid max-w-md gap-1 rounded-lg border border-white/10 bg-[#171512]/75 p-1 shadow-[0_14px_44px_rgba(0,0,0,0.22)] backdrop-blur"
+          >
             {orderedCategories.map((entry) => {
               const Icon = entry.icon;
               const isActive = activeCategory === entry.id;

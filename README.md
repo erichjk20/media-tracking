@@ -8,6 +8,18 @@ Signed-in users land on a centered quick-log homepage. Choose a media type, sear
 
 Lookup results populate the form and cover art automatically. The add sheet shows a cover preview by default; users can add, change, remove, or paste a cover URL only when they need to override the sourced image. Library browsing, stats, and recently added items live outside the homepage so the first screen stays focused on logging.
 
+## Profile and settings
+
+Profile shows a compact identity header, library totals, category breakdown, and recently added items. Use the gear beside your name to open Settings. Settings groups shelf customization under Library, and display-name editing, email, and Sign out under Account. The bottom menu remains dedicated to your shelves.
+
+## Customize shelves
+
+Open **Profile → Settings → Library → Customize shelves** to choose which media types appear on Home and in the bottom menu. Drag the selected shelves or use the up/down arrows to change their order. Keep at least one selected. The preview updates as you edit; **Save** applies the changes, **Cancel** discards them, and **Reset to default** restores Books, Manga, Movies, TV in the draft.
+
+Hidden shelves retain their items and remain accessible through Profile's media totals. Stats and the editor's category choices continue to include every type. The menu shrinks with fewer shelves; Add stays centered for two to four shelves, and one shelf uses a compact shelf-and-Add pair.
+
+Signed-in preferences are stored on the user's profile and load on other devices at sign-in/reload. Local demo preferences stay in this browser. For an existing Supabase database, run `supabase/migrations/20261020020000_add_navigation_shelves.sql` before using cloud customization. Existing profiles receive the current four-shelf order. Without the migration, browsing uses defaults and customization saves show an actionable error. New databases include the field and validation in `supabase/schema.sql`.
+
 ## Supabase Setup
 
 1. Create a Supabase project.

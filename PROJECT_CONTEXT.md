@@ -92,8 +92,10 @@ Tracked/source files:
 ```text
 .
 ├── .gitignore
+├── .env.example
 ├── README.md
 ├── PROJECT_CONTEXT.md
+├── QA_CHECKLIST.md
 ├── netlify.toml
 ├── index.html
 ├── package-lock.json
@@ -107,11 +109,21 @@ Tracked/source files:
 │       ├── lookup-manga.js
 │       └── mangadex-manga.js
 ├── public
+│   ├── _redirects
 │   ├── app-icon.png
 │   ├── app-icon.svg
 │   └── site.webmanifest
 ├── supabase
+│   ├── migrations
+│   │   ├── 20261020000000_add_finished_on.sql
+│   │   ├── 20261020010000_add_finished_month.sql
+│   │   └── 20261020020000_add_navigation_shelves.sql
+│   ├── scripts
+│   │   └── backfill_erichjk20_finished_on.sql
 │   └── schema.sql
+├── tests
+│   ├── mediaDates.test.js
+│   └── navigationPreferences.test.js
 ├── tailwind.config.js
 ├── vite.config.js
 └── src
@@ -123,29 +135,38 @@ Tracked/source files:
     │   ├── BrandWordmark.jsx
     │   ├── ConfirmDialog.jsx
     │   ├── CompleteItemDialog.jsx
+    │   ├── CustomizeShelvesSheet.jsx
     │   ├── DeleteItemDialog.jsx
     │   ├── DetailsLookup.jsx
     │   ├── EditorSheet.jsx
-    │   ├── FloatingAddButton.jsx
+    │   ├── FinishedDateField.jsx
+    │   ├── HomeSearchSuggestions.jsx
     │   ├── HomeView.jsx
     │   ├── LibraryView.jsx
+    │   ├── MediaActivityDate.jsx
     │   ├── MediaCards.jsx
     │   ├── MediaCover.jsx
     │   ├── MediaDetailOverlay.jsx
-    │   ├── SettingsView.jsx
     │   ├── ProfileView.jsx
     │   ├── Rating.jsx
-    │   └── ShelfControls.jsx
+    │   ├── SettingsView.jsx
+    │   ├── ShelfControls.jsx
+    │   └── ShelfNavigationPill.jsx
     ├── hooks
     │   ├── useLibraryMetrics.js
     │   ├── useMediaLookup.js
+    │   ├── usePersistentUiState.js
     │   └── useShelfData.js
     ├── index.css
     ├── lib
+    │   ├── lookupResultUtils.js
     │   ├── mediaConfig.js
+    │   ├── mediaDates.js
     │   ├── mediaItemsStore.js
     │   ├── mediaLookup.js
     │   ├── mediaUtils.js
+    │   ├── navigationPreferences.js
+    │   ├── searchUtils.js
     │   └── supabase.js
     └── main.jsx
 ```
@@ -166,6 +187,7 @@ Both are ignored by Git.
 - Coordinates top-level app state, auth/session loading, storage mode, view switching, item CRUD behavior, and add/edit form handling.
 - Loads and saves signed-in media items through Supabase, or uses localStorage only when Supabase is not configured.
 - Persists lightweight library filter state to `media-shelf-ui-state`, restores the current page for recent reloads, and starts older/cold app opens on Home without reopening transient overlays or edit dialogs.
+- Derives the shared ordered navigation categories from the current user's profile. Account changes clear the previous profile before loading the next one; in-flight preference saves cannot overwrite another account's menu. Same-account session refreshes preserve open Settings drafts.
 
 `src/hooks/useMediaLookup.js`
 
@@ -175,13 +197,20 @@ Both are ignored by Git.
 
 - Derives visible shelf items, category counts, subtype counts, and active shelf counts from app state.
 
+`src/hooks/usePersistentUiState.js`
+
+- Persists Home, Library, Profile, and Settings plus library filters in `media-shelf-ui-state`. Restores views saved within 30 minutes; older/cold opens start on Home. Navigation preferences are stored separately on the profile.
+
 `src/components/`
 
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
 - `AuthView.jsx` owns email/password signup, login, and password reset flows.
-- `HomeView.jsx` owns homepage command state and lookup handoff. Its category selector follows the same reading/watching grouping as the bottom nav: Books, Manga, Movies, TV.
+- `HomeView.jsx` owns homepage command state and lookup handoff. Its category selector shares the selected shelves/order with the bottom nav; the default is Books, Manga, Movies, TV.
 - `BottomNav.jsx` owns the mobile fixed pill navigation. The default order is Books, Manga, center Add, Movies, TV; user-selected shelf order comes from Settings preferences. `ShelfNavigationPill.jsx` shares the responsive layout with the customization preview. Profile lives in the top-right header action instead of the pill.
 - `AppHeader.jsx` owns the compact app header, brand-home action, and top-right Profile action. The Profile action remains highlighted on Settings, which has an explicit Back to profile action.
+- `ProfileView.jsx` owns the compact identity header, Settings gear, library totals, all-category breakdown, and recently added items.
+- `SettingsView.jsx` owns Library/Account groups, the selected-shelf summary, display-name editing, read-only email, and Sign out. Local demo mode omits email and Sign out. Save/sign-out errors stay beside their actions; failed saves retain edits.
+- `CustomizeShelvesSheet.jsx` owns the selected/hidden shelf lists, Pointer Events dragging, accessible Move up/down controls, live menu preview, and draft Save/Cancel/Reset behavior. It traps keyboard focus and returns focus to the Customize shelves row when dismissed.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
 - `DetailsLookup.jsx` owns user-facing lookup search and result selection without exposing provider/debug details.
 - `MediaDetailOverlay.jsx` owns the pulled-off-shelf interaction, including the 3D cover/back-cover flip view and released-season breakdown display for TV Shows.
@@ -189,6 +218,11 @@ Both are ignored by Git.
 `src/lib/mediaConfig.js`
 
 - Defines categories, shelves, subtypes, sort options, starter sample data, and empty draft shape.
+
+`src/lib/navigationPreferences.js`
+
+- Defines the default shelf order, preference normalization, selection/reordering helpers, count-dependent menu layout, and Home category fallback.
+- Drops unknown/duplicate category IDs and restores defaults when no valid IDs remain. Selection controls preserve at least one visible shelf; newly enabled shelves append.
 
 `src/lib/mediaLookup.js`
 
@@ -212,11 +246,13 @@ Both are ignored by Git.
 
 - Contains storage normalization, search ranking/deduping, parsing, tile metadata, subtype labels, and shared formatting helpers.
 - Normalizes optional TV season breakdown metadata from app-style and database-style keys.
+- Loads/saves the local demo profile under `media-shelf-profile`, including normalized `navigation_shelves` preferences.
 
 `src/lib/supabase.js`
 
 - Creates the Supabase client when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present.
 - Provides session, auth subscription, email/password signup and login, password reset, sign-out, and user profile helpers.
+- Reads existing profiles before creating missing ones, preserving saved display names and shelf preferences at sign-in. Email synchronization updates only email/timestamp; shelf saves update only `navigation_shelves`/timestamp, and display-name saves preserve navigation.
 
 `src/lib/mediaItemsStore.js`
 
@@ -250,6 +286,7 @@ Both are ignored by Git.
 - Contains Vite and verification scripts:
   - `npm run dev`
   - `npm run lint`
+  - `npm test`
   - `npm run build`
   - `npm run preview`
 
@@ -288,7 +325,24 @@ Run lint checks:
 npm run lint
 ```
 
-The production build and lint checks were last verified successfully after the mobile bottom-nav/profile/header/safe-area updates.
+Run automated tests:
+
+```bash
+npm test
+```
+
+After the customizable-navigation and Profile/Settings updates, `npm run lint`, all 22 Node tests, `npm run build`, and `git diff --check` passed. Browser checks covered 320px/375px phone and 1280px desktop layouts, touch/keyboard reordering, modal focus, save failure/retry, hidden-shelf access, Home fallback, and recent/cold view restoration. Signed-in name/sign-out flows, second-device preference loading, and account switching were checked with a mocked backend. Isolated PostgreSQL checks covered migration reruns, array validation, new-profile defaults, and profile ownership policies. These checks did not change the hosted database; use `QA_CHECKLIST.md` for deployment/device verification.
+
+## Profile, Settings, And Navigation Preferences
+
+- The global header opens Profile. Profile focuses on identity and library activity; its gear opens Settings. Back to profile returns to the compact header and focuses the gear. Settings stays outside the customizable bottom menu.
+- Settings → Library → Customize shelves lets users select/reorder one to four media categories. All four are selected initially, ordered Books, Manga, Movies, TV; there is no onboarding prompt.
+- The sheet uses a local draft. Its preview shares the actual menu layout; Save applies changes only after persistence succeeds. Cancel, Close, or Escape discard edits. Reset restores defaults in the draft until Save is pressed.
+- Two to four shelves keep Add centered: one/two shelves on each side as appropriate, with three using two left and one right in equal-width side groups. One shelf uses a compact shelf-and-Add pair. Add retains the current shelf's Search title/Manual entry flow and is available on Library views.
+- Home uses the same shelf selection/order without Add. Entering Home from a hidden category chooses the first selected shelf and clears old-category lookup results. Saving preferences also falls back if the current category was hidden.
+- Hiding a shortcut never deletes media or removes a category from Profile stats, recently added items, or editor category choices. Hidden shelves remain accessible through Profile and recent Library reloads; no bottom tab is active while viewing them.
+- Account preferences use `user_profiles.navigation_shelves`, a non-null `text[]` with one to four unique IDs from `books`, `manga`, `movies`, `tv`. The database default is `['books', 'manga', 'movies', 'tv']`. Existing profile ownership policies apply. Signed-in preferences load across devices at sign-in/reload; local demo preferences stay in this browser.
+- Apply `supabase/migrations/20261020020000_add_navigation_shelves.sql` to existing databases before cloud customization. The base schema includes the same column/constraint. A missing column leaves default navigation usable and produces an actionable Save error without losing the draft. The hosted migration was not applied during this implementation.
 
 ## Supabase Persistence
 
@@ -486,7 +540,7 @@ The lookup:
 - The previous "All completed" route/control has been removed for now.
 - The active shelf is controlled with a two-option segmented control.
 - The add/edit form opens as a modal sheet instead of living as a permanent sidebar.
-- A floating add button is available on shelf views.
+- The elevated Add button in the bottom pill is available on shelf views.
 - Completed items show ratings; planned items do not.
 - Want items can be moved to Completed from the shelf cards or detail overlay; the app asks for a rating before saving the move.
 - Delete actions use a confirmation dialog before removing an item.
@@ -502,10 +556,8 @@ The lookup:
 - Apply `supabase/migrations/20261020010000_add_finished_month.sql` to existing Supabase databases before deploying date tracking. It includes both date columns and preserves existing exact dates. No historical completion dates are inferred automatically from `status_changed_at` or `added_at`; the account-specific script in `supabase/scripts` is an explicitly authorized exception and skips existing month-only dates too.
 
 - Add import/export JSON for backups.
-- Add sorting controls, such as rating, title, or recently added.
-- Add validation or image preview error handling for broken cover URLs.
+- Add monthly/yearly recaps using `finishedOn`, preserving exact/month-only precision and keeping unknown completion dates explicit.
 - Persist external source ids/source metadata in Supabase if refresh-metadata workflows become important.
 - Keep extracting focused hooks/components from `src/App.jsx` as new workflows grow.
-- Add tests with Vitest and React Testing Library.
-- Add email/password login as an optional Supabase Auth method if users need a more conventional sign-in path.
+- Expand component/interaction coverage with Vitest and React Testing Library; the existing date/navigation tests use the Node test runner.
 - Add a future `media_titles` table if shared canonical media metadata, global stats, or recommendations become product priorities.

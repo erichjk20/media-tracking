@@ -51,6 +51,19 @@ Check these titles:
 - Existing Supabase databases must have the new migration applied before deployment.
 - On an older database without `finished_month`, edits with exact or unknown dates must still save. Month-only saves must give a visible error next to Save without discarding the selected month or other edits.
 
+## History
+
+- Open Profile → History below media totals. Back to profile focuses the History entry; History starts at the top with a focused heading. Profile remains highlighted in the global header; the bottom menu still contains shelves only.
+- A year shows the completion total and monthly groups, newest first. All four media types, including hidden shelves, appear. Want items never appear.
+- Year choices include the current year and populated historical years. Month selection restricts the timeline and total; media filters further narrow it. Filter counts describe the selected period across media types.
+- Exact and month-only dates both group into their recorded month, with no fabricated day or time-zone shift. Dates reflect completion, not when an item was logged or moved shelves.
+- Date unknown expands separately across all years, respects the media filter, and does not contribute to dated totals. Invalid/legacy missing dates never fall back to logged timestamps.
+- Open a title and edit its date: the timeline, available years, counts, and unknown group update. Moving it back to Want or deleting it removes it from History.
+- Recent reloads restore History and year/month/media filters. Cold opens still start on Home. Test empty libraries, unknown-only libraries, empty periods, and media filters with no matches.
+- Check 320px/375px phones and desktop: no horizontal overflow, long titles use up to two lines, creators stay on one truncated line, fallback covers fit, controls remain reachable, and the bottom menu does not obscure the last item.
+- The completion summary is a compact line stating the total and selected year/month, rather than a large card with a repeated year label. Check that the tighter top spacing brings the first card above the floating navigation at typical phone sizes.
+- Check History controls at 320px–1280px and 200% text size: dropdown text has reserved arrow space, chevrons sit inside the border with a visible inset, buttons retain at least 44px height, and selectors wrap when needed. Verify the native select menu and Date unknown disclosure still work.
+
 ## Profile and Settings
 
 - Profile shows a compact name/avatar header with a Settings gear; library stats appear directly below. Display-name inputs, email, shelf customization, and Sign out live in Settings.

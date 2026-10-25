@@ -19,16 +19,21 @@ const defaultUiState = {
   shelfView: "grid",
   sortOrder: "recent",
   query: "",
+  historyYear: "",
+  historyMonth: "all",
+  historyCategory: "all",
 };
 
 const allowedUiValues = {
-  activeView: ["home", "library", "profile", "settings"],
+  activeView: ["home", "library", "profile", "settings", "history"],
   activeCategory: categories.map((category) => category.id),
   activeStatus: statuses,
   activeBookSubtype: bookSubtypeOptions.map((option) => option.value),
   activeTvSubtype: tvSubtypeOptions.map((option) => option.value),
   shelfView: ["grid", "list"],
   sortOrder: sortOptions.map((option) => option.value),
+  historyMonth: ["all", ...Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))],
+  historyCategory: ["all", ...categories.map((category) => category.id)],
 };
 
 function getAllowedValue(value, allowedValues, fallback) {
@@ -59,6 +64,9 @@ function getStoredUiState() {
       shelfView: getAllowedValue(parsedState.shelfView, allowedUiValues.shelfView, defaultUiState.shelfView),
       sortOrder: getAllowedValue(parsedState.sortOrder, allowedUiValues.sortOrder, defaultUiState.sortOrder),
       query: typeof parsedState.query === "string" ? parsedState.query : defaultUiState.query,
+      historyYear: /^(?!0000)\d{4}$/.test(parsedState.historyYear || "") ? parsedState.historyYear : defaultUiState.historyYear,
+      historyMonth: getAllowedValue(parsedState.historyMonth, allowedUiValues.historyMonth, defaultUiState.historyMonth),
+      historyCategory: getAllowedValue(parsedState.historyCategory, allowedUiValues.historyCategory, defaultUiState.historyCategory),
     };
   } catch {
     return defaultUiState;
@@ -75,6 +83,9 @@ export function usePersistentUiState() {
   const [shelfView, setShelfView] = useState(initialUiState.shelfView);
   const [sortOrder, setSortOrder] = useState(initialUiState.sortOrder);
   const [query, setQuery] = useState(initialUiState.query);
+  const [historyYear, setHistoryYear] = useState(initialUiState.historyYear);
+  const [historyMonth, setHistoryMonth] = useState(initialUiState.historyMonth);
+  const [historyCategory, setHistoryCategory] = useState(initialUiState.historyCategory);
 
   useEffect(() => {
     const nextUiState = {
@@ -86,6 +97,9 @@ export function usePersistentUiState() {
       shelfView,
       sortOrder,
       query,
+      historyYear,
+      historyMonth,
+      historyCategory,
       lastActiveAt: Date.now(),
     };
 
@@ -96,6 +110,9 @@ export function usePersistentUiState() {
     activeStatus,
     activeTvSubtype,
     activeView,
+    historyYear,
+    historyMonth,
+    historyCategory,
     query,
     shelfView,
     sortOrder,
@@ -107,12 +124,18 @@ export function usePersistentUiState() {
     activeStatus,
     activeTvSubtype,
     activeView,
+    historyYear,
+    historyMonth,
+    historyCategory,
     query,
     setActiveBookSubtype,
     setActiveCategory,
     setActiveStatus,
     setActiveTvSubtype,
     setActiveView,
+    setHistoryYear,
+    setHistoryMonth,
+    setHistoryCategory,
     setQuery,
     setShelfView,
     setSortOrder,

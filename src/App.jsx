@@ -6,6 +6,7 @@ import CompleteItemDialog from "./components/CompleteItemDialog";
 import DeleteItemDialog from "./components/DeleteItemDialog";
 import EditorSheet from "./components/EditorSheet";
 import HomeView from "./components/HomeView";
+import HistoryView from "./components/HistoryView";
 import LibraryView from "./components/LibraryView";
 import MediaDetailOverlay from "./components/MediaDetailOverlay";
 import ProfileView from "./components/ProfileView";
@@ -68,12 +69,18 @@ function App() {
     activeStatus,
     activeTvSubtype,
     activeView,
+    historyYear,
+    historyMonth,
+    historyCategory,
     query,
     setActiveBookSubtype,
     setActiveCategory,
     setActiveStatus,
     setActiveTvSubtype,
     setActiveView,
+    setHistoryYear,
+    setHistoryMonth,
+    setHistoryCategory,
     setQuery,
     setShelfView,
     setSortOrder,
@@ -93,6 +100,7 @@ function App() {
   const [completionError, setCompletionError] = useState("");
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [pendingLookupResult, setPendingLookupResult] = useState(null);
+  const [focusProfileHistory, setFocusProfileHistory] = useState(false);
   const user = session?.user || null;
   const userId = user?.id || null;
   const userEmail = user?.email || "";
@@ -513,6 +521,7 @@ function App() {
   }
 
   function showProfile() {
+    setFocusProfileHistory(false);
     setActiveView("profile");
   }
 
@@ -645,12 +654,30 @@ function App() {
         ) : activeView === "profile" ? (
           <ProfileView
             key={user?.id || "local"}
+            focusHistory={focusProfileHistory}
             metrics={libraryMetrics}
             onOpenItem={openItemDetails}
+            onShowHistory={() => setActiveView("history")}
             onShowSettings={() => setActiveView("settings")}
             onShowCategory={showCategory}
             profile={currentProfile}
             user={user}
+          />
+        ) : activeView === "history" ? (
+          <HistoryView
+            key={user?.id || "local"}
+            items={items}
+            year={historyYear}
+            month={historyMonth}
+            category={historyCategory}
+            onYearChange={setHistoryYear}
+            onMonthChange={setHistoryMonth}
+            onCategoryChange={setHistoryCategory}
+            onBack={() => {
+              setFocusProfileHistory(true);
+              setActiveView("profile");
+            }}
+            onOpenItem={openItemDetails}
           />
         ) : activeView === "settings" ? (
           <SettingsView

@@ -10,7 +10,7 @@ function AppHeader({
   onHomeClick,
   onShowProfile,
 }) {
-  const isProfileActive = activeView === "profile" || activeView === "settings";
+  const isProfileActive = ["profile", "settings", "history"].includes(activeView);
   const hasAddMenu = Boolean(onAddSearchClick && onAddManualClick);
 
   return (

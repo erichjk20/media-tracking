@@ -68,7 +68,7 @@ function LibraryView({
       <div className="min-w-0">
         <div className="border-b border-stone-300 pb-3 dark:border-white/10">
           <div>
-            <h2 className="text-[1.65rem] font-semibold leading-tight text-stone-950 dark:text-[#eee9df] sm:text-3xl">{category.label}</h2>
+            <h2 className="text-[1.375rem] font-semibold leading-tight text-stone-950 dark:text-[#eee9df] sm:text-2xl">{category.label}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-600 dark:text-stone-400">
               <span>
                 {doneCount} done, {wantCount} want

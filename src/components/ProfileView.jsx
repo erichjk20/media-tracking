@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Library, Settings, UserRound } from "lucide-react";
+import { ChevronRight, History, Library, Settings, UserRound } from "lucide-react";
 import { statusLabels } from "../lib/mediaConfig";
 import MediaCover from "./MediaCover";
 
@@ -8,14 +8,17 @@ function formatAverageRating(value) {
 }
 
 function ProfileView({
+  focusHistory = false,
   metrics,
   onOpenItem,
+  onShowHistory,
   onShowSettings,
   onShowCategory,
   profile,
   user,
 }) {
   const settingsButtonRef = useRef(null);
+  const historyButtonRef = useRef(null);
   const shownName = profile?.display_name || "Your profile";
   const completedPercent = metrics.totalCount
     ? Math.round((metrics.completedCount / metrics.totalCount) * 100)
@@ -23,8 +26,9 @@ function ProfileView({
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    settingsButtonRef.current?.focus({ preventScroll: true });
-  }, []);
+    const focusTarget = focusHistory ? historyButtonRef : settingsButtonRef;
+    focusTarget.current?.focus({ preventScroll: true });
+  }, [focusHistory]);
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
@@ -108,6 +112,21 @@ function ProfileView({
                 ))}
               </div>
             </section>
+
+            <button
+              ref={historyButtonRef}
+              className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[#181715] p-4 text-left transition hover:border-shelf-accent-bright/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-shelf-accent-soft"
+              onClick={onShowHistory}
+              type="button"
+              aria-label="History"
+            >
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-shelf-accent-deep/15 text-shelf-accent-soft"><History size={20} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-stone-100">History</span>
+                <span className="mt-1 block text-xs leading-5 text-stone-400">Revisit what you finished, month by month.</span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-stone-500" />
+            </button>
 
             <section className="rounded-lg border border-white/10 bg-[#181715] p-4 shadow-sm">
               <h3 className="text-lg font-semibold text-[#eee9df]">Recently added</h3>

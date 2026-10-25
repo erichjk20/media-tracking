@@ -20,6 +20,12 @@ Hidden shelves retain their items and remain accessible through Profile's media 
 
 Signed-in preferences are stored on the user's profile and load on other devices at sign-in/reload. Local demo preferences stay in this browser. For an existing Supabase database, run `supabase/migrations/20261020020000_add_navigation_shelves.sql` before using cloud customization. Existing profiles receive the current four-shelf order. Without the migration, browsing uses defaults and customization saves show an actionable error. New databases include the field and validation in `supabase/schema.sql`.
 
+## History
+
+Open **Profile → History** to revisit finished media across all four categories, including hidden shelves. Choose a year to see its completion total and titles grouped by month, newest first. Select a month for a monthly recap, or a media type to narrow the timeline. The counts beside media filters describe the selected year/month; the main total reflects the selected media type too. The year selector includes the current year and any years with finished titles.
+
+History uses the watched/finished date, never the logged date. Month-only dates join their month without inventing a day. **Date unknown** is a separate expandable group across all years, filtered by media type and excluded from dated totals. Open any title to view or edit it; adding or changing a finished date immediately updates History. Recent reloads restore History and its filters; cold opens still start on Home. No additional database migration is needed beyond the existing date-tracking migrations. Richer/shareable recaps are not implemented yet.
+
 ## Supabase Setup
 
 1. Create a Supabase project.
@@ -46,7 +52,7 @@ For an existing database, run `supabase/migrations/20261020010000_add_finished_m
 
 Items keep their original added timestamp and a separate optional finished date with exact-day or month precision. New entries added directly to Done default to an unknown finished date, including when switching shelves before saving a new item. Moving an existing Want item → Done defaults to today in the user's local time zone. The date controls offer Exact date, Month & year, Don't remember, and a Today shortcut. Month-only dates display as October 2024 and are stored in `finished_month` as `YYYY-MM`; exact dates use `finished_on`. No day is invented when a user knows only the month. Moving back to Want clears either finished date. Ordinary edits preserve dates and their precision; legacy completion dates remain unknown until supplied by the user.
 
-Shelf cards keep dates out of both list and grid layouts. Open an item's details to see Watched/Finished for Done items, with the original Logged date as secondary text, or Added for Want items. Unknown completion dates never fall back to the logged date. The separate finished date supports future monthly/yearly recaps; recap views are not implemented yet.
+Shelf cards keep dates out of both list and grid layouts. Open an item's details to see Watched/Finished for Done items, with the original Logged date as secondary text, or Added for Want items. Unknown completion dates never fall back to the logged date. History groups finished titles by this separate completion date for monthly and yearly browsing.
 
 Before the month-column migration is applied, ordinary edits with exact or unknown dates remain supported. Month-only saves require the migration and show an error beside Save if it is missing; failed saves preserve the form's edits.
 

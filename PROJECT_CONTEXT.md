@@ -40,9 +40,10 @@ The main app supports:
 - A command-style homepage for choosing media type, then quickly searching and logging new media through the add sheet
 - Email/password signup and sign-in when Supabase is configured
 - Private per-user libraries backed by Supabase Auth and row-level security
-- Home/Library/Profile/Settings view switching
+- Home/Library/Profile/Settings/History view switching
 - Refresh restoration for the last active view, category, shelf filters, sort, layout mode, and search query
 - Category switching
+- Media shelf headings share `LibraryView.jsx` styling across Books, Movies, TV Shows, and Manga: 22px on mobile and 24px from the `sm` breakpoint, with semibold weight and tight line height. This reduces their previous sizes by about 17%/20% so the centered shelvd wordmark stays visually prominent.
 - A blended, divider-free header with a centered wordmark, top-right Profile, and a neutral top-left Add menu on Library views; bottom navigation contains equal-width shelf shortcuts only.
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
@@ -68,7 +69,8 @@ The main app supports:
 - Star rating input for Completed items only
 - Quick completion flow that moves Want items to Completed with a rating
 - Added and watched/finished dates shown in item details, with unknown historical dates labeled explicitly
-- Shelf cards omit activity dates in both list and grid layouts. Item details show Watched/Finished for Done items and Added for Want items. Done details keep Logged as smaller secondary text below the content. Unknown finished dates never fall back to logged dates; future recap grouping should use `finishedOn`.
+- Shelf cards omit activity dates in both list and grid layouts. Item details show Watched/Finished for Done items and Added for Want items. Done details keep Logged as smaller secondary text below the content. Unknown finished dates never fall back to logged dates; History groups by `finishedOn`.
+- Profile → History provides year/month selectors, media filters with period counts, a filtered completion total, and monthly groups of finished titles across all four categories, including hidden shelves. Current and populated years are available, newest first. Exact and month-only dates retain precision; unknown dates appear separately across all years and never enter dated totals. Titles open the existing detail/edit flows. Recent reloads restore History and its filters; cold opens still start on Home. No new schema changes.
 - Optional finished date in the add/edit sheet and quick completion dialog: Exact date, Month & year, Don't remember, and a Today shortcut. New Done entries default to unknown; moving an existing Want item → Done defaults to local today. App `finishedOn` is `YYYY-MM-DD` for exact dates or `YYYY-MM` for month-only dates. Supabase stores these separately in `finished_on date` and `finished_month text`, with a constraint preventing both being populated. Month-only dates display as October 2024 with no invented day. Backdating is supported, ordinary edits preserve precision, and returning to Want clears both.
 - Starter sample data across the library
 
@@ -201,7 +203,7 @@ Both are ignored by Git.
 
 `src/hooks/usePersistentUiState.js`
 
-- Persists Home, Library, Profile, and Settings plus library filters in `media-shelf-ui-state`. Restores views saved within 30 minutes; older/cold opens start on Home. Navigation preferences are stored separately on the profile.
+- Persists Home, Library, Profile, Settings, and History plus library/history filters in `media-shelf-ui-state`. Restores views saved within 30 minutes; older/cold opens start on Home. Navigation preferences are stored separately on the profile.
 
 `src/components/`
 
@@ -212,6 +214,7 @@ Both are ignored by Git.
 - `AppHeader.jsx` handles the centered brand-home layout, top-right Profile action, and placement of the contextual top-left Add menu on Library views. Its transparent, divider-free background exposes the page gradient while retaining backdrop blur and mobile sticky behavior. The tagline is desktop-only. Profile remains highlighted on Settings, which has an explicit Back to profile action.
 - `HeaderAddMenu.jsx` owns the Add trigger, Search title / Manual entry actions, menu state, outside dismissal, and keyboard/focus behavior. It remounts when the current category label changes, closing any open menu. The neutral 44px trigger has a bright white 24px plus and visible border; there is no floating or bottom-nav Add action.
 - `ProfileView.jsx` owns the compact identity header, Settings gear, library totals, all-category breakdown, and recently added items.
+- `HistoryView.jsx` owns the year/month selectors, media filters, completion totals, monthly timeline, and expandable undated group. `src/lib/mediaHistory.js` derives groups and totals using finished dates only. Profile links to History below media totals; Back to profile restores focus to that entry. History keeps Profile highlighted in the header and no active shelf in the bottom menu.
 - `SettingsView.jsx` owns Library/Account groups, the selected-shelf summary, display-name editing, read-only email, and Sign out. Local demo mode omits email and Sign out. Save/sign-out errors stay beside their actions; failed saves retain edits.
 - `CustomizeShelvesSheet.jsx` owns the selected/hidden shelf lists, Pointer Events dragging, accessible Move up/down controls, live menu preview, and draft Save/Cancel/Reset behavior. It traps keyboard focus and returns focus to the Customize shelves row when dismissed.
 - `EditorSheet.jsx` owns the add/edit form, including the fast shelf selector and cover preview/override controls.
@@ -335,6 +338,10 @@ npm test
 ```
 
 After the customizable-navigation and Profile/Settings updates, `npm run lint`, all 22 Node tests, `npm run build`, and `git diff --check` passed. Browser checks covered 320px/375px phone and 1280px desktop layouts, touch/keyboard reordering, modal focus, save failure/retry, hidden-shelf access, Home fallback, and recent/cold view restoration. Signed-in name/sign-out flows, second-device preference loading, and account switching were checked with a mocked backend. Isolated PostgreSQL checks covered migration reruns, array validation, new-profile defaults, and profile ownership policies. These checks did not change the hosted database; use `QA_CHECKLIST.md` for deployment/device verification.
+
+After adding History, `npm run lint`, all 28 Node tests, `npm run build`, and `git diff --check` passed. Six History tests cover year options, monthly grouping, intersecting filters, unknown dates, date/status changes, and time-zone boundaries. Isolated local-demo browser checks covered 320px/375px/1280px layouts, long-title/fallback-cover overflow, Profile/History navigation and focus, hidden shelves, period/media filters, recent reload restoration, malformed filters, cold Home restoration, empty/unknown-only/Want-only libraries, and editing an undated title into a month-only completion. No browser errors were reported. No hosted data or schema was changed.
+
+History control spacing uses native selects with custom, inset chevrons and reserved text padding. The selectors wrap at constrained widths; filter buttons and icons resist shrinking, and disclosure controls have internal padding. The completion summary is an inline count with the selected period; tighter top spacing brings the timeline higher on phones. History titles allow two lines while creators stay on one truncated line. Follow-up browser checks at 320px, 375px, 500px, 640px, and 1280px with 100%/200% text verified arrow bounds, selected-text fit, button height, and control overflow. Lint and build passed after the spacing and density adjustments.
 
 ## Profile, Settings, And Navigation Preferences
 
@@ -559,7 +566,7 @@ The lookup:
 - Apply `supabase/migrations/20261020010000_add_finished_month.sql` to existing Supabase databases before deploying date tracking. It includes both date columns and preserves existing exact dates. No historical completion dates are inferred automatically from `status_changed_at` or `added_at`; the account-specific script in `supabase/scripts` is an explicitly authorized exception and skips existing month-only dates too.
 
 - Add import/export JSON for backups.
-- Add monthly/yearly recaps using `finishedOn`, preserving exact/month-only precision and keeping unknown completion dates explicit.
+- Extend History with richer/shareable monthly and yearly recaps; basic dated totals and monthly browsing are implemented. Preserve exact/month-only precision and keep unknown completion dates explicit.
 - Persist external source ids/source metadata in Supabase if refresh-metadata workflows become important.
 - Keep extracting focused hooks/components from `src/App.jsx` as new workflows grow.
 - Expand component/interaction coverage with Vitest and React Testing Library; the existing date/navigation tests use the Node test runner.
@@ -572,3 +579,4 @@ The lookup:
 - Home/auth layouts, library data, saved preferences, and schema are unchanged. Games and More navigation remain future possibilities; the app still has four media categories.
 - Reverting remains supported. The complete layout/refactor is grouped in the commit titled `Refine header and shelf navigation`; use a new Git revert commit after publication to undo it without rewriting shared history. The pre-change baseline is `10372c3`. Local original-file snapshots and the full trial patch also live under `.git/codex-ui-trials/header-add-20261025/`; the manifest includes the new `src/components/HeaderAddMenu.jsx` file that must be removed when restoring the original snapshots. Intermediate colored-button, divider, and background versions are saved in that directory for reverting individual styling changes.
 - Validation after component extraction: `npm run lint`, all 22 Node tests, `npm run build`, and `git diff --check` passed. Browser checks covered one to four shelves at 320px, 375px, and 1280px, centered wordmark, equal-width touch targets, no horizontal overflow, keyboard/outside menu dismissal, Manual entry, Search title, category context, Profile/Settings, and local customization save/reload. No hosted database changes were made.
+- Follow-up typography adjustment: reduced every media shelf heading from 26.4px to 22px on mobile and from 30px to 24px on larger screens, retaining its weight. Validation for the combined History and heading changes: all 28 Node tests, lint, production build, and `git diff --check` passed.

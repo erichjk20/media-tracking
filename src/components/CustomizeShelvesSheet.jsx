@@ -140,9 +140,10 @@ function CustomizeShelvesSheet({ shelves, onSave, onClose }) {
         </div>
 
         <div className="mt-5 rounded-xl border border-white/5 bg-[#100f0d] px-1 py-4">
-          <p className="mb-6 text-center text-xs font-semibold uppercase tracking-widest text-stone-500">Menu preview</p>
+          <p className="mb-3 text-center text-xs font-semibold uppercase tracking-widest text-stone-500">Menu preview</p>
           <div aria-hidden="true"><ShelfNavigationPill orderedCategories={orderedCategories} activeCategory={selected[0]} activeView="library" preview /></div>
-          <p className="sr-only">Menu order: {selected.length === 1 ? `${byId[selected[0]].label}, Add` : [...selected.slice(0, Math.ceil(selected.length / 2)).map((id) => byId[id].label), "Add", ...selected.slice(Math.ceil(selected.length / 2)).map((id) => byId[id].label)].join(", ")}</p>
+          <p className="sr-only">Menu order: {orderedCategories.map((entry) => entry.label).join(", ")}</p>
+          <p className="mt-3 text-center text-xs text-stone-400">Add titles using + in the library header.</p>
         </div>
 
         <h3 className="mb-2 mt-5 text-sm font-semibold">Shown shelves</h3>

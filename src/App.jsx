@@ -144,6 +144,7 @@ function App() {
     () => items.find((item) => item.id === selectedItemId) || null,
     [items, selectedItemId],
   );
+  const canAddFromLibrary = activeView === "library" && !isEditorOpen && !selectedItem;
   const lookupExistingItems = useMemo(
     () => items.filter((item) => item.category === draft.category && item.id !== editingId),
     [draft.category, editingId, items],
@@ -611,6 +612,9 @@ function App() {
         {activeView !== "home" && (
           <AppHeader
             activeView={activeView}
+            addLabel={getAddLabel(activeCategory)}
+            onAddManualClick={canAddFromLibrary ? () => startAddItem("manual") : undefined}
+            onAddSearchClick={canAddFromLibrary ? () => startAddItem("search") : undefined}
             onHomeClick={showHome}
             onShowProfile={showProfile}
           />
@@ -756,9 +760,6 @@ function App() {
           orderedCategories={orderedCategories}
           activeCategory={activeCategory}
           activeView={activeView}
-          addLabel={getAddLabel(activeCategory)}
-          onAddManualClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("manual") : undefined}
-          onAddSearchClick={activeView === "library" && !isEditorOpen && !selectedItem ? () => startAddItem("search") : undefined}
           onShowCategory={showCategory}
         />
       )}

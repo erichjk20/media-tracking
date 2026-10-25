@@ -43,6 +43,7 @@ The main app supports:
 - Home/Library/Profile/Settings view switching
 - Refresh restoration for the last active view, category, shelf filters, sort, layout mode, and search query
 - Category switching
+- A blended, divider-free header with a centered wordmark, top-right Profile, and a neutral top-left Add menu on Library views; bottom navigation contains equal-width shelf shortcuts only.
 - Shelf switching between Completed and Want to Watch/Read
 - Add, edit, and delete media items
 - Delete confirmation before removing media items
@@ -140,6 +141,7 @@ Tracked/source files:
     │   ├── DetailsLookup.jsx
     │   ├── EditorSheet.jsx
     │   ├── FinishedDateField.jsx
+    │   ├── HeaderAddMenu.jsx
     │   ├── HomeSearchSuggestions.jsx
     │   ├── HomeView.jsx
     │   ├── LibraryView.jsx
@@ -206,8 +208,9 @@ Both are ignored by Git.
 - Contains reusable UI components for the header, bottom navigation, homepage, library, shelf controls, media cards, rating input, editor sheet, and details lookup panel.
 - `AuthView.jsx` owns email/password signup, login, and password reset flows.
 - `HomeView.jsx` owns homepage command state and lookup handoff. Its category selector shares the selected shelves/order with the bottom nav; the default is Books, Manga, Movies, TV.
-- `BottomNav.jsx` owns the mobile fixed pill navigation. The default order is Books, Manga, center Add, Movies, TV; user-selected shelf order comes from Settings preferences. `ShelfNavigationPill.jsx` shares the responsive layout with the customization preview. Profile lives in the top-right header action instead of the pill.
-- `AppHeader.jsx` owns the compact app header, brand-home action, and top-right Profile action. The Profile action remains highlighted on Settings, which has an explicit Back to profile action.
+- `BottomNav.jsx` owns the mobile fixed pill navigation. The default order is Books, Manga, Movies, TV; user-selected shelf order comes from Settings preferences. The pill contains only equal-width shelf tabs and shrinks with fewer selections. `ShelfNavigationPill.jsx` shares the responsive layout with the customization preview. Profile lives in the top-right header action instead of the pill.
+- `AppHeader.jsx` handles the centered brand-home layout, top-right Profile action, and placement of the contextual top-left Add menu on Library views. Its transparent, divider-free background exposes the page gradient while retaining backdrop blur and mobile sticky behavior. The tagline is desktop-only. Profile remains highlighted on Settings, which has an explicit Back to profile action.
+- `HeaderAddMenu.jsx` owns the Add trigger, Search title / Manual entry actions, menu state, outside dismissal, and keyboard/focus behavior. It remounts when the current category label changes, closing any open menu. The neutral 44px trigger has a bright white 24px plus and visible border; there is no floating or bottom-nav Add action.
 - `ProfileView.jsx` owns the compact identity header, Settings gear, library totals, all-category breakdown, and recently added items.
 - `SettingsView.jsx` owns Library/Account groups, the selected-shelf summary, display-name editing, read-only email, and Sign out. Local demo mode omits email and Sign out. Save/sign-out errors stay beside their actions; failed saves retain edits.
 - `CustomizeShelvesSheet.jsx` owns the selected/hidden shelf lists, Pointer Events dragging, accessible Move up/down controls, live menu preview, and draft Save/Cancel/Reset behavior. It traps keyboard focus and returns focus to the Customize shelves row when dismissed.
@@ -338,7 +341,7 @@ After the customizable-navigation and Profile/Settings updates, `npm run lint`, 
 - The global header opens Profile. Profile focuses on identity and library activity; its gear opens Settings. Back to profile returns to the compact header and focuses the gear. Settings stays outside the customizable bottom menu.
 - Settings → Library → Customize shelves lets users select/reorder one to four media categories. All four are selected initially, ordered Books, Manga, Movies, TV; there is no onboarding prompt.
 - The sheet uses a local draft. Its preview shares the actual menu layout; Save applies changes only after persistence succeeds. Cancel, Close, or Escape discard edits. Reset restores defaults in the draft until Save is pressed.
-- Two to four shelves keep Add centered: one/two shelves on each side as appropriate, with three using two left and one right in equal-width side groups. One shelf uses a compact shelf-and-Add pair. Add retains the current shelf's Search title/Manual entry flow and is available on Library views.
+- One to four shelves form a shelf-only pill with equal-width tabs; the pill shrinks with fewer selections. Add lives at the top-left of the centered-logo header on Library views and retains the current shelf's Search title/Manual entry flow. Profile remains top-right. The mobile header omits the tagline.
 - Home uses the same shelf selection/order without Add. Entering Home from a hidden category chooses the first selected shelf and clears old-category lookup results. Saving preferences also falls back if the current category was hidden.
 - Hiding a shortcut never deletes media or removes a category from Profile stats, recently added items, or editor category choices. Hidden shelves remain accessible through Profile and recent Library reloads; no bottom tab is active while viewing them.
 - Account preferences use `user_profiles.navigation_shelves`, a non-null `text[]` with one to four unique IDs from `books`, `manga`, `movies`, `tv`. The database default is `['books', 'manga', 'movies', 'tv']`. Existing profile ownership policies apply. Signed-in preferences load across devices at sign-in/reload; local demo preferences stay in this browser.
@@ -531,8 +534,8 @@ The lookup:
 - Shelf browsing supports a list view and a poster grid view.
 - Poster grid view keeps at least three columns on narrow screens.
 - Mobile category switching uses a fixed bottom navigation bar.
-- The mobile bottom navigation defaults to Books, Manga, Add, Movies, TV. Users can choose/reorder one to four shelves through Profile → Settings → Library → Customize shelves. The pill shrinks with fewer shelves; Add stays centered with two to four shelves, while one shelf uses a compact shelf-and-Add pair. Three shelves use two left of Add and one right, in equal-width side groups.
-- The center Add action is a slightly elevated circular button with a dark outline/socket treatment and opens Search title / Manual entry actions from the pill.
+- The mobile bottom navigation defaults to Books, Manga, Movies, TV. Users can choose/reorder one to four shelves through Profile → Settings → Library → Customize shelves. The pill contains equal-width shelf tabs and shrinks with fewer selections; the customization preview uses the same layout.
+- Add is a neutral top-left header action with a bright white plus, visible border, centered wordmark, and top-right Profile. It opens Search title / Manual entry below the trigger. Add and Profile use matching 44px button sizes. The tagline is hidden on phones. The header blends into the page with a transparent background and no divider; backdrop blur and mobile sticky positioning remain.
 - Profile access lives in the top-right app header, not in the bottom pill.
 - The Home category selector mirrors the user's selected bottom-nav shelves and order without the Add action. Entering Home from a hidden shelf selects the first visible shelf. Hidden library destinations, including recent-page restores, remain valid.
 - Home/auth wordmark screens reserve iOS safe-area space so the `shelvd` mark stays below the translucent status-bar blur on devices using `viewport-fit=cover`.
@@ -540,7 +543,7 @@ The lookup:
 - The previous "All completed" route/control has been removed for now.
 - The active shelf is controlled with a two-option segmented control.
 - The add/edit form opens as a modal sheet instead of living as a permanent sidebar.
-- The elevated Add button in the bottom pill is available on shelf views.
+- The top-left header Add menu is available on shelf views.
 - Completed items show ratings; planned items do not.
 - Want items can be moved to Completed from the shelf cards or detail overlay; the app asks for a rating before saving the move.
 - Delete actions use a confirmation dialog before removing an item.
@@ -561,3 +564,11 @@ The lookup:
 - Keep extracting focused hooks/components from `src/App.jsx` as new workflows grow.
 - Expand component/interaction coverage with Vitest and React Testing Library; the existing date/navigation tests use the Node test runner.
 - Add a future `media_titles` table if shared canonical media metadata, global stats, or recommendations become product priorities.
+
+## Header And Shelf Navigation — October 25, 2026
+
+- Approved design: centered wordmark, neutral top-left Add on Library, top-right Profile, transparent divider-free header, desktop-only tagline, and a shelf-only bottom pill. One to four selected shelves get equal-width tabs and a pill that shrinks with the count. Four shelves remain the default; no extra minimum is imposed.
+- `AppHeader` owns header layout; `HeaderAddMenu` owns Add interaction; `BottomNav` places the shared `ShelfNavigationPill`, which also renders the customization preview. `App` determines when contextual Add is available and connects the existing search/manual flows.
+- Home/auth layouts, library data, saved preferences, and schema are unchanged. Games and More navigation remain future possibilities; the app still has four media categories.
+- Reverting remains supported. The complete layout/refactor is grouped in the commit titled `Refine header and shelf navigation`; use a new Git revert commit after publication to undo it without rewriting shared history. The pre-change baseline is `10372c3`. Local original-file snapshots and the full trial patch also live under `.git/codex-ui-trials/header-add-20261025/`; the manifest includes the new `src/components/HeaderAddMenu.jsx` file that must be removed when restoring the original snapshots. Intermediate colored-button, divider, and background versions are saved in that directory for reverting individual styling changes.
+- Validation after component extraction: `npm run lint`, all 22 Node tests, `npm run build`, and `git diff --check` passed. Browser checks covered one to four shelves at 320px, 375px, and 1280px, centered wordmark, equal-width touch targets, no horizontal overflow, keyboard/outside menu dismissal, Manual entry, Search title, category context, Profile/Settings, and local customization save/reload. No hosted database changes were made.

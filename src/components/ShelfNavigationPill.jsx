@@ -1,7 +1,6 @@
-import { Plus } from "lucide-react";
 import { getNavigationLayout } from "../lib/navigationPreferences";
 
-function ShelfNavigationPill({ orderedCategories, activeCategory, activeView, onShowCategory, preview = false, children }) {
+function ShelfNavigationPill({ orderedCategories, activeCategory, activeView, onShowCategory, preview = false }) {
   const layout = getNavigationLayout(orderedCategories.map((entry) => entry.id));
   const byId = Object.fromEntries(orderedCategories.map((entry) => [entry.id, entry]));
 
@@ -22,13 +21,9 @@ function ShelfNavigationPill({ orderedCategories, activeCategory, activeView, on
   return (
     <div
       className="mx-auto grid h-16 w-[calc(100%-1rem)] items-center gap-1 overflow-visible rounded-full border border-white/[0.08] bg-[#14120f]/[0.9] px-1.5 py-1 shadow-[0_12px_34px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-      style={{ maxWidth: layout.maxWidth, gridTemplateColumns: layout.compact ? "1fr 1fr" : "minmax(0, 1fr) 3.5rem minmax(0, 1fr)" }}
+      style={{ maxWidth: layout.maxWidth, gridTemplateColumns: layout.gridTemplateColumns }}
     >
-      <div className="flex min-w-0 gap-1">{layout.left.map(renderShelf)}</div>
-      {preview ? (
-        <span className="flex justify-center"><span className="flex h-[3.25rem] w-[3.25rem] -translate-y-2.5 items-center justify-center rounded-full border-[5px] border-[#0d0c0b] bg-shelf-accent text-white ring-1 ring-white/10"><Plus size={24} strokeWidth={2.6} /></span></span>
-      ) : children}
-      {!layout.compact && <div className="flex min-w-0 gap-1">{layout.right.map(renderShelf)}</div>}
+      {layout.shelves.map(renderShelf)}
     </div>
   );
 }

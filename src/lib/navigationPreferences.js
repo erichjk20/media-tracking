@@ -26,12 +26,10 @@ export function moveNavigationShelf(value, id, destination) {
 
 export function getNavigationLayout(value) {
   const shelves = normalizeNavigationShelves(value);
-  const split = Math.ceil(shelves.length / 2);
   return {
-    left: shelves.slice(0, split),
-    right: shelves.slice(split),
-    compact: shelves.length === 1,
-    maxWidth: ({ 1: "10rem", 2: "15rem", 3: "20rem", 4: "24rem" })[shelves.length],
+    shelves,
+    gridTemplateColumns: `repeat(${shelves.length}, minmax(0, 1fr))`,
+    maxWidth: `${shelves.length * 6}rem`,
   };
 }
 

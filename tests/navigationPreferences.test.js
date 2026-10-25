@@ -121,18 +121,13 @@ test("reordering moves shelves without mutating its input and clamps positions",
   assert.deepEqual(initial, defaultNavigationShelves);
 });
 
-test("all menu counts preserve shelf order and the centered Add layout", () => {
-  const cases = [
-    [["tv"], ["tv"], [], true],
-    [["tv", "books"], ["tv"], ["books"], false],
-    [["tv", "books", "manga"], ["tv", "books"], ["manga"], false],
-    [["tv", "books", "manga", "movies"], ["tv", "books"], ["manga", "movies"], false],
-  ];
-  for (const [shelves, left, right, compact] of cases) {
+test("all menu counts retain shelf order in a shelf-only row", () => {
+  const order = ["tv", "books", "manga", "movies"];
+  for (let count = 1; count <= order.length; count += 1) {
+    const shelves = order.slice(0, count);
     const layout = getNavigationLayout(shelves);
-    assert.deepEqual(layout.left, left);
-    assert.deepEqual(layout.right, right);
-    assert.equal(layout.compact, compact);
+    assert.deepEqual(layout.shelves, shelves);
+    assert.equal(layout.shelves.length, count);
   }
 });
 
